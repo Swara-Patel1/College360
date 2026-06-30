@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance — EduPulse</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <a class="sidebar-brand" href="../dashboard/admin.html">
+      <div class="sidebar-brand-icon">🎓</div>
+      <div class="sidebar-brand-text">
+        <div class="sidebar-brand-title">EduPulse</div>
+        <div class="sidebar-brand-subtitle">Management</div>
+      </div>
+    </a>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Main</div>
+      <a class="nav-item" href="../dashboard/admin.html"><span class="nav-icon">📊</span> Dashboard</a>
+      <div class="nav-section-title">Management</div>
+      <a class="nav-item" href="students.html"><span class="nav-icon">🎓</span> Students</a>
+      <a class="nav-item" href="faculty.html"><span class="nav-icon">👨‍🏫</span> Faculty</a>
+      <a class="nav-item" href="courses.html"><span class="nav-icon">📚</span> Courses</a>
+      <a class="nav-item" href="departments.html"><span class="nav-icon">🏛️</span> Departments</a>
+      <div class="nav-section-title">Academic</div>
+      <a class="nav-item active" href="attendance.html"><span class="nav-icon">✅</span> Attendance</a>
+      <a class="nav-item" href="grades.html"><span class="nav-icon">📝</span> Grades</a>
+      <a class="nav-item" href="timetable.html"><span class="nav-icon">📅</span> Timetable</a>
+      <div class="nav-section-title">Finance & Comms</div>
+      <a class="nav-item" href="fees.html"><span class="nav-icon">💰</span> Fee Management</a>
+      <a class="nav-item" href="notices.html"><span class="nav-icon">📢</span> Notices</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user" onclick="Auth.logout()">
+        <div class="user-avatar" data-user-initials>U</div>
+        <div class="user-info">
+          <div class="user-name" data-user-name>User</div>
+          <div class="user-role" data-user-role>role</div>
+        </div>
+        <span style="color:var(--text-muted);">⏻</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="header">
+      <div>
+        <div class="header-title">Attendance Management</div>
+        <div class="header-subtitle">Mark and track student attendance in real-time</div>
+      </div>
+      <div class="header-spacer"></div>
+      <div class="online-indicator" id="rtStatus">
+        <div class="online-dot"></div> Live Mode
+      </div>
+      <div class="header-actions">
+        <button class="header-btn">🔔</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h1>Attendance Tracking</h1>
+          <p>Mark attendance for courses, view stats, and track trends.</p>
+        </div>
+        <div class="page-header-right">
+          <input type="date" class="form-control" id="attendanceDate" style="width:auto;" value="">
+          <button class="btn btn-primary" onclick="Modal.open('markAttendanceModal')">✅ Mark Attendance</button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card success">
+          <div class="stat-icon">✅</div>
+          <div class="stat-value" id="statPresent">—</div>
+          <div class="stat-label">Present Today</div>
+        </div>
+        <div class="stat-card danger">
+          <div class="stat-icon">❌</div>
+          <div class="stat-value" id="statAbsent">—</div>
+          <div class="stat-label">Absent Today</div>
+        </div>
+        <div class="stat-card warning">
+          <div class="stat-icon">⏰</div>
+          <div class="stat-value" id="statLate">—</div>
+          <div class="stat-label">Late Today</div>
+        </div>
+        <div class="stat-card primary">
+          <div class="stat-icon">📊</div>
+          <div class="stat-value" id="statPct">—%</div>
+          <div class="stat-label">Avg Attendance %</div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <!-- Filter & Records -->
+        <div class="card col-8">
+          <div class="card-header">
+            <div class="card-title">📋 Attendance Records</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <select class="form-control" id="filterCourse" style="width:160px;padding:7px 10px;font-size:0.8rem;" onchange="loadAttendance()">
+                <option value="">All Courses</option>
+              </select>
+              <input type="date" class="form-control" id="filterDate" style="width:auto;padding:7px 10px;font-size:0.8rem;" onchange="loadAttendance()">
+              <select class="form-control" id="filterStatus" style="width:120px;padding:7px 10px;font-size:0.8rem;" onchange="loadAttendance()">
+                <option value="">All Status</option>
+                <option value="present">Present</option>
+                <option value="absent">Absent</option>
+                <option value="late">Late</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div class="table-wrapper">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Course</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Marked By</th>
+                  </tr>
+                </thead>
+                <tbody id="attendanceBody">
+                  <tr><td colspan="5" class="text-center" style="padding:30px;"><div class="loading-spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attendance Chart -->
+        <div class="card col-4">
+          <div class="card-header">
+            <div class="card-title">📈 7-Day Trend</div>
+          </div>
+          <div class="card-body">
+            <div class="chart-container" style="height:220px;">
+              <canvas id="attendanceTrendChart"></canvas>
+            </div>
+            <div class="mt-16">
+              <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;font-weight:600;">ATTENDANCE RATE</div>
+              <div id="courseAttendance"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Mark Attendance Modal -->
+<div class="modal-overlay" id="markAttendanceModal">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <div class="modal-title">✅ Mark Attendance</div>
+      <button class="modal-close" onclick="Modal.close('markAttendanceModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Course</label>
+          <select class="form-control" id="markCourse" onchange="loadStudentsForCourse()">
+            <option value="">Select Course</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-control" id="markDate">
+        </div>
+      </div>
+
+      <div id="studentAttendanceList" style="max-height:350px;overflow-y:auto;">
+        <div class="empty-state"><div class="empty-state-icon">📚</div><p>Select a course to see students</p></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="Modal.close('markAttendanceModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitBulkAttendance()">✅ Save Attendance</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+  Auth.requireAuth();
+
+  // Set today's date
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('attendanceDate').value = today;
+  document.getElementById('filterDate').value = today;
+  document.getElementById('markDate').value = today;
+
+  let allCourses = [];
+  let attendanceStatuses = {};
+  let socket;
+
+  async function init() {
+    await Promise.all([loadCourses(), loadAttendance(), loadTodayStats()]);
+    initChart();
+    initSocket();
+  }
+
+  async function loadCourses() {
+    try {
+      const data = await API.get('/courses/');
+      allCourses = data.results || data;
+      const filterOpts = allCourses.map(c => `<option value="${c.id}">${c.code} - ${c.name}</option>`).join('');
+      document.getElementById('filterCourse').innerHTML = '<option value="">All Courses</option>' + filterOpts;
+      document.getElementById('markCourse').innerHTML = '<option value="">Select Course</option>' + filterOpts;
+    } catch (e) { console.error(e); }
+  }
+
+  async function loadAttendance() {
+    const course = document.getElementById('filterCourse').value;
+    const date = document.getElementById('filterDate').value;
+    const status = document.getElementById('filterStatus').value;
+    let url = '/attendance/?';
+    if (course) url += `course=${course}&`;
+    if (date) url += `date=${date}&`;
+    if (status) url += `status=${status}&`;
+
+    document.getElementById('attendanceBody').innerHTML = '<tr><td colspan="5" class="text-center" style="padding:30px;"><div class="loading-spinner"></div></td></tr>';
+
+    try {
+      const data = await API.get(url);
+      const records = data.results || data;
+      if (!records.length) {
+        document.getElementById('attendanceBody').innerHTML = '<tr><td colspan="5" class="text-center" style="padding:30px;color:var(--text-muted);">No attendance records found for this filter.</td></tr>';
+        return;
+      }
+      document.getElementById('attendanceBody').innerHTML = records.map(r => `
+        <tr>
+          <td>
+            <div class="avatar-cell">
+              <div class="table-avatar">${Utils.getInitials(r.student_name || 'S')}</div>
+              <span style="font-weight:600;">${r.student_name || r.student}</span>
+            </div>
+          </td>
+          <td style="color:var(--primary-light);font-weight:500;">${r.course_name || r.course}</td>
+          <td>${Utils.formatDate(r.date)}</td>
+          <td>${Utils.getStatusBadge(r.status)}</td>
+          <td style="color:var(--text-muted);">${r.marked_by || 'System'}</td>
+        </tr>
+      `).join('');
+    } catch (e) { console.error(e); }
+  }
+
+  async function loadTodayStats() {
+    try {
+      const data = await API.get('/attendance/stats/');
+      document.getElementById('statPresent').textContent = data.present || 0;
+      document.getElementById('statAbsent').textContent = data.absent || 0;
+      document.getElementById('statLate').textContent = data.late || 0;
+      document.getElementById('statPct').textContent = (data.percentage || 0) + '%';
+    } catch (e) {
+      document.getElementById('statPresent').textContent = '—';
+      document.getElementById('statAbsent').textContent = '—';
+      document.getElementById('statLate').textContent = '—';
+      document.getElementById('statPct').textContent = '—%';
+    }
+  }
+
+  async function loadStudentsForCourse() {
+    const courseId = document.getElementById('markCourse').value;
+    if (!courseId) return;
+    document.getElementById('studentAttendanceList').innerHTML = '<div class="text-center" style="padding:20px;"><div class="loading-spinner"></div></div>';
+    try {
+      const enrollData = await API.get(`/courses/enrollments/?course=${courseId}`);
+      const enrollments = enrollData.results || enrollData;
+      if (!enrollments.length) {
+        document.getElementById('studentAttendanceList').innerHTML = '<div class="empty-state"><p>No students enrolled in this course.</p></div>';
+        return;
+      }
+      attendanceStatuses = {};
+      enrollments.forEach(e => { attendanceStatuses[e.student] = 'present'; });
+      document.getElementById('studentAttendanceList').innerHTML = `
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button class="btn btn-success btn-sm" onclick="markAll('present')">✅ All Present</button>
+          <button class="btn btn-danger btn-sm" onclick="markAll('absent')">❌ All Absent</button>
+        </div>
+        <table class="table">
+          <thead><tr><th>Student</th><th>Present</th><th>Absent</th><th>Late</th></tr></thead>
+          <tbody>
+          ${enrollments.map(e => `
+            <tr>
+              <td><div class="avatar-cell">
+                <div class="table-avatar">${Utils.getInitials(e.student_name || 'S')}</div>
+                <span style="font-weight:600;">${e.student_name || 'Student ' + e.student}</span>
+              </div></td>
+              <td><button class="attendance-btn present" id="btn-${e.student}-present" onclick="setStatus(${e.student}, 'present')">P</button></td>
+              <td><button class="attendance-btn" id="btn-${e.student}-absent" onclick="setStatus(${e.student}, 'absent')">A</button></td>
+              <td><button class="attendance-btn" id="btn-${e.student}-late" onclick="setStatus(${e.student}, 'late')">L</button></td>
+            </tr>
+          `).join('')}
+          </tbody>
+        </table>
+      `;
+      // Store student IDs for submission
+      window._currentEnrollments = enrollments;
+    } catch (e) { console.error(e); }
+  }
+
+  function setStatus(studentId, status) {
+    attendanceStatuses[studentId] = status;
+    ['present', 'absent', 'late'].forEach(s => {
+      const btn = document.getElementById(`btn-${studentId}-${s}`);
+      if (btn) btn.className = 'attendance-btn' + (s === status ? ` ${s}` : '');
+    });
+  }
+
+  function markAll(status) {
+    if (!window._currentEnrollments) return;
+    window._currentEnrollments.forEach(e => setStatus(e.student, status));
+  }
+
+  async function submitBulkAttendance() {
+    const courseId = document.getElementById('markCourse').value;
+    const date = document.getElementById('markDate').value;
+    if (!courseId || !date) return Toast.warning('Select a course and date first.');
+
+    const records = Object.entries(attendanceStatuses).map(([studentId, status]) => ({
+      student: parseInt(studentId), course: parseInt(courseId),
+      date, status
+    }));
+
+    try {
+      await API.post('/attendance/bulk-mark/', { records });
+      Modal.close('markAttendanceModal');
+      Toast.success(`Attendance marked for ${records.length} students!`);
+      loadAttendance();
+      loadTodayStats();
+
+      // Emit via socket
+      if (socket?.connected) {
+        const course = allCourses.find(c => c.id == courseId);
+        socket.emit('attendance:mark', {
+          courseName: course?.name, courseId, date,
+          markedCount: records.length
+        });
+      }
+    } catch (e) { Toast.error('Failed to save attendance.'); }
+  }
+
+  function initChart() {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    new Chart(document.getElementById('attendanceTrendChart'), {
+      type: 'line',
+      data: {
+        labels: days,
+        datasets: [{
+          label: 'Attendance %',
+          data: [85, 90, 78, 92, 88, 75, 95],
+          borderColor: '#6C63FF',
+          backgroundColor: 'rgba(108,99,255,0.15)',
+          fill: true, tension: 0.4,
+          pointBackgroundColor: '#6C63FF', pointRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#A0A0C0', font: { size: 11 } } },
+          y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#A0A0C0', font: { size: 11 } } }
+        }
+      }
+    });
+
+    // Course attendance bars
+    document.getElementById('courseAttendance').innerHTML = [
+      { name: 'Data Structures', pct: 88, color: '#6C63FF' },
+      { name: 'DBMS', pct: 92, color: '#00D4AA' },
+      { name: 'Networks', pct: 75, color: '#FF9F43' },
+    ].map(c => `
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:4px;">
+          <span style="color:var(--text-secondary);">${c.name}</span>
+          <span style="font-weight:700;color:${c.color};">${c.pct}%</span>
+        </div>
+        <div class="progress"><div class="progress-bar" style="width:${c.pct}%;background:${c.color};"></div></div>
+      </div>
+    `).join('');
+  }
+
+  function initSocket() {
+    try {
+      socket = io(SOCKET_URL, { auth: { token: Auth.getToken() }, timeout: 2000 });
+      socket.on('connect', () => {
+        document.getElementById('rtStatus').innerHTML = '<div class="online-dot"></div> Live Mode';
+      });
+      socket.on('attendance:updated', (data) => {
+        Toast.info(`Attendance updated for ${data.courseName || 'a course'}`, 'Live Update');
+        loadAttendance();
+        loadTodayStats();
+      });
+    } catch (e) {}
+  }
+
+  init();
+</script>
+</body>
+</html>

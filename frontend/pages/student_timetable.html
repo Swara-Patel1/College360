@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Timetable — EduPulse Student</title>
+  <meta name="description" content="View your full weekly class timetable published by the Head of Department.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    /* ── Today badge shown next to page heading ── */
+    .today-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 16px;
+      border-radius: 50px;
+      background: rgba(0,212,170,0.15);
+      border: 1.5px solid #00D4AA;
+      color: #00D4AA;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      margin-top: 8px;
+    }
+
+    /* ── Weekly Grid ── */
+    .grid-wrapper {
+      overflow-x: auto;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+    }
+    .weekly-grid {
+      display: grid;
+      grid-template-columns: 80px repeat(6, 1fr);
+      gap: 0;
+      min-width: 720px;
+    }
+
+    /* Header row */
+    .wg-corner {
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .wg-header {
+      padding: 14px 8px;
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+    .wg-header:last-child { border-right: none; }
+
+    /* Time column */
+    .wg-time {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 4px;
+      min-height: 72px;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* Empty cell */
+    .wg-cell {
+      min-height: 72px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: transparent;
+      position: relative;
+    }
+    .wg-cell:last-child { border-right: none; }
+
+    /* Filled cell */
+    .wg-cell.filled {
+      padding: 10px;
+      cursor: default;
+    }
+    .wg-cell.filled:hover { filter: brightness(1.08); }
+
+    .wg-cell-inner {
+      height: 100%;
+      border-radius: 8px;
+      padding: 8px 10px;
+      min-height: 52px;
+    }
+    .wg-code {
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      margin-bottom: 3px;
+      text-transform: uppercase;
+    }
+    .wg-cname {
+      font-size: 0.65rem;
+      color: var(--text-secondary);
+      line-height: 1.3;
+      margin-bottom: 3px;
+    }
+    .wg-room {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+    }
+    .wg-faculty {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Today column highlight */
+    .wg-cell.is-today-col {
+      background: rgba(0,212,170,0.07);
+    }
+    .wg-header.is-today-col {
+      background: rgba(0,212,170,0.18);
+      border-bottom: 2px solid #00D4AA;
+      position: relative;
+    }
+    .wg-header.is-today-col::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #00D4AA;
+      border-radius: 2px 2px 0 0;
+    }
+
+    /* Empty state */
+    .no-classes {
+      padding: 60px 20px;
+      text-align: center;
+      grid-column: 1 / -1;
+    }
+    .no-classes-icon { font-size: 3rem; margin-bottom: 12px; }
+    .no-classes h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; color: var(--text-primary); }
+    .no-classes p { color: var(--text-muted); font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <a class="sidebar-brand" href="../dashboard/student.html">
+      <div class="sidebar-brand-icon">🎓</div>
+      <div class="sidebar-brand-text">
+        <div class="sidebar-brand-title">EduPulse</div>
+        <div class="sidebar-brand-subtitle">Student Portal</div>
+      </div>
+    </a>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Main</div>
+      <a class="nav-item" href="../dashboard/student.html"><span class="nav-icon">📊</span> My Dashboard</a>
+      <div class="nav-section-title">Academics</div>
+      <a class="nav-item" href="student_attendance.html"><span class="nav-icon">✅</span> My Attendance</a>
+      <a class="nav-item" href="student_grades.html"><span class="nav-icon">📝</span> My Grades</a>
+      <a class="nav-item active" href="student_timetable.html"><span class="nav-icon">📅</span> Timetable</a>
+      <a class="nav-item" href="courses.html"><span class="nav-icon">📚</span> Courses</a>
+      <div class="nav-section-title">Support &amp; Info</div>
+      <a class="nav-item" href="student_complaints.html"><span class="nav-icon">📣</span> My Complaints</a>
+      <a class="nav-item" href="notices.html"><span class="nav-icon">📢</span> Notices</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user" onclick="Auth.logout()">
+        <div class="user-avatar" data-user-initials>S</div>
+        <div class="user-info">
+          <div class="user-name" data-user-name>Student</div>
+          <div class="user-role">🎓 Student</div>
+        </div>
+        <span style="color:var(--text-muted);">⏻</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="header">
+      <div>
+        <div class="header-title">Class Timetable</div>
+        <div class="header-subtitle">Weekly schedule published by HOD</div>
+      </div>
+      <div class="header-spacer"></div>
+      <div class="header-actions">
+        <button class="header-btn">🔔</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h1>📅 Weekly Timetable</h1>
+          <p>All class schedules set by the Head of Department.</p>
+          <div class="today-badge" id="todayBadge">⭐ Today</div>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <div class="grid-wrapper">
+        <div class="weekly-grid" id="weeklyGrid">
+          <div style="grid-column:1/-1;padding:40px;text-align:center;">
+            <div class="loading-spinner"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+  Auth.requireRole('student');
+
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const dayColors = {
+    monday: '#6C63FF', tuesday: '#00D4AA', wednesday: '#FF9F43',
+    thursday: '#54A0FF', friday: '#FF6B6B', saturday: '#C084FC'
+  };
+  const timeSlots = [
+    '08:00','09:00','10:00','11:00','12:00',
+    '13:00','14:00','15:00','16:00','17:00'
+  ];
+
+  let allSchedules = [];
+  const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
+  function hexToRgb(hex) {
+    const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : '108,99,255';
+  }
+
+  /* ── Update today badge label ── */
+  function updateTodayBadge() {
+    const badge = document.getElementById('todayBadge');
+    if (badge) badge.textContent = `⭐ Today is ${todayName}`;
+  }
+
+  /* ── Render weekly grid ── */
+  function renderGrid() {
+    const container = document.getElementById('weeklyGrid');
+
+    if (!allSchedules.length) {
+      container.innerHTML = `
+        <div class="no-classes">
+          <div class="no-classes-icon">📭</div>
+          <h3>No Timetable Yet</h3>
+          <p>The HOD has not published any schedules yet.</p>
+        </div>`;
+      return;
+    }
+
+    // Build lookup: byDay[dayKey] = [schedule, ...]
+    const byDay = {};
+    days.forEach(d => byDay[d.toLowerCase()] = []);
+    allSchedules.forEach(s => { if (byDay[s.day]) byDay[s.day].push(s); });
+
+    // All days always visible — no dimming
+
+    let html = '';
+
+    /* Header row */
+    html += `<div class="wg-corner"></div>`;
+    days.forEach(d => {
+      const key = d.toLowerCase();
+      const color = dayColors[key];
+      const isToday = d === todayName;
+      const todayCls = isToday ? ' is-today-col' : '';
+      html += `
+        <div class="wg-header${todayCls}" style="color:${color};">
+          ${isToday ? '⭐ ' : ''}${d.substring(0,3).toUpperCase()}
+        </div>`;
+    });
+
+    /* Time slot rows */
+    for (let i = 0; i < timeSlots.length - 1; i++) {
+      const slotStart = timeSlots[i];
+      const slotEnd   = timeSlots[i + 1];
+
+      html += `<div class="wg-time">${slotStart}<br>${slotEnd}</div>`;
+
+      days.forEach(d => {
+        const key = d.toLowerCase();
+        const color = dayColors[key];
+        const rgb = hexToRgb(color);
+        const isToday = d === todayName;
+        const todayCls = isToday ? ' is-today-col' : '';
+        const match = byDay[key].find(s => s.start_time?.substring(0,5) === slotStart);
+
+        if (match) {
+          html += `
+            <div class="wg-cell filled${todayCls}">
+              <div class="wg-cell-inner"
+                   style="background:rgba(${rgb},0.18);border:1px solid rgba(${rgb},0.35);">
+                <div class="wg-code" style="color:${color};">${match.course_code || ''}</div>
+                <div class="wg-cname">${match.course_name || ''}</div>
+                ${match.room    ? `<div class="wg-room">📍 ${match.room}</div>` : ''}
+                ${match.faculty_name ? `<div class="wg-faculty">👨‍🏫 ${match.faculty_name}</div>` : ''}
+              </div>
+            </div>`;
+        } else {
+          html += `<div class="wg-cell${todayCls}"></div>`;
+        }
+      });
+    }
+
+    container.innerHTML = html;
+  }
+
+  /* ── Init ── */
+  async function init() {
+    try {
+      const data = await API.get('/timetable/');
+      allSchedules = data.results || data;
+
+      updateTodayBadge();
+      renderGrid();
+    } catch (e) {
+      document.getElementById('weeklyGrid').innerHTML =
+        '<p style="padding:30px;color:var(--text-muted);">Could not load timetable.</p>';
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
