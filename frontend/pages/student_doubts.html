@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Doubts Q&A — EduPulse</title>
+  <meta name="description" content="Submit academic doubts and get answers from faculty.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    .doubt-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      transition: all 0.2s;
+    }
+    .doubt-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .doubt-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 0.75rem; }
+    .doubt-subject-chip {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 8px;
+      background: rgba(108,99,255,0.12);
+      color: var(--accent);
+      font-size: 0.72rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .doubt-question { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .doubt-meta { font-size: 0.78rem; color: var(--text-muted); display: flex; gap: 1rem; flex-wrap: wrap; }
+    .status-pill {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .s-open         { background: rgba(84,160,255,0.12);   color: #54A0FF; }
+    .s-under_review { background: rgba(255,159,67,0.12);   color: #FF9F43; }
+    .s-resolved     { background: rgba(0,212,170,0.12);    color: #00D4AA; }
+    .s-escalated    { background: rgba(255,107,107,0.12);  color: #FF6B6B; }
+    .s-reassigned   { background: rgba(192,132,252,0.12);  color: #C084FC; }
+    .resolution-box {
+      background: rgba(0,212,170,0.06);
+      border: 1px solid rgba(0,212,170,0.2);
+      border-radius: 12px;
+      padding: 1rem;
+      margin-top: 0.75rem;
+    }
+    .resolution-box h4 { color: #00D4AA; font-size: 0.82rem; margin-bottom: 0.4rem; }
+    .resolution-box p { font-size: 0.88rem; line-height: 1.6; }
+    .sla-warn {
+      background: rgba(255,107,107,0.08);
+      border: 1px solid rgba(255,107,107,0.2);
+      border-radius: 8px;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.75rem;
+      color: #FF6B6B;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .filter-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .empty-state-sm { padding: 3rem 1rem; text-align: center; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"><!-- injected --></aside>
+
+  <div class="main-content">
+    <header class="header">
+      <div>
+        <div class="header-title">My Doubts Q&A</div>
+        <div class="header-subtitle">Ask questions, get answers from faculty</div>
+      </div>
+      <div class="header-spacer"></div>
+      <button class="btn btn-primary" onclick="Modal.open('doubtModal')">❓ Ask Doubt</button>
+    </header>
+
+    <main class="page-content">
+      <!-- Stats Row -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.5rem;">
+        <div class="stat-card primary"><div class="stat-icon">📨</div><div class="stat-value" id="st-total">—</div><div class="stat-label">Total Doubts</div></div>
+        <div class="stat-card warning"><div class="stat-icon">⏳</div><div class="stat-value" id="st-open">—</div><div class="stat-label">Open</div></div>
+        <div class="stat-card success"><div class="stat-icon">✅</div><div class="stat-value" id="st-resolved">—</div><div class="stat-label">Resolved</div></div>
+        <div class="stat-card danger" ><div class="stat-icon">🚨</div><div class="stat-value" id="st-escalated">—</div><div class="stat-label">Escalated</div></div>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-tabs">
+        <button class="btn btn-primary btn-sm"  onclick="filterDoubts('all')"         id="df-all">All</button>
+        <button class="btn btn-ghost   btn-sm"  onclick="filterDoubts('open')"        id="df-open">Open</button>
+        <button class="btn btn-ghost   btn-sm"  onclick="filterDoubts('under_review')"id="df-under_review">Under Review</button>
+        <button class="btn btn-ghost   btn-sm"  onclick="filterDoubts('resolved')"    id="df-resolved">Resolved</button>
+        <button class="btn btn-ghost   btn-sm"  onclick="filterDoubts('escalated')"   id="df-escalated">Escalated</button>
+      </div>
+
+      <div id="doubtsList">
+        <div class="empty-state"><div class="empty-state-icon">❓</div><p>Loading doubts...</p></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Ask Doubt Modal -->
+<div class="modal-overlay" id="doubtModal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 class="modal-title">❓ Ask a Doubt</h3>
+      <button class="modal-close" onclick="Modal.close('doubtModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Subject</label>
+        <select class="form-control" id="doubtSubject">
+          <option value="">Select subject...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Your Question</label>
+        <textarea class="form-control" id="doubtQuestion" rows="4" placeholder="Describe your doubt clearly with context..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="Modal.close('doubtModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitDoubt()">📨 Submit Doubt</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/app.js"></script>
+<script src="../js/supabase-client.js"></script>
+<script>
+  const user = Auth.requireAuth();
+  if (!user) throw new Error('Not authenticated');
+
+  // Sidebar
+  (function buildSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const initials = (user.first_name?.[0]||'')+(user.last_name?.[0]||'');
+    sidebar.innerHTML = `
+      <a class="sidebar-brand" href="../dashboard/student.html">
+        <div class="sidebar-brand-icon">🎓</div>
+        <div class="sidebar-brand-text"><div class="sidebar-brand-title">EduPulse</div><div class="sidebar-brand-subtitle">Student Portal</div></div>
+      </a>
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main</div>
+        <a class="nav-item" href="../dashboard/student.html"><span class="nav-icon">📊</span> My Dashboard</a>
+        <div class="nav-section-title">Academics</div>
+        <a class="nav-item" href="student_attendance.html"><span class="nav-icon">✅</span> My Attendance</a>
+        <a class="nav-item" href="student_grades.html"><span class="nav-icon">📝</span> My Grades</a>
+        <a class="nav-item" href="student_timetable.html"><span class="nav-icon">📅</span> Timetable</a>
+        <a class="nav-item" href="courses.html"><span class="nav-icon">📚</span> Courses</a>
+        <a class="nav-item" href="student_content.html"><span class="nav-icon">📖</span> Study Materials</a>
+        <a class="nav-item active" href="student_doubts.html"><span class="nav-icon">❓</span> My Doubts Q&A</a>
+        <div class="nav-section-title">Support & Info</div>
+        <a class="nav-item" href="student_complaints.html"><span class="nav-icon">📣</span> My Complaints</a>
+        <a class="nav-item" href="notices.html"><span class="nav-icon">📢</span> Notices</a>
+        <div class="nav-section-title">Career & Wellness</div>
+        <a class="nav-item" href="student_placement.html"><span class="nav-icon">🎯</span> Placement Score</a>
+        <a class="nav-item" href="student_wellness.html"><span class="nav-icon">💚</span> Wellness Tracker</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user" onclick="Auth.logout()">
+          <div class="user-avatar">${initials.toUpperCase()||'U'}</div>
+          <div class="user-info"><div class="user-name">${user.first_name} ${user.last_name}</div><div class="user-role">🎓 Student</div></div>
+          <span style="color:var(--text-muted);">⏻</span>
+        </div>
+      </div>`;
+  })();
+
+  let allDoubts = [];
+  let myCourses = [];
+  let currentFilter = 'all';
+
+  async function loadEnrolledCourses() {
+    try {
+      const data = await API.get('/enrollments/?expand=course');
+      myCourses = data.results || data;
+      const sel = document.getElementById('doubtSubject');
+      myCourses.forEach(e => {
+        const c = e.course || e;
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.name} (${c.code})`;
+        opt.dataset.name = c.name;
+        opt.dataset.code = c.code;
+        sel.appendChild(opt);
+      });
+    } catch {
+      // fallback: load all courses
+      try {
+        const data = await API.get('/courses/');
+        const courses = data.results || data;
+        const sel = document.getElementById('doubtSubject');
+        courses.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = `${c.name} (${c.code})`;
+          opt.dataset.name = c.name;
+          opt.dataset.code = c.code;
+          sel.appendChild(opt);
+        });
+      } catch {}
+    }
+  }
+
+  async function loadDoubts() {
+    try {
+      allDoubts = await SupaAPI.doubts.byStudent(user.id);
+      updateStats();
+      renderDoubts(allDoubts);
+    } catch (e) {
+      document.getElementById('doubtsList').innerHTML = '<div class="empty-state-sm">❌ Could not load doubts from Supabase.</div>';
+    }
+  }
+
+  function updateStats() {
+    document.getElementById('st-total').textContent = allDoubts.length;
+    document.getElementById('st-open').textContent = allDoubts.filter(d => d.status === 'open' || d.status === 'under_review').length;
+    document.getElementById('st-resolved').textContent = allDoubts.filter(d => d.status === 'resolved').length;
+    document.getElementById('st-escalated').textContent = allDoubts.filter(d => d.status === 'escalated').length;
+  }
+
+  function filterDoubts(f) {
+    currentFilter = f;
+    ['all','open','under_review','resolved','escalated'].forEach(t => {
+      document.getElementById(`df-${t}`).className = t === f ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+    });
+    const filtered = f === 'all' ? allDoubts : allDoubts.filter(d => d.status === f);
+    renderDoubts(filtered);
+  }
+
+  function renderDoubts(list) {
+    if (!list.length) {
+      document.getElementById('doubtsList').innerHTML = `<div class="empty-state-sm">📭 No doubts in this category.<br><button class="btn btn-primary" style="margin-top:1rem;" onclick="Modal.open('doubtModal')">Ask your first doubt</button></div>`;
+      return;
+    }
+    const slaWarn = (d) => {
+      const deadline = new Date(d.sla_deadline);
+      const now = new Date();
+      const hoursLeft = (deadline - now) / 3600000;
+      if (d.status === 'resolved' || hoursLeft > 24) return '';
+      if (hoursLeft < 0) return `<span class="sla-warn">⚠️ SLA Breached — Escalating to HOD</span>`;
+      return `<span class="sla-warn">⏰ ${Math.round(hoursLeft)}h left for reply</span>`;
+    };
+    document.getElementById('doubtsList').innerHTML = list.map(d => `
+      <div class="doubt-card">
+        <div class="doubt-header">
+          <div style="flex:1;">
+            <span class="doubt-subject-chip">${d.subject_code || 'Course'}</span>
+            <span style="margin-left:0.5rem;" class="status-pill s-${d.status}">${d.status.replace('_',' ').toUpperCase()}</span>
+            ${slaWarn(d)}
+          </div>
+          <div class="doubt-meta">${new Date(d.submitted_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>
+        </div>
+        <div class="doubt-question">${d.question}</div>
+        <div class="doubt-meta">
+          <span>📚 ${d.subject_name || '—'}</span>
+          ${d.assigned_faculty_name ? `<span>👨‍🏫 ${d.assigned_faculty_name}</span>` : ''}
+          ${d.resolved_at ? `<span>✅ Resolved ${new Date(d.resolved_at).toLocaleDateString('en-IN')}</span>` : ''}
+        </div>
+        ${d.resolution ? `
+        <div class="resolution-box">
+          <h4>📖 Faculty Answer:</h4>
+          <p>${d.resolution}</p>
+        </div>` : ''}
+      </div>`).join('');
+  }
+
+  async function submitDoubt() {
+    const sel  = document.getElementById('doubtSubject');
+    const subjectId = parseInt(sel.value);
+    const question  = document.getElementById('doubtQuestion').value.trim();
+    if (!subjectId) { Toast.warning('Please select a subject.'); return; }
+    if (question.length < 20) { Toast.warning('Please describe your doubt in at least 20 characters.'); return; }
+    const selectedOpt = sel.options[sel.selectedIndex];
+    try {
+      await SupaAPI.doubts.add({
+        student_id: user.id,
+        student_name: `${user.first_name} ${user.last_name}`,
+        subject_id: subjectId,
+        subject_name: selectedOpt.dataset.name,
+        subject_code: selectedOpt.dataset.code,
+        question,
+        status: 'open',
+      });
+      Toast.success('Doubt submitted! Faculty will respond within 72 hours.');
+      Modal.close('doubtModal');
+      document.getElementById('doubtQuestion').value = '';
+      loadDoubts();
+    } catch (e) {
+      console.error(e);
+      Toast.error('Failed to submit doubt.');
+    }
+  }
+
+  loadEnrolledCourses();
+  loadDoubts();
+</script>
+</body>
+</html>

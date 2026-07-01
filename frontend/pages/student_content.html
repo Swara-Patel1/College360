@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Study Materials — EduPulse</title>
+  <meta name="description" content="Access notes, videos, and study content uploaded by faculty.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    .content-filters {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .content-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.25rem;
+    }
+    .content-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      transition: all 0.25s;
+      cursor: pointer;
+    }
+    .content-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--accent);
+      box-shadow: 0 8px 32px rgba(108,99,255,0.12);
+    }
+    .content-type-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .type-note  { background: rgba(108,99,255,0.12); color: #8B85FF; }
+    .type-video { background: rgba(255,107,107,0.12); color: #FF6B6B; }
+    .type-link  { background: rgba(84,160,255,0.12);  color: #54A0FF; }
+    .type-ppt   { background: rgba(255,159,67,0.12);  color: #FF9F43; }
+    .content-title { font-weight: 700; font-size: 0.95rem; line-height: 1.4; }
+    .content-desc  { font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; }
+    .content-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .content-tag {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      background: var(--bg-secondary);
+      font-size: 0.7rem;
+    }
+    .subject-filter-bar {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"><!-- injected --></aside>
+
+  <div class="main-content">
+    <header class="header">
+      <div>
+        <div class="header-title">Study Materials</div>
+        <div class="header-subtitle">Notes, videos & resources from your faculty</div>
+      </div>
+      <div class="header-spacer"></div>
+      <input type="text" class="form-control" style="width:220px;" id="searchContent" placeholder="🔍 Search materials..." oninput="searchContent(this.value)">
+    </header>
+
+    <main class="page-content">
+
+      <!-- Stats -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.5rem;">
+        <div class="stat-card primary"><div class="stat-icon">📚</div><div class="stat-value" id="st-all">—</div><div class="stat-label">Total Items</div></div>
+        <div class="stat-card info"   ><div class="stat-icon">📄</div><div class="stat-value" id="st-notes">—</div><div class="stat-label">Notes</div></div>
+        <div class="stat-card danger" ><div class="stat-icon">▶️</div><div class="stat-value" id="st-videos">—</div><div class="stat-label">Videos</div></div>
+        <div class="stat-card success"><div class="stat-icon">🔗</div><div class="stat-value" id="st-links">—</div><div class="stat-label">Links/PPT</div></div>
+      </div>
+
+      <!-- Type Filter -->
+      <div class="content-filters">
+        <button class="btn btn-primary btn-sm" onclick="filterType('all')"   id="ct-all">📚 All</button>
+        <button class="btn btn-ghost   btn-sm" onclick="filterType('note')"  id="ct-note">📄 Notes</button>
+        <button class="btn btn-ghost   btn-sm" onclick="filterType('video')" id="ct-video">▶️ Videos</button>
+        <button class="btn btn-ghost   btn-sm" onclick="filterType('link')"  id="ct-link">🔗 Links</button>
+        <button class="btn btn-ghost   btn-sm" onclick="filterType('ppt')"   id="ct-ppt">📊 PPT</button>
+      </div>
+
+      <!-- Subject filter pills -->
+      <div class="subject-filter-bar" id="subjectPills"></div>
+
+      <!-- Content Grid -->
+      <div class="content-grid" id="contentGrid">
+        <div class="empty-state"><div class="empty-state-icon">📚</div><p>Loading study materials...</p></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="../js/app.js"></script>
+<script src="../js/supabase-client.js"></script>
+<script>
+  const user = Auth.requireAuth();
+  if (!user) throw new Error('Not authenticated');
+  const isFaculty = user.role === 'faculty';
+
+  // Sidebar
+  (function buildSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const initials = (user.first_name?.[0]||'') + (user.last_name?.[0]||'');
+    const isStudent = user.role === 'student';
+    const dashHref = isStudent ? '../dashboard/student.html' : '../dashboard/faculty.html';
+    const nav = isStudent ? `
+      <div class="nav-section-title">Main</div>
+      <a class="nav-item" href="${dashHref}"><span class="nav-icon">📊</span> My Dashboard</a>
+      <div class="nav-section-title">Academics</div>
+      <a class="nav-item" href="student_attendance.html"><span class="nav-icon">✅</span> My Attendance</a>
+      <a class="nav-item" href="student_grades.html"><span class="nav-icon">📝</span> My Grades</a>
+      <a class="nav-item" href="student_timetable.html"><span class="nav-icon">📅</span> Timetable</a>
+      <a class="nav-item" href="courses.html"><span class="nav-icon">📚</span> Courses</a>
+      <a class="nav-item active" href="student_content.html"><span class="nav-icon">📖</span> Study Materials</a>
+      <a class="nav-item" href="student_doubts.html"><span class="nav-icon">❓</span> My Doubts Q&A</a>
+      <div class="nav-section-title">Support & Info</div>
+      <a class="nav-item" href="student_complaints.html"><span class="nav-icon">📣</span> My Complaints</a>
+      <a class="nav-item" href="notices.html"><span class="nav-icon">📢</span> Notices</a>
+      <div class="nav-section-title">Career & Wellness</div>
+      <a class="nav-item" href="student_placement.html"><span class="nav-icon">🎯</span> Placement Score</a>
+      <a class="nav-item" href="student_wellness.html"><span class="nav-icon">💚</span> Wellness Tracker</a>` : `
+      <div class="nav-section-title">Main</div>
+      <a class="nav-item" href="${dashHref}"><span class="nav-icon">📊</span> Dashboard</a>
+      <div class="nav-section-title">Academic</div>
+      <a class="nav-item" href="courses.html"><span class="nav-icon">📚</span> My Courses</a>
+      <a class="nav-item active" href="student_content.html"><span class="nav-icon">📖</span> Study Materials</a>
+      <a class="nav-item" href="attendance.html"><span class="nav-icon">✅</span> Attendance</a>
+      <a class="nav-item" href="grades.html"><span class="nav-icon">📝</span> Grades</a>`;
+    sidebar.innerHTML = `
+      <a class="sidebar-brand" href="${dashHref}">
+        <div class="sidebar-brand-icon">🎓</div>
+        <div class="sidebar-brand-text"><div class="sidebar-brand-title">EduPulse</div><div class="sidebar-brand-subtitle">${isStudent ? 'Student Portal' : 'Faculty Portal'}</div></div>
+      </a>
+      <nav class="sidebar-nav">${nav}</nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user" onclick="Auth.logout()">
+          <div class="user-avatar">${initials.toUpperCase()||'U'}</div>
+          <div class="user-info"><div class="user-name">${user.first_name} ${user.last_name}</div><div class="user-role">${isStudent ? '🎓 Student' : '👨‍🏫 Faculty'}</div></div>
+          <span style="color:var(--text-muted);">⏻</span>
+        </div>
+      </div>`;
+  })();
+
+  let allContent = [];
+  let currentTypeFilter = 'all';
+  let currentSubject = null;
+  let searchQuery = '';
+  let subjectSet = new Map();
+
+  function getTypeConfig(type) {
+    return {
+      note:  { icon: '📄', label: 'Note',  cls: 'type-note',  action: 'Download' },
+      video: { icon: '▶️', label: 'Video', cls: 'type-video', action: 'Watch' },
+      link:  { icon: '🔗', label: 'Link',  cls: 'type-link',  action: 'Open' },
+      ppt:   { icon: '📊', label: 'PPT',   cls: 'type-ppt',   action: 'View' },
+    }[type] || { icon: '📎', label: type, cls: 'type-link', action: 'Open' };
+  }
+
+  async function loadContent() {
+    try {
+      allContent = isFaculty
+        ? await SupaAPI.content.byFaculty(user.id)
+        : await SupaAPI.content.all();
+
+      // Build subject set
+      subjectSet = new Map();
+      allContent.forEach(c => { if (c.subject_name) subjectSet.set(c.subject_id, c.subject_name); });
+      renderSubjectPills();
+
+      updateStats();
+      renderContent();
+    } catch (e) {
+      document.getElementById('contentGrid').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📚</div><p>Could not load materials.</p></div>';
+    }
+  }
+
+  function updateStats() {
+    document.getElementById('st-all').textContent    = allContent.length;
+    document.getElementById('st-notes').textContent  = allContent.filter(c => c.content_type === 'note').length;
+    document.getElementById('st-videos').textContent = allContent.filter(c => c.content_type === 'video').length;
+    document.getElementById('st-links').textContent  = allContent.filter(c => c.content_type === 'link' || c.content_type === 'ppt').length;
+  }
+
+  function renderSubjectPills() {
+    const bar = document.getElementById('subjectPills');
+    if (subjectSet.size === 0) { bar.innerHTML = ''; return; }
+    bar.innerHTML = `<button class="btn ${currentSubject === null ? 'btn-secondary' : 'btn-ghost'} btn-sm" onclick="filterSubject(null)">All Subjects</button>`
+      + [...subjectSet.entries()].map(([id, name]) =>
+          `<button class="btn ${currentSubject === id ? 'btn-secondary' : 'btn-ghost'} btn-sm" onclick="filterSubject(${id})">${name}</button>`
+        ).join('');
+  }
+
+  function filterType(type) {
+    currentTypeFilter = type;
+    ['all','note','video','link','ppt'].forEach(t => {
+      document.getElementById(`ct-${t}`).className = t === type ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+    });
+    renderContent();
+  }
+
+  function filterSubject(id) {
+    currentSubject = id;
+    renderSubjectPills();
+    renderContent();
+  }
+
+  function searchContent(q) {
+    searchQuery = q.toLowerCase();
+    renderContent();
+  }
+
+  function renderContent() {
+    let list = allContent;
+    if (currentTypeFilter !== 'all') list = list.filter(c => c.content_type === currentTypeFilter);
+    if (currentSubject !== null)     list = list.filter(c => c.subject_id === currentSubject);
+    if (searchQuery)                 list = list.filter(c => c.title.toLowerCase().includes(searchQuery) || (c.topic_tag||'').toLowerCase().includes(searchQuery));
+
+    if (!list.length) {
+      document.getElementById('contentGrid').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><p>No materials found.</p></div>';
+      return;
+    }
+    document.getElementById('contentGrid').innerHTML = list.map(c => {
+      const cfg = getTypeConfig(c.content_type);
+      const url = c.file_url || c.video_url || '#';
+      return `<div class="content-card" onclick="openContent(${c.id}, '${url}', '${c.content_type}')">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="content-type-badge ${cfg.cls}">${cfg.icon} ${cfg.label}</span>
+          ${c.topic_tag ? `<span class="content-tag">${c.topic_tag}</span>` : ''}
+        </div>
+        <div class="content-title">${c.title}</div>
+        ${c.description ? `<div class="content-desc">${c.description.substring(0,100)}${c.description.length>100?'…':''}</div>` : ''}
+        <div class="content-footer">
+          <span>📚 ${c.subject_code || c.subject_name || '—'}</span>
+          <span>👨‍🏫 ${c.faculty_name || '—'}</span>
+          <span class="btn btn-primary btn-sm" style="pointer-events:none;">${cfg.action} →</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function openContent(id, url, type) {
+    const item = allContent.find(c => c.id === id);
+    if (item) await SupaAPI.content.incrDownloads(id, item.downloads || 0);
+    if (url && url !== '#') window.open(url, '_blank');
+    else Toast.info('No link available for this resource yet.');
+  }
+
+  loadContent();
+</script>
+</body>
+</html>

@@ -9,8 +9,9 @@ echo.
 echo  Starting all services...
 echo.
 
-:: Start Django Backend
-start "Django Backend (Port 8000)" cmd /k "cd /d %~dp0backend && python manage.py runserver 0.0.0.0:8000"
+:: Start Django Backend (DISABLED - Django replaced by Supabase)
+:: start "Django Backend (Port 8000)" cmd /k "cd /d %~dp0backend && python manage.py runserver 0.0.0.0:8000"
+
 
 :: Wait a moment
 timeout /t 3 /nobreak > nul
