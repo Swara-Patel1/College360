@@ -4,9 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Notices — EduPulse</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/main.css">
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <link rel="stylesheet" href="../css/main.css">
+  <script src="../js/socket.io.min.js"></script>
 </head>
 <body>
 <div class="app-layout">
@@ -248,10 +247,12 @@
                   <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">${n.audience === 'all' ? '👥 Everyone' : n.audience === 'students' ? '🎓 Students' : '👨‍🏫 Faculty'}</div>
                 </div>
               </div>
+              ${isStudent ? '' : `
               <div style="display:flex;gap:6px;flex-shrink:0;">
                 <button class="btn btn-ghost btn-sm btn-icon" onclick='editNotice(${JSON.stringify(n).replace(/'/g,"\\'")})'  title="Edit">✏️</button>
                 <button class="btn btn-danger btn-sm btn-icon" onclick="deleteNotice(${n.id})" title="Delete">🗑️</button>
               </div>
+              `}
             </div>
             <h3 style="font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:10px;line-height:1.3;">${n.title}</h3>
             <p style="font-size:0.825rem;line-height:1.6;color:var(--text-secondary);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${n.content}</p>
@@ -317,7 +318,7 @@
 
   function initSocket() {
     try {
-      socket = io(SOCKET_URL, { auth: { token: Auth.getToken() }, timeout: 2000 });
+      socket = io(SOCKET_URL, { auth: { token: Auth.getToken() }, timeout: 2000, transports: ['websocket'] });
       socket.on('connect', () => { document.getElementById('rtStatus').innerHTML = '<div class="online-dot"></div> Live'; });
       socket.on('notice:new', () => { loadNotices(); Toast.info('New notice received!'); });
     } catch (e) {}

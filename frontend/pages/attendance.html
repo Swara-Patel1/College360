@@ -4,10 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Attendance — EduPulse</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/main.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <link rel="stylesheet" href="../css/main.css">
+  <script src="../js/chart.min.js"></script>
+  <script src="../js/socket.io.min.js"></script>
 </head>
 <body>
 <div class="app-layout">
@@ -392,7 +391,7 @@
 
   function initSocket() {
     try {
-      socket = io(SOCKET_URL, { auth: { token: Auth.getToken() }, timeout: 2000 });
+      socket = io(SOCKET_URL, { auth: { token: Auth.getToken() }, timeout: 2000, transports: ['websocket'] });
       socket.on('connect', () => {
         document.getElementById('rtStatus').innerHTML = '<div class="online-dot"></div> Live Mode';
       });

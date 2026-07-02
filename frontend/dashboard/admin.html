@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard — EduPulse</title>
   <meta name="description" content="EduPulse Admin Dashboard">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/main.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  
+    <link rel="stylesheet" href="../css/main.css">
+  <script src="../js/chart.min.js"></script>
+  <script src="../js/socket.io.min.js"></script>
 </head>
 <body>
 <div class="app-layout">
@@ -587,6 +586,7 @@
       socket = io(SOCKET_URL, {
         auth: { token: Auth.getToken() },
         timeout: 3000,
+        transports: ['websocket']
       });
 
       socket.on('connect', () => {

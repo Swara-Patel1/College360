@@ -4,10 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Student Dashboard — EduPulse</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/main.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <link rel="stylesheet" href="../css/main.css">
 </head>
 <body>
 <div class="app-layout">
@@ -154,6 +151,8 @@
   </div>
 </div>
 
+<script src="../js/chart.min.js"></script>
+<script src="../js/socket.io.min.js"></script>
 <script src="../js/app.js"></script>
 <script>
   const user = Auth.requireRole('student');
@@ -166,16 +165,21 @@
   let socket;
 
   async function loadDashboard() {
+    // Fire independent calls immediately — don't wait for profile
+    const noticesP      = loadNotices();
+    const timetableP    = loadTodayClasses();
+
     try {
-      // Get student profile
+      // Profile fetch (instant on repeat visits due to localStorage cache)
       const profile = await API.get('/students/my_profile/');
       studentId = profile.id;
-      document.getElementById('studentInfo').textContent = `${profile.student_id} · ${profile.department_name || 'N/A'} · Year ${profile.year_of_study} · Sem ${profile.semester}`;
-      await Promise.all([loadGrades(), loadFees(), loadNotices(), loadTodayClasses(), loadAttStats()]);
+      document.getElementById('studentInfo').textContent =
+        `${profile.student_id} · ${profile.department_name || 'N/A'} · Year ${profile.year_of_study} · Sem ${profile.semester}`;
+      await Promise.all([loadGrades(), loadFees(), loadAttStats(), noticesP, timetableP]);
       initChart();
     } catch (e) {
       document.getElementById('studentInfo').textContent = 'Student profile not found.';
-      await Promise.all([loadNotices(), loadTodayClasses()]);
+      await Promise.all([noticesP, timetableP]);
       initChart();
     }
     initSocket();
@@ -307,7 +311,7 @@
 
   function initSocket() {
     try {
-      socket = io(SOCKET_URL, { auth: { token: Auth.getToken() }, timeout: 2000 });
+      socket = io(SOCKET_URL, { auth: { token: Auth.getToken() }, timeout: 2000, transports: ['websocket'] });
       socket.on('connect', () => {
         document.getElementById('rtStatus').innerHTML = '<div class="online-dot"></div> Connected';
       });

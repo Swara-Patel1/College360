@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Attendance — EduPulse Student</title>
   <meta name="description" content="View your course attendance records and statistics.">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/main.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <link rel="stylesheet" href="../css/main.css">
   <style>
     /* ── Course Attendance Card styling ── */
     .course-grid {
@@ -276,10 +273,25 @@
 
   async function init() {
     try {
+      // Use cached profile instantly (no network wait on repeat visits)
+      const cached = localStorage.getItem('student_profile');
+      if (cached) {
+        const profile = JSON.parse(cached);
+        studentId = profile.id;
+        document.getElementById('attSubtitle').textContent =
+          `${profile.student_id} · ${profile.department_name || 'N/A'} · Year ${profile.year_of_study} · Sem ${profile.semester}`;
+        // Fire all data calls right away
+        await Promise.all([loadStats(), loadEnrollmentsAndBreakdown(), loadLogs()]);
+        initSocket();
+        // Refresh cache silently in background
+        API.get('/students/my_profile/').catch(() => {});
+        return;
+      }
+      // First visit after login — fetch profile normally
       const profile = await API.get('/students/my_profile/');
       studentId = profile.id;
-      document.getElementById('attSubtitle').textContent = `${profile.student_id} · ${profile.department_name || 'N/A'} · Year ${profile.year_of_study} · Sem ${profile.semester}`;
-
+      document.getElementById('attSubtitle').textContent =
+        `${profile.student_id} · ${profile.department_name || 'N/A'} · Year ${profile.year_of_study} · Sem ${profile.semester}`;
       await Promise.all([loadStats(), loadEnrollmentsAndBreakdown(), loadLogs()]);
       initSocket();
     } catch (e) {
@@ -561,7 +573,7 @@
 
   function initSocket() {
     try {
-      socket = io(SOCKET_URL, { auth: { token: Auth.getToken() }, timeout: 2000 });
+      socket = io(SOCKET_URL, { auth: { token: Auth.getToken() }, timeout: 2000, transports: ['websocket'] });
       socket.on('connect', () => {
         document.getElementById('rtStatus').innerHTML = '<div class="online-dot"></div> Live Mode';
       });
@@ -579,5 +591,7 @@
 
   init();
 </script>
+<script src="../js/chart.min.js"></script>
+<script src="../js/socket.io.min.js"></script>
 </body>
 </html>
