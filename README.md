@@ -1,4 +1,4 @@
-# 🎓 EduPulse — College Management System
+# EduPulse: College Management System
 
 A full-stack College Management System built with **Django + Node.js + Modern HTML/CSS/JS**.
 
