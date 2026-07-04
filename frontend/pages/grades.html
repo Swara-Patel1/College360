@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Grades — EduPulse</title>
     <link rel="stylesheet" href="../css/main.css">
-  <script src="../js/chart.min.js"></script>
 </head>
 <body>
 <div class="app-layout">
@@ -72,7 +71,7 @@
       <div class="stats-grid">
         <div class="stat-card success">
           <div class="stat-icon">⭐</div>
-          <div class="stat-value">O/A+</div>
+          <div class="stat-value" id="statTopGrades">—</div>
           <div class="stat-label">Top Grades</div>
         </div>
         <div class="stat-card primary">
@@ -94,7 +93,7 @@
 
       <div class="dashboard-grid">
         <!-- Grades Table -->
-        <div class="card col-8">
+        <div class="card col-12">
           <div class="card-header">
             <div class="card-title">📋 Grade Records</div>
             <div style="display:flex;gap:8px;">
@@ -106,6 +105,11 @@
                 <option>O</option><option>A+</option><option>A</option>
                 <option>B+</option><option>B</option><option>C</option>
                 <option>D</option><option>F</option>
+              </select>
+              <select class="form-control" id="gradeSort" style="width:160px;padding:7px 10px;font-size:0.8rem;" onchange="loadGrades()">
+                <option value="">Sort: Default</option>
+                <option value="exam_asc">Exam Name (A-Z)</option>
+                <option value="exam_desc">Exam Name (Z-A)</option>
               </select>
             </div>
           </div>
@@ -127,18 +131,6 @@
                   <tr><td colspan="7" class="text-center" style="padding:30px;"><div class="loading-spinner"></div></td></tr>
                 </tbody>
               </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Grade Distribution Chart -->
-        <div class="card col-4">
-          <div class="card-header">
-            <div class="card-title">📊 Grade Distribution</div>
-          </div>
-          <div class="card-body">
-            <div class="chart-container" style="height:250px;">
-              <canvas id="gradeDistChart"></canvas>
             </div>
           </div>
         </div>
@@ -226,7 +218,6 @@
 
   async function init() {
     await Promise.all([loadCourses(), loadStudents(), loadGrades()]);
-    initChart();
   }
 
   async function loadCourses() {
@@ -244,7 +235,7 @@
       const data = await API.get('/students/');
       const students = data.results || data;
       document.getElementById('gradeStudent').innerHTML = '<option value="">Select Student</option>' +
-        students.map(s => `<option value="${s.id}">${s.user?.first_name} ${s.user?.last_name} (${s.student_id})</option>`).join('');
+        students.map(s => `<option value="${s.id}">${s.first_name || s.user?.first_name || ''} ${s.last_name || s.user?.last_name || ''} (${s.student_id})</option>`).join('');
     } catch (e) {}
   }
 
@@ -257,8 +248,17 @@
     try {
       const data = await API.get(url);
       allGrades = data.results || data;
-      const filtered = grade ? allGrades.filter(g => g.grade === grade) : allGrades;
+      let filtered = grade ? allGrades.filter(g => g.grade === grade) : [...allGrades];
+      
+      const sortVal = document.getElementById('gradeSort').value;
+      if (sortVal === 'exam_asc') {
+        filtered.sort((a, b) => (a.exam_type || '').localeCompare(b.exam_type || ''));
+      } else if (sortVal === 'exam_desc') {
+        filtered.sort((a, b) => (b.exam_type || '').localeCompare(a.exam_type || ''));
+      }
+
       document.getElementById('statGrades').textContent = filtered.length;
+      document.getElementById('statTopGrades').textContent = filtered.filter(g => g.grade === 'O' || g.grade === 'A+').length;
       const avg = filtered.length ? (filtered.reduce((s, g) => s + parseFloat(g.percentage || 0), 0) / filtered.length).toFixed(1) : '0';
       document.getElementById('statAvgPct').textContent = avg + '%';
       document.getElementById('statFailed').textContent = filtered.filter(g => g.grade === 'F').length;
@@ -277,19 +277,22 @@
               <span style="font-weight:600;">${g.student_name || 'Student'}</span>
             </div>
           </td>
-          <td style="color:var(--primary-light);">${g.course_code || ''} ${g.course_name || ''}</td>
+          <td style="color:var(--primary-light);">${g.course_name || ''}</td>
           <td><span class="badge badge-info">${g.exam_type}</span></td>
           <td style="font-weight:700;">${g.marks_obtained}/${g.total_marks}</td>
           <td style="color:${parseFloat(g.percentage) >= 50 ? 'var(--secondary)' : 'var(--accent)'};">${g.percentage}%</td>
           <td>${Utils.getGradeBadge(g.grade)}</td>
           <td>
             <button class="btn btn-ghost btn-sm" onclick="editGrade(${JSON.stringify(g).replace(/"/g, '&quot;')})">✏️</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteGrade(${g.id})">🗑️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteGrade('${g.id}')">🗑️</button>
           </td>
         </tr>
       `).join('');
       loadTopPerformers(filtered);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      document.getElementById('gradesBody').innerHTML = '<tr><td colspan="7" class="text-center" style="padding:30px;color:var(--text-muted);">Failed to load grades. Please try again.</td></tr>';
+    }
   }
 
   function loadTopPerformers(grades) {
@@ -339,8 +342,8 @@
   async function saveGrade() {
     const id = document.getElementById('editGradeId').value;
     const payload = {
-      student: parseInt(document.getElementById('gradeStudent').value),
-      course: parseInt(document.getElementById('gradeCourse').value),
+      student: document.getElementById('gradeStudent').value,
+      course: document.getElementById('gradeCourse').value,
       exam_type: document.getElementById('gradeExamType').value,
       marks_obtained: parseFloat(document.getElementById('gradeMarks').value),
       total_marks: parseFloat(document.getElementById('gradeTotalMarks').value),
@@ -367,28 +370,7 @@
     } catch (e) { Toast.error('Failed to delete.'); }
   }
 
-  function initChart() {
-    new Chart(document.getElementById('gradeDistChart'), {
-      type: 'bar',
-      data: {
-        labels: ['O', 'A+', 'A', 'B+', 'B', 'C', 'D', 'F'],
-        datasets: [{
-          data: [3, 5, 6, 4, 2, 1, 0, 0],
-          backgroundColor: ['#00D4AA33','#00D4AA55','#54A0FF33','#54A0FF55','#6C63FF33','#FF9F4333','#FF9F4355','#FF6B6B33'],
-          borderColor: ['#00D4AA','#00D4AA','#54A0FF','#54A0FF','#6C63FF','#FF9F43','#FF9F43','#FF6B6B'],
-          borderWidth: 2, borderRadius: 6,
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#A0A0C0' } },
-          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#A0A0C0', stepSize: 1 } }
-        }
-      }
-    });
-  }
+
 
   init();
 </script>

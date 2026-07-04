@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leave Management — EduPulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .status-pending { background: rgba(255,159,67,0.15); color: #FF9F43; }
+    .status-approved { background: rgba(0,212,170,0.15); color: #00D4AA; }
+    .status-rejected { background: rgba(255,77,77,0.15); color: #FF4D4D; }
+
+    .tabs-bar { display: flex; gap: 10px; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .tab-btn { padding: 8px 20px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; background: transparent; color: var(--text-muted); transition: all 0.2s; }
+    .tab-btn:hover { color: var(--text-primary); }
+    .tab-btn.active { background: rgba(108,99,255,0.15); border-color: var(--primary); color: var(--primary-light); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .leave-form-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+    .history-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+
+    .action-btn-group { display: flex; gap: 8px; }
+    .btn-approve { background: rgba(0,212,170,0.15); color: #00D4AA; border: 1px solid rgba(0,212,170,0.3); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn-approve:hover { background: #00D4AA; color: #000; }
+    .btn-reject { background: rgba(255,77,77,0.15); color: #FF4D4D; border: 1px solid rgba(255,77,77,0.3); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn-reject:hover { background: #FF4D4D; color: #fff; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state-icon { font-size: 3rem; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <a class="sidebar-brand" href="../dashboard/faculty.html">
+      <div class="sidebar-brand-icon">🎓</div>
+      <div class="sidebar-brand-text">
+        <div class="sidebar-brand-title">EduPulse</div>
+        <div class="sidebar-brand-subtitle" id="portalSub">Faculty Portal</div>
+      </div>
+    </a>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Main</div>
+      <a class="nav-item" href="../dashboard/faculty.html"><span class="nav-icon">📊</span> My Dashboard</a>
+      <div class="nav-section-title">My Classes</div>
+      <a class="nav-item" href="attendance.html"><span class="nav-icon">✅</span> Mark Attendance</a>
+      <a class="nav-item" href="grades.html"><span class="nav-icon">📝</span> Enter Grades</a>
+      <a class="nav-item" href="faculty_timetable.html"><span class="nav-icon">📅</span> My Timetable</a>
+      <a class="nav-item active" href="leaves.html"><span class="nav-icon">📝</span> Leave Application</a>
+      <div class="nav-section-title" id="hodSectionTitle">HOD Actions</div>
+      <a class="nav-item" id="hodComplaintsLink" href="hod_complaints.html"><span class="nav-icon">📣</span> Student Complaints</a>
+      <a class="nav-item" id="hodTimetableLink" href="timetable.html"><span class="nav-icon">🗓️</span> Manage Timetable</a>
+      <div class="nav-section-title">Information</div>
+      <a class="nav-item" href="students.html"><span class="nav-icon">🎓</span> View Students</a>
+      <a class="nav-item" href="courses.html"><span class="nav-icon">📚</span> Courses</a>
+      <a class="nav-item" href="notices.html"><span class="nav-icon">📢</span> Notices</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user" onclick="Auth.logout()">
+        <div class="user-avatar" data-user-initials>F</div>
+        <div class="user-info">
+          <div class="user-name" data-user-name>Faculty</div>
+          <div class="user-role" data-user-role>Faculty</div>
+        </div>
+        <span style="color:var(--text-muted);">⏻</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="header">
+      <div>
+        <div class="header-title">Leave Management</div>
+        <div class="header-subtitle">Apply and track staff leaves</div>
+      </div>
+      <div class="header-spacer"></div>
+      <div class="header-actions">
+        <button class="header-btn" onclick="init()">🔄 Refresh</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div class="tabs-bar">
+        <button class="tab-btn active" id="tabBtnApply" onclick="switchTab('apply')">📝 Apply Leave</button>
+        <button class="tab-btn" id="tabBtnApprove" style="display:none;" onclick="switchTab('approve')">✅ Approve Leaves</button>
+      </div>
+
+      <!-- Apply Leave Tab -->
+      <div class="tab-panel active" id="panelApply">
+        <div class="grid-2">
+          <!-- Application Form -->
+          <div class="leave-form-card">
+            <h3 style="margin-bottom: 20px; color: var(--text-primary);">New Leave Application</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">From Date</label>
+                <input type="date" class="form-control" id="leaveFromDate">
+              </div>
+              <div class="form-group">
+                <label class="form-label">To Date</label>
+                <input type="date" class="form-control" id="leaveToDate">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Leave Type</label>
+              <select class="form-control" id="leaveType">
+                <option value="casual">Casual Leave</option>
+                <option value="medical">Medical Leave</option>
+                <option value="duty">Duty Leave</option>
+                <option value="half_day">Half Day</option>
+                <option value="full_day">Full Day</option>
+                <option value="multiple_days">Multiple Days</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Reason</label>
+              <textarea class="form-control" id="leaveReason" rows="4" placeholder="Brief explanation of your leave request..."></textarea>
+            </div>
+            <button class="btn btn-primary w-100" style="margin-top: 10px;" onclick="submitLeave()">Submit Leave Request</button>
+          </div>
+
+          <!-- Leave History -->
+          <div class="history-card">
+            <h3 style="margin-bottom: 20px; color: var(--text-primary);">My Leave History</h3>
+            <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Date Range</th>
+                    <th>Type</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="myLeaveHistory">
+                  <tr><td colspan="4" class="text-center" style="padding: 30px;"><div class="loading-spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Approve Leaves Tab -->
+      <div class="tab-panel" id="panelApprove">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Pending Leave Requests</div></div>
+          <div class="card-body" style="padding: 0;">
+            <div class="table-wrapper">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Faculty</th>
+                    <th>Date Range</th>
+                    <th>Type</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="hodLeavesBody">
+                  <tr><td colspan="6" class="text-center" style="padding: 30px;"><div class="loading-spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+  Auth.requireAuth();
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  if (user.role === 'student') window.location.href = '../dashboard/student.html';
+
+  let isHod = false;
+  let allMyLeaves = [];
+  let departmentLeaves = [];
+
+  // Default dates
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('leaveFromDate').value = today;
+  document.getElementById('leaveToDate').value = today;
+
+  async function checkHodStatus() {
+    try {
+      const response = await API.get('/hod/check/');
+      if (response && response.isHod) {
+        isHod = true;
+        document.getElementById('tabBtnApprove').style.display = 'inline-block';
+        document.getElementById('portalSub').textContent = 'HOD Portal';
+        
+        // Show HOD sections in sidebar
+        document.getElementById('hodSectionTitle').style.display = 'block';
+        document.getElementById('hodComplaintsLink').style.display = 'flex';
+        document.getElementById('hodTimetableLink').style.display = 'flex';
+      } else {
+        // Hide HOD sections in sidebar
+        document.getElementById('hodSectionTitle').style.display = 'none';
+        document.getElementById('hodComplaintsLink').style.display = 'none';
+        document.getElementById('hodTimetableLink').style.display = 'none';
+      }
+    } catch (e) {
+      console.error('Failed HOD check', e);
+    }
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+
+    if (tab === 'apply') {
+      document.getElementById('tabBtnApply').classList.add('active');
+      document.getElementById('panelApply').classList.add('active');
+    } else {
+      document.getElementById('tabBtnApprove').classList.add('active');
+      document.getElementById('panelApprove').classList.add('active');
+      loadDepartmentLeaves();
+    }
+  }
+
+  async function loadMyLeaves() {
+    try {
+      const data = await API.get('/faculty/leave/');
+      allMyLeaves = Array.isArray(data) ? data : (data.results || []);
+      renderMyHistory();
+    } catch (e) {
+      document.getElementById('myLeaveHistory').innerHTML = '<tr><td colspan="4" class="text-center" style="padding:20px;color:var(--text-muted);">Failed to load history</td></tr>';
+    }
+  }
+
+  function renderMyHistory() {
+    const tbody = document.getElementById('myLeaveHistory');
+    if (!allMyLeaves.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding:40px;color:var(--text-muted);"><div class="empty-state-icon">📝</div><div>No leave applications found</div></td></tr>';
+      return;
+    }
+
+    const typeLabels = { casual: 'Casual', medical: 'Medical', duty: 'Duty', half_day: 'Half Day', full_day: 'Full Day', multiple_days: 'Multiple Days' };
+
+    tbody.innerHTML = allMyLeaves.map(l => {
+      const from = Utils.formatDate(l.from_date);
+      const to = Utils.formatDate(l.to_date);
+      const dateRange = from === to ? from : `${from} – ${to}`;
+      return `
+        <tr>
+          <td><span style="font-weight:600;">${dateRange}</span></td>
+          <td><span class="badge badge-ghost">${typeLabels[l.leave_type] || l.leave_type}</span></td>
+          <td style="color:var(--text-secondary);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.reason || ''}">${l.reason || '—'}</td>
+          <td><span class="status-badge status-${l.status}">${l.status}</span></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function loadDepartmentLeaves() {
+    try {
+      const data = await API.get('/hod/leaves/');
+      departmentLeaves = Array.isArray(data) ? data : (data.results || []);
+      renderDepartmentLeaves();
+    } catch (e) {
+      document.getElementById('hodLeavesBody').innerHTML = '<tr><td colspan="6" class="text-center" style="padding:20px;color:var(--text-muted);">Failed to load requests</td></tr>';
+    }
+  }
+
+  function renderDepartmentLeaves() {
+    const tbody = document.getElementById('hodLeavesBody');
+    if (!departmentLeaves.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding:40px;color:var(--text-muted);"><div class="empty-state-icon">✅</div><div>No leave applications found for your department</div></td></tr>';
+      return;
+    }
+
+    const typeLabels = { casual: 'Casual', medical: 'Medical', duty: 'Duty', half_day: 'Half Day', full_day: 'Full Day', multiple_days: 'Multiple Days' };
+
+    tbody.innerHTML = departmentLeaves.map(l => {
+      const from = Utils.formatDate(l.from_date);
+      const to = Utils.formatDate(l.to_date);
+      const dateRange = from === to ? from : `${from} – ${to}`;
+      const facName = l.faculty ? `${l.faculty.first_name || ''} ${l.faculty.last_name || ''}`.trim() : 'Faculty';
+      
+      let actionColumn = '—';
+      if (l.status === 'pending') {
+        actionColumn = `
+          <div class="action-btn-group">
+            <button class="btn-approve" onclick="respondLeave('${l.leave_id}', 'approve')">Approve</button>
+            <button class="btn-reject" onclick="respondLeave('${l.leave_id}', 'reject')">Reject</button>
+          </div>
+        `;
+      }
+
+      return `
+        <tr>
+          <td><div class="avatar-cell">
+            <div class="table-avatar">${Utils.getInitials(facName)}</div>
+            <span style="font-weight:600;">${facName}</span>
+          </div></td>
+          <td><span style="font-weight:600;">${dateRange}</span></td>
+          <td><span class="badge badge-ghost">${typeLabels[l.leave_type] || l.leave_type}</span></td>
+          <td style="color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.reason || ''}">${l.reason || '—'}</td>
+          <td><span class="status-badge status-${l.status}">${l.status}</span></td>
+          <td>${actionColumn}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function submitLeave() {
+    const fromDate = document.getElementById('leaveFromDate').value;
+    const toDate = document.getElementById('leaveToDate').value;
+    const leaveType = document.getElementById('leaveType').value;
+    const reason = document.getElementById('leaveReason').value.trim();
+
+    if (!fromDate || !toDate) {
+      return Toast.warning('Please select leave start and end dates.');
+    }
+    if (new Date(fromDate) > new Date(toDate)) {
+      return Toast.warning('From Date cannot be later than To Date.');
+    }
+    if (!reason) {
+      return Toast.warning('Please specify a reason for the leave.');
+    }
+
+    try {
+      await API.post('/faculty/leave/', { fromDate, toDate, leaveType, reason });
+      Toast.success('Leave application submitted successfully!');
+      document.getElementById('leaveReason').value = '';
+      loadMyLeaves();
+    } catch (e) {
+      const msg = e.message || 'Failed to submit leave request.';
+      Toast.error(msg);
+    }
+  }
+
+  async function respondLeave(leaveId, action) {
+    try {
+      await API.post(`/hod/leaves/${leaveId}/${action}/`);
+      Toast.success(`Leave request ${action}ed!`);
+      loadDepartmentLeaves();
+    } catch (e) {
+      Toast.error(`Failed to ${action} leave request.`);
+    }
+  }
+
+  async function init() {
+    await checkHodStatus();
+    await loadMyLeaves();
+  }
+
+  init();
+</script>
+</body>
+</html>

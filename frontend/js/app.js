@@ -224,13 +224,20 @@ const API = {
       // 5. ALL STUDENTS LIST
       if (path === 'students') {
         if (method === 'GET') {
-          const rows = await SupaFetch.request('students?select=*,user:users(*),department:departments(*)&order=enrollment_no.asc');
+          const rows = await SupaFetch.request('students?select=*,user:users(*),department:departments(*),current_semester:semesters(*)&order=enrollment_no.asc');
           return rows.map(s => ({
             ...s,
             id: s.student_id,
             student_id: s.enrollment_no,
             department_name: s.department?.name || '—',
-            user: s.user
+            semester: s.current_semester?.number || '—',
+            year_of_study: s.current_semester?.number ? Math.ceil(s.current_semester.number / 2) : '—',
+            user: {
+              ...(s.user || {}),
+              first_name: s.first_name || '',
+              last_name: s.last_name || ''
+            },
+            roll_number: s.current_rollno // Map current_rollno to roll_number for frontend compatibility
           }));
         }
         if (method === 'POST') {
@@ -243,16 +250,31 @@ const API = {
           const createdUser = Array.isArray(newUser) ? newUser[0] : newUser;
           const newStudent = await SupaFetch.request('students', 'POST', {
             user_id: createdUser.id,
-            enrollment_no: body.roll_number || body.student_id,
+            enrollment_no: body.student_id,
             first_name: body.first_name || body.username,
             last_name: body.last_name || '',
             date_of_birth: body.date_of_birth || '2005-01-01',
             parent_email: body.parent_email || 'parent@college.edu',
             parent_phone: body.parent_phone || '',
             department_id: body.department_id || 'd0000000-0000-0000-0000-000000000001',
-            current_semester_id: 'e0000000-0000-0000-0000-000000000005'
+            current_semester_id: body.semester ? `e0000000-0000-0000-0000-00000000000${body.semester}` : 'e0000000-0000-0000-0000-000000000005',
+            current_rollno: body.roll_number || body.current_rollno || ''
           });
-          return Array.isArray(newStudent) ? newStudent[0] : newStudent;
+          const createdStudent = Array.isArray(newStudent) ? newStudent[0] : newStudent;
+          
+          // Auto-enroll student into matching subjects
+          if (createdStudent && createdStudent.student_id) {
+            const subjects = await SupaFetch.request(`subjects?department_id=eq.${createdStudent.department_id}&semester_id=eq.${createdStudent.current_semester_id}`);
+            if (subjects && subjects.length > 0) {
+              const enrollmentPayload = subjects.map(sub => ({
+                student_id: createdStudent.student_id,
+                subject_id: sub.subject_id,
+                semester_id: createdStudent.current_semester_id
+              }));
+              await SupaFetch.request('enrollments', 'POST', enrollmentPayload).catch(() => {});
+            }
+          }
+          return createdStudent;
         }
       }
 
@@ -260,8 +282,50 @@ const API = {
       if (path.startsWith('students/')) {
         const studentUuid = path.split('/')[1];
         if (method === 'PATCH' || method === 'PUT') {
-          const row = await SupaFetch.request(`students?student_id=eq.${studentUuid}`, 'PATCH', body);
-          return Array.isArray(row) ? row[0] : row;
+          const updateBody = { ...body };
+          if (updateBody.semester !== undefined) {
+            updateBody.current_semester_id = `e0000000-0000-0000-0000-00000000000${updateBody.semester}`;
+            delete updateBody.semester;
+          }
+          if (updateBody.year_of_study !== undefined) {
+            delete updateBody.year_of_study;
+          }
+          if (updateBody.status !== undefined) {
+            delete updateBody.status;
+          }
+          if (updateBody.roll_number !== undefined) {
+            updateBody.current_rollno = updateBody.roll_number;
+            delete updateBody.roll_number;
+          }
+          if (updateBody.email !== undefined || updateBody.phone !== undefined) {
+            const stRows = await SupaFetch.request(`students?select=user_id&student_id=eq.${studentUuid}`);
+            if (stRows && stRows.length) {
+              const uId = stRows[0].user_id;
+              const userUpdate = {};
+              if (updateBody.email !== undefined) userUpdate.email = updateBody.email;
+              if (Object.keys(userUpdate).length > 0) {
+                await SupaFetch.request(`users?id=eq.${uId}`, 'PATCH', userUpdate);
+              }
+            }
+            delete updateBody.email;
+            delete updateBody.phone;
+          }
+          const row = await SupaFetch.request(`students?student_id=eq.${studentUuid}`, 'PATCH', updateBody);
+          const updatedStudent = Array.isArray(row) ? row[0] : row;
+
+          // Automatically enroll/re-enroll student in all subjects matching department and semester
+          if (updatedStudent && updatedStudent.student_id) {
+            const subjects = await SupaFetch.request(`subjects?department_id=eq.${updatedStudent.department_id}&semester_id=eq.${updatedStudent.current_semester_id}`);
+            if (subjects && subjects.length > 0) {
+              const enrollmentPayload = subjects.map(sub => ({
+                student_id: updatedStudent.student_id,
+                subject_id: sub.subject_id,
+                semester_id: updatedStudent.current_semester_id
+              }));
+              await SupaFetch.request('enrollments', 'POST', enrollmentPayload).catch(() => {});
+            }
+          }
+          return updatedStudent;
         }
         if (method === 'DELETE') {
           const student = await SupaFetch.request(`students?student_id=eq.${studentUuid}`);
@@ -279,58 +343,180 @@ const API = {
           ...f,
           id: f.faculty_id,
           department_name: f.department?.name || '—',
-          user: f.user
+          // Normalize: expose first_name/last_name on user so pages using f.user?.first_name work
+          user: {
+            ...(f.user || {}),
+            first_name: f.first_name || f.user?.email?.split('@')[0] || '',
+            last_name: f.last_name || ''
+          }
+        }));
+      }
+
+      // 7b. DEPARTMENTS (also aliased as faculty/departments)
+      if (path === 'faculty/departments' || path === 'departments') {
+        const rows = await SupaFetch.request('departments?select=*&order=name.asc');
+        return rows.map(d => ({
+          ...d,
+          id: d.department_id,
+          name: d.name,
+          code: d.code,
         }));
       }
 
       // 8. ALL COURSES / SUBJECTS
       if (path === 'courses') {
-        const rows = await SupaFetch.request('subjects?select=*,faculty:faculty(*,user:users(*)),department:departments(*)');
-        return rows.map(c => ({
-          ...c,
-          id: c.subject_id,
-          department_name: c.department?.name || '—',
-          faculty_name: c.faculty?.user ? `${c.faculty.user.first_name || c.faculty.user.username} ${c.faculty.user.last_name || ''}` : '—'
-        }));
+        const rows = await SupaFetch.request('subjects?select=*,faculty:faculty(*,user:users(*)),department:departments(*),semester:semesters(*),enrollments(student_id)');
+        return rows.map(c => {
+          const enrolledCount = c.enrollments ? c.enrollments.length : 0;
+          return {
+            ...c,
+            id: c.subject_id,
+            enrolled_count: enrolledCount,
+            department_name: c.department?.name || '—',
+            // faculty has first_name/last_name directly on the record
+            faculty_name: c.faculty
+              ? `${c.faculty.first_name || ''} ${c.faculty.last_name || ''}`.trim() || '—'
+              : '—',
+            // expose semester number for the table display
+            semester: c.semester?.number || '—',
+            is_active: true
+          };
+        });
       }
 
       // 9. ENROLLMENTS
       if (path === 'enrollments' || path === 'courses/enrollments') {
-        const studentRow = await SupaFetch.request(`students?user_id=eq.${loggedInUser.id}`);
-        if (!studentRow || studentRow.length === 0) return [];
-        const rows = await SupaFetch.request(`enrollments?select=*,course:subjects(*)&student_id=eq.${studentRow[0].student_id}`);
-        return rows.map(e => ({
-          ...e,
-          course: e.course?.subject_id,
-          course_code: e.course?.code,
-          course_name: e.course?.name
-        }));
+        let courseUuid = params.get('course');
+        if (courseUuid) {
+          const rows = await SupaFetch.request(`enrollments?select=*,student:students(*),course:subjects(*)&subject_id=eq.${courseUuid}`);
+          return rows.map(e => ({
+            ...e,
+            course: e.course?.subject_id,
+            course_code: e.course?.code,
+            course_name: e.course?.name,
+            student: e.student?.student_id,
+            student_name: e.student ? `${e.student.first_name || ''} ${e.student.last_name || ''}`.trim() : 'Student'
+          }));
+        } else {
+          const studentRow = await SupaFetch.request(`students?user_id=eq.${loggedInUser.id}`);
+          if (!studentRow || studentRow.length === 0) return [];
+          const rows = await SupaFetch.request(`enrollments?select=*,course:subjects(*)&student_id=eq.${studentRow[0].student_id}`);
+          return rows.map(e => ({
+            ...e,
+            course: e.course?.subject_id,
+            course_code: e.course?.code,
+            course_name: e.course?.name
+          }));
+        }
       }
 
       // 10. GRADES / MARKS
       if (path === 'grades/my_grades' || path === 'grades') {
-        let studentUuid = params.get('student');
-        if (!studentUuid && path === 'grades/my_grades') {
-          const studentRow = await SupaFetch.request(`students?select=student_id&user_id=eq.${loggedInUser.id}`);
-          if (!studentRow || studentRow.length === 0) return [];
-          studentUuid = studentRow[0].student_id;
+        if (method === 'GET') {
+          let studentUuid = params.get('student');
+          let courseUuid = params.get('course');
+          if (!studentUuid && path === 'grades/my_grades') {
+            const studentRow = await SupaFetch.request(`students?select=student_id&user_id=eq.${loggedInUser.id}`);
+            if (!studentRow || studentRow.length === 0) return [];
+            studentUuid = studentRow[0].student_id;
+          }
+          let query = 'marks?select=*,course:subjects(*),student:students(*)';
+          if (studentUuid) {
+            query += `&student_id=eq.${studentUuid}`;
+          }
+          if (courseUuid) {
+            query += `&subject_id=eq.${courseUuid}`;
+          }
+          const rows = await SupaFetch.request(query);
+          return rows.map(r => {
+            const obtained = parseFloat(r.total_marks || (parseFloat(r.internal_marks || 0) + parseFloat(r.external_marks || 0)) || 0);
+            const maxMarks = obtained > 100 ? 150 : 100;
+            const percentage = Math.round((obtained / maxMarks) * 100);
+            const studentName = r.student ? `${r.student.first_name || ''} ${r.student.last_name || ''}`.trim() : 'Student';
+            
+            let computedGrade = 'F';
+            if (percentage >= 90) computedGrade = 'O';
+            else if (percentage >= 85) computedGrade = 'A+';
+            else if (percentage >= 75) computedGrade = 'A';
+            else if (percentage >= 65) computedGrade = 'B+';
+            else if (percentage >= 55) computedGrade = 'B';
+            else if (percentage >= 45) computedGrade = 'C';
+            else if (percentage >= 35) computedGrade = 'D';
+
+            return {
+              ...r,
+              id: r.mark_id,
+              marks_obtained: obtained,
+              total_marks: maxMarks,
+              percentage: percentage,
+              grade: computedGrade,
+              course_name: r.course?.name || '—',
+              course_code: r.course?.code || '—',
+              student_name: studentName,
+              exam_type: 'Semester End Exam',
+              exam_date: r.entered_at
+            };
+          });
         }
-        const rows = await SupaFetch.request(`marks?select=*,course:subjects(*)&student_id=eq.${studentUuid || 'st000000-0000-0000-0000-000000000001'}`);
-        return rows.map(r => {
-          const obtained = parseFloat(r.total_marks || (r.internal_marks + r.external_marks) || 0);
-          const maxMarks = obtained > 100 ? 150 : 100;
-          const percentage = Math.round((obtained / maxMarks) * 100);
-          return {
-            ...r,
-            marks_obtained: obtained,
-            total_marks: maxMarks,
-            percentage: percentage,
-            course_name: r.course?.name || '—',
-            course_code: r.course?.code || '—',
-            exam_type: 'Semester End Exam',
-            exam_date: r.entered_at
-          };
-        });
+        if (method === 'POST') {
+          const percentage = Math.round((body.marks_obtained / body.total_marks) * 100);
+          let computedGrade = 'F';
+          let gpa = 0.0;
+          if (percentage >= 90) { computedGrade = 'O'; gpa = 10.0; }
+          else if (percentage >= 85) { computedGrade = 'A+'; gpa = 9.0; }
+          else if (percentage >= 75) { computedGrade = 'A'; gpa = 8.0; }
+          else if (percentage >= 65) { computedGrade = 'B+'; gpa = 7.0; }
+          else if (percentage >= 55) { computedGrade = 'B'; gpa = 6.0; }
+          else if (percentage >= 45) { computedGrade = 'C'; gpa = 5.0; }
+          else if (percentage >= 35) { computedGrade = 'D'; gpa = 4.0; }
+          
+          const activeSem = 'e0000000-0000-0000-0000-000000000005';
+          
+          const row = await SupaFetch.request('marks', 'POST', {
+            student_id: body.student,
+            subject_id: body.course,
+            semester_id: activeSem,
+            internal_marks: body.marks_obtained * 0.4,
+            external_marks: body.marks_obtained * 0.6,
+            total_marks: body.marks_obtained,
+            grade: computedGrade,
+            gpa: gpa,
+            entered_by: loggedInUser.id
+          });
+          return row;
+        }
+      }
+
+      // marks EDIT / DELETE
+      if (path.startsWith('grades/')) {
+        const gradeId = path.split('/')[1];
+        if (method === 'PATCH' || method === 'PUT') {
+          const percentage = Math.round((body.marks_obtained / body.total_marks) * 100);
+          let computedGrade = 'F';
+          let gpa = 0.0;
+          if (percentage >= 90) { computedGrade = 'O'; gpa = 10.0; }
+          else if (percentage >= 85) { computedGrade = 'A+'; gpa = 9.0; }
+          else if (percentage >= 75) { computedGrade = 'A'; gpa = 8.0; }
+          else if (percentage >= 65) { computedGrade = 'B+'; gpa = 7.0; }
+          else if (percentage >= 55) { computedGrade = 'B'; gpa = 6.0; }
+          else if (percentage >= 45) { computedGrade = 'C'; gpa = 5.0; }
+          else if (percentage >= 35) { computedGrade = 'D'; gpa = 4.0; }
+
+          const row = await SupaFetch.request(`marks?mark_id=eq.${gradeId}`, 'PATCH', {
+            student_id: body.student,
+            subject_id: body.course,
+            internal_marks: body.marks_obtained * 0.4,
+            external_marks: body.marks_obtained * 0.6,
+            total_marks: body.marks_obtained,
+            grade: computedGrade,
+            gpa: gpa
+          });
+          return row;
+        }
+        if (method === 'DELETE') {
+          await SupaFetch.request(`marks?mark_id=eq.${gradeId}`, 'DELETE');
+          return null;
+        }
       }
 
       // 11. TIMETABLE
@@ -359,8 +545,11 @@ const API = {
       if (path === 'attendance/stats') {
         const studentUuid = params.get('student');
         const subjectUuid = params.get('course');
-        let query = `attendance_records?student_id=eq.${studentUuid}`;
+        const date = params.get('date');
+        let query = 'attendance_records?select=*';
+        if (studentUuid) query += `&student_id=eq.${studentUuid}`;
         if (subjectUuid) query += `&subject_id=eq.${subjectUuid}`;
+        if (date) query += `&date=eq.${date}`;
         const records = await SupaFetch.request(query);
         
         const present = records.filter(r => r.status === 'present' || r.status === 'P' || r.status === 'p').length;
@@ -370,7 +559,6 @@ const API = {
         const total   = records.length;
         const totalEligible = total || 1;
         
-        // Calculate attended (present + late)
         const attended = present + late;
         const percentage = ((attended / totalEligible) * 100).toFixed(1);
 
@@ -384,14 +572,118 @@ const API = {
         };
       }
       if (path === 'attendance') {
-        const studentUuid = params.get('student');
-        const rows = await SupaFetch.request(`attendance_records?select=*,course:subjects(*),marker:faculty(*)&student_id=eq.${studentUuid}`);
-        return rows.map(r => ({
-          ...r,
-          course_name: r.course?.name || '—',
-          course_code: r.course?.code || '—',
-          marked_by: r.marker ? `${r.marker.first_name} ${r.marker.last_name}` : 'System'
+        if (method === 'GET') {
+          const studentUuid = params.get('student');
+          const courseUuid = params.get('course');
+          const date = params.get('date');
+          const status = params.get('status');
+          
+          let query = 'attendance_records?select=*,course:subjects(*),student:students(*)';
+          if (studentUuid) {
+            query += `&student_id=eq.${studentUuid}`;
+          }
+          if (courseUuid) {
+            query += `&subject_id=eq.${courseUuid}`;
+          }
+          if (date) {
+            query += `&date=eq.${date}`;
+          }
+          if (status) {
+            // Map UI status request to database status enum value if filtering
+            const uiToDbStatus = {
+              'present': 'P',
+              'absent': 'A',
+              'late': 'L'
+            };
+            query += `&status=eq.${uiToDbStatus[status] || status}`;
+          }
+          
+          let rows;
+          try {
+            console.log('[API] Querying attendance:', query);
+            rows = await SupaFetch.request(query);
+            console.log('[API] Attendance rows received:', rows);
+          } catch (queryErr) {
+            console.error('[API] SupaFetch query error:', queryErr);
+            throw queryErr;
+          }
+
+          if (!rows) {
+            console.warn('[API] Attendance returned falsy rows:', rows);
+            rows = [];
+          }
+          if (!Array.isArray(rows)) {
+            console.warn('[API] Attendance rows is not an array:', rows);
+            rows = [rows];
+          }
+
+          // Resolve faculty names for marked_by (best-effort, won't block if lookup fails)
+          const uniqueMarkerIds = [...new Set(rows.map(r => r ? r.marked_by : null).filter(Boolean))];
+          let markerMap = {};
+          if (uniqueMarkerIds.length > 0) {
+            try {
+              console.log('[API] Resolving marker names for:', uniqueMarkerIds);
+              const facultyRows = await SupaFetch.request(`faculty?select=faculty_id,first_name,last_name&faculty_id=in.(${uniqueMarkerIds.join(',')})`);
+              console.log('[API] Faculty rows resolved:', facultyRows);
+              if (Array.isArray(facultyRows)) {
+                facultyRows.forEach(f => {
+                  markerMap[f.faculty_id] = `${f.first_name || ''} ${f.last_name || ''}`.trim();
+                });
+              }
+            } catch (markerErr) {
+              console.warn('[API] Could not resolve marker names:', markerErr);
+            }
+          }
+
+          return rows.map(r => {
+            if (!r) return null;
+            const studentName = r.student ? `${r.student.first_name || ''} ${r.student.last_name || ''}`.trim() : 'Student';
+            const markedByName = markerMap[r.marked_by] || 'System';
+            
+            // Map database status enum ('P', 'A', 'L') to UI values ('present', 'absent', 'late')
+            const dbToUiStatus = {
+              'P': 'present',
+              'A': 'absent',
+              'L': 'late'
+            };
+            const statusVal = dbToUiStatus[r.status] || r.status || 'present';
+
+            return {
+              ...r,
+              status: statusVal,
+              student_name: studentName,
+              course_name: r.course?.name || '—',
+              course_code: r.course?.code || '—',
+              marked_by: markedByName
+            };
+          }).filter(Boolean);
+        }
+      }
+      if (path === 'attendance/bulk-mark' && method === 'POST') {
+        let facultyId = null;
+        if (loggedInUser && loggedInUser.id) {
+          const facultyRow = await SupaFetch.request(`faculty?select=faculty_id&user_id=eq.${loggedInUser.id}`);
+          if (facultyRow && facultyRow.length > 0) {
+            facultyId = facultyRow[0].faculty_id;
+          }
+        }
+
+        const uiToDbStatus = {
+          'present': 'P',
+          'absent': 'A',
+          'late': 'L'
+        };
+
+        const payload = body.records.map(r => ({
+          student_id: r.student,
+          subject_id: r.course,
+          date: r.date,
+          status: uiToDbStatus[r.status] || r.status || 'P',
+          marked_by: facultyId,
+          ip_address: '127.0.0.1'
         }));
+        const response = await SupaFetch.request('attendance_records', 'POST', payload);
+        return response;
       }
 
       // 13. FEES / FEE STRUCTURE & PAYMENTS
@@ -556,6 +848,104 @@ const API = {
         }
       }
 
+      // 16. HOD CHECK
+      if (path === 'hod/check') {
+        if (method === 'GET') {
+          const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
+          if (hodRow && hodRow.length > 0) {
+            return { isHod: true, hod: hodRow[0] };
+          }
+          return { isHod: false };
+        }
+      }
+
+      // 17. FACULTY LEAVE
+      if (path === 'faculty/leave') {
+        if (method === 'GET') {
+          const facultyRow = await SupaFetch.request(`faculty?user_id=eq.${loggedInUser.id}`);
+          if (!facultyRow || !facultyRow.length) {
+            throw { error: 'not_found', message: 'Faculty profile not found.' };
+          }
+          const leaveRows = await SupaFetch.request(`leave_requests?select=*&faculty_id=eq.${facultyRow[0].faculty_id}&order=applied_at.desc`);
+          return leaveRows;
+        }
+        if (method === 'POST') {
+          const facultyRow = await SupaFetch.request(`faculty?user_id=eq.${loggedInUser.id}`);
+          if (!facultyRow || !facultyRow.length) {
+            throw { error: 'not_found', message: 'Faculty profile not found.' };
+          }
+          const facId = facultyRow[0].faculty_id;
+          
+          // Validation: Leave dates must not overlap with already-approved leave
+          const existingApproved = await SupaFetch.request(`leave_requests?select=*&faculty_id=eq.${facId}&status=eq.approved`);
+          
+          const fromDateVal = new Date(body.fromDate);
+          const toDateVal = new Date(body.toDate);
+          
+          const overlap = existingApproved.some(leave => {
+            const start = new Date(leave.from_date);
+            const end = new Date(leave.to_date);
+            return (fromDateVal <= end && toDateVal >= start);
+          });
+          
+          if (overlap) {
+            throw { error: 'validation_error', message: 'Requested dates overlap with an already approved leave.' };
+          }
+          
+          const row = await SupaFetch.request('leave_requests', 'POST', {
+            faculty_id: facId,
+            from_date: body.fromDate,
+            to_date: body.toDate,
+            leave_type: body.leaveType || 'casual',
+            reason: body.reason || '',
+            status: 'pending'
+          });
+          return Array.isArray(row) ? row[0] : row;
+        }
+      }
+
+      // 18. HOD LEAVE MANAGEMENT
+      if (path === 'hod/leaves') {
+        if (method === 'GET') {
+          const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
+          if (!hodRow || !hodRow.length) {
+            throw { error: 'unauthorized', message: 'Only HODs can access department leaves.' };
+          }
+          
+          const facultyInDept = await SupaFetch.request(`faculty?select=faculty_id,first_name,last_name&department_id=eq.${hodRow[0].department_id}`);
+          if (!facultyInDept || !facultyInDept.length) {
+            return [];
+          }
+          
+          const facIds = facultyInDept.map(f => f.faculty_id);
+          const leaveRows = await SupaFetch.request(`leave_requests?select=*,faculty:faculty(*)&faculty_id=in.(${facIds.join(',')})&order=applied_at.desc`);
+          return leaveRows;
+        }
+      }
+
+      if (path.startsWith('hod/leaves/')) {
+        const parts = path.split('/');
+        const leaveUuid = parts[2];
+        const action = parts[3];
+        
+        if (method === 'PATCH' || method === 'POST' || method === 'PUT') {
+          const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
+          if (!hodRow || !hodRow.length) {
+            throw { error: 'unauthorized', message: 'Only HODs can approve/reject leaves.' };
+          }
+          
+          const status = action === 'approve' ? 'approved' : 'rejected';
+          const updateData = {
+            status: status,
+            approved_by_hod: hodRow[0].hod_id,
+            decision_at: new Date().toISOString()
+          };
+          
+          const row = await SupaFetch.request(`leave_requests?leave_id=eq.${leaveUuid}`, 'PATCH', updateData);
+          return Array.isArray(row) ? row[0] : row;
+        }
+      }
+
       // Fallback API Call
       const token = Auth.getToken();
       const headers = {
@@ -566,7 +956,7 @@ const API = {
       return response.status === 204 ? null : await response.json();
 
     } catch (err) {
-      console.error('Translation error:', err);
+      console.error('Translation error:', JSON.stringify(err), err);
       throw err;
     }
   },

@@ -196,13 +196,13 @@
 
       <!-- Tabs Card -->
       <div class="card" style="overflow:visible;">
-        <div class="tabs-bar">
+        <div class="tabs-bar" style="display: none;">
           <button class="tab-btn active" onclick="switchTab('courses', this)">📚 Courses</button>
         </div>
 
         <!-- Courses Tab -->
         <div class="tab-panel active" id="tab-courses">
-          <div class="filters-bar">
+          <div class="filters-bar" style="display: none;">
             <div class="search-input-wrap">
               <span>🔍</span>
               <input type="text" id="searchInput" placeholder="Search by name, code...">
@@ -251,7 +251,7 @@
             </table>
           </div>
 
-          <div class="pagination">
+          <div class="pagination" style="display: none;">
             <span id="paginationInfo">Loading...</span>
             <div class="pagination-btns" id="paginationBtns"></div>
           </div>
@@ -492,6 +492,7 @@
         <a class="nav-item" href="attendance.html"><span class="nav-icon">✅</span> Attendance</a>
         <a class="nav-item" href="grades.html"><span class="nav-icon">📝</span> Grades</a>
         <a class="nav-item" href="faculty_timetable.html"><span class="nav-icon">📅</span> Timetable</a>
+        <a class="nav-item" href="leaves.html"><span class="nav-icon">📝</span> Leave Application</a>
         <div class="nav-section-title">Communications</div>
         <a class="nav-item" href="notices.html"><span class="nav-icon">📢</span> Notices</a>
         <a class="nav-item" href="hod_complaints.html"><span class="nav-icon">📣</span> Complaints</a>`;
@@ -559,15 +560,38 @@
   // ---- Load Data ----
   async function loadAll() {
     try {
-      const [coursesData, facultyData, deptsData] = await Promise.all([
+      const [coursesData, facultyData, deptsData, semData] = await Promise.all([
         API.get('/courses/'),
         API.get('/faculty/'),
         API.get('/faculty/departments/'),
+        API.get('/semesters?is_active=eq.true'),
       ]);
 
       let courses = (coursesData.results || coursesData) || [];
       allFaculty = (facultyData.results || facultyData) || [];
       allDepts   = (deptsData.results || deptsData) || [];
+      const activeSemesters = (semData.results || semData) || [];
+
+      // Determine the current semester
+      let currentSem = null;
+      if (isStudent) {
+        try {
+          const cached = localStorage.getItem('student_profile');
+          if (cached) {
+            currentSem = JSON.parse(cached).semester;
+          } else {
+            const profile = await API.get('/students/my_profile/');
+            currentSem = profile.semester;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        if (activeSemesters.length > 0) {
+          activeSemesters.sort((a, b) => a.number - b.number);
+          currentSem = activeSemesters[0].number;
+        }
+      }
 
       // ── Role-based filtering ──────────────────────────────────────
       if (isStudent) {
@@ -577,10 +601,8 @@
           const myEnrollments = (enrollData.results || enrollData) || [];
           const myCourseIds = new Set(myEnrollments.map(e => e.course || e.course_id));
           courses = courses.filter(c => myCourseIds.has(c.id));
-          document.getElementById('pageDesc').textContent =
-            `You are enrolled in ${courses.length} course${courses.length !== 1 ? 's' : ''}.`;
-        } catch {
-          document.getElementById('pageDesc').textContent = 'Your enrolled courses.';
+        } catch (e) {
+          console.error(e);
         }
       } else if (isFaculty) {
         // Show only courses assigned to this faculty
@@ -588,20 +610,36 @@
           const profileData = await API.get('/faculty/my_profile/');
           const myFacultyId = profileData.id;
           courses = courses.filter(c => c.faculty === myFacultyId || c.faculty_id === myFacultyId);
-          document.getElementById('pageDesc').textContent =
-            `You are teaching ${courses.length} course${courses.length !== 1 ? 's' : ''}.`;
-        } catch {
-          document.getElementById('pageDesc').textContent = 'Your assigned courses.';
+        } catch (e) {
+          console.error(e);
         }
+      }
+
+      // ── Filter by current semester ────────────────────────────────
+      if (currentSem && currentSem !== '—') {
+        courses = courses.filter(c => String(c.semester) === String(currentSem));
+      }
+
+      // ── Update Page Description and Headers ───────────────────────
+      if (isStudent) {
+        document.getElementById('pageDesc').textContent =
+          `You are enrolled in ${courses.length} course${courses.length !== 1 ? 's' : ''} for your current semester (Semester ${currentSem || '—'}).`;
+      } else if (isFaculty) {
+        document.getElementById('pageDesc').textContent =
+          `You are teaching ${courses.length} course${courses.length !== 1 ? 's' : ''} in the current active semester (Semester ${currentSem || '—'}).`;
       } else {
-        document.getElementById('pageDesc').textContent = 'Manage course catalog, enrollments, and curriculum.';
+        document.getElementById('pageDesc').textContent =
+          `Showing ${courses.length} course${courses.length !== 1 ? 's' : ''} for the current active semester (Semester ${currentSem || '—'}).`;
         // Add Actions column header for admin
         const headRow = document.querySelector('#coursesTableHead tr');
         if (headRow && isAdmin) {
-          const th = document.createElement('th');
-          th.style.textAlign = 'center';
-          th.textContent = 'Actions';
-          headRow.appendChild(th);
+          if (!headRow.querySelector('th[data-actions]')) {
+            const th = document.createElement('th');
+            th.setAttribute('data-actions', 'true');
+            th.style.textAlign = 'center';
+            th.textContent = 'Actions';
+            headRow.appendChild(th);
+          }
         }
       }
 

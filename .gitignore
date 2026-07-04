@@ -56,3 +56,9 @@ staticfiles/
 venv/
 env/
 .venv/
+
+supabase/
+
+# Tool outputs
+.claude/
+graphify-out/

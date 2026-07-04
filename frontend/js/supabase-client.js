@@ -3,8 +3,12 @@
    Lightweight fetch-based client for new UUID-based schema.
    ============================================================ */
 
-const SUPABASE_URL  = 'https://olaqwoxycxdbcmqegifi.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sYXF3b3h5Y3hkYmNtcWVnaWZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MDYyODgsImV4cCI6MjA5ODM4MjI4OH0.JUYUKKGAAd7fx8s840meU0Ayd5VE7sfSMwDbiG8twlU';
+if (typeof SUPABASE_URL === 'undefined') {
+  window.SUPABASE_URL = 'https://olaqwoxycxdbcmqegifi.supabase.co';
+}
+if (typeof SUPABASE_ANON === 'undefined') {
+  window.SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sYXF3b3h5Y3hkYmNtcWVnaWZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MDYyODgsImV4cCI6MjA5ODM4MjI4OH0.JUYUKKGAAd7fx8s840meU0Ayd5VE7sfSMwDbiG8twlU';
+}
 
 const SupaDB = {
   _headers() {
@@ -59,9 +63,9 @@ const SupaDB = {
 // ---- Supabase API Endpoints ----
 const SupaAPI = {
   content: {
-    bySubject: (subjId)  => SupaDB.select('content', { subject_id: `eq.${subjId}`, is_active: 'eq.true', order: 'uploaded_at.desc' }),
-    byFaculty: (facId)   => SupaDB.select('content', { faculty_id: `eq.${facId}`, is_active: 'eq.true', order: 'uploaded_at.desc' }),
-    all:       ()        => SupaDB.select('content', { is_active: 'eq.true', order: 'uploaded_at.desc' }),
+    bySubject: (subjId)  => SupaDB.select('content', { select: '*,subject:subjects(code,name),faculty:faculty(first_name,last_name)', subject_id: `eq.${subjId}`, is_active: 'eq.true', order: 'uploaded_at.desc' }),
+    byFaculty: (facId)   => SupaDB.select('content', { select: '*,subject:subjects(code,name),faculty:faculty(first_name,last_name)', faculty_id: `eq.${facId}`, is_active: 'eq.true', order: 'uploaded_at.desc' }),
+    all:       ()        => SupaDB.select('content', { select: '*,subject:subjects(code,name),faculty:faculty(first_name,last_name)', is_active: 'eq.true', order: 'uploaded_at.desc' }),
     add:       (data)    => SupaDB.insert('content', data),
     delete:    (id)      => SupaDB.delete('content', { content_id: `eq.${id}` }),
   },

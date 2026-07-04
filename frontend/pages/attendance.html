@@ -7,6 +7,43 @@
     <link rel="stylesheet" href="../css/main.css">
   <script src="../js/chart.min.js"></script>
   <script src="../js/socket.io.min.js"></script>
+  <style>
+    .date-group { margin-bottom: 4px; }
+    .date-group-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 20px;
+      background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06));
+      border-bottom: 1px solid rgba(99,102,241,0.15);
+      position: sticky; top: 0; z-index: 2;
+      backdrop-filter: blur(8px);
+    }
+    .date-group-title { display: flex; align-items: center; gap: 10px; }
+    .date-group-icon { font-size: 1.1rem; }
+    .date-group-label {
+      font-weight: 700; font-size: 0.92rem;
+      color: var(--text-primary);
+      letter-spacing: 0.02em;
+    }
+    .date-group-stats { display: flex; align-items: center; gap: 12px; }
+    .date-stat {
+      font-size: 0.75rem; font-weight: 600;
+      padding: 3px 10px; border-radius: 20px;
+    }
+    .present-stat { color: #34d399; background: rgba(52,211,153,0.12); }
+    .absent-stat { color: #f87171; background: rgba(248,113,113,0.12); }
+    .late-stat { color: #fbbf24; background: rgba(251,191,36,0.12); }
+    .total-stat { color: var(--text-muted); background: rgba(255,255,255,0.06); }
+    .date-table { margin-bottom: 0 !important; }
+    .date-table thead th {
+      font-size: 0.7rem !important;
+      padding: 8px 16px !important;
+      background: rgba(0,0,0,0.15) !important;
+      color: var(--text-muted) !important;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .date-table tbody td { padding: 10px 16px !important; }
+    .date-table tbody tr:last-child td { border-bottom: none; }
+  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -68,7 +105,7 @@
           <p>Mark attendance for courses, view stats, and track trends.</p>
         </div>
         <div class="page-header-right">
-          <input type="date" class="form-control" id="attendanceDate" style="width:auto;" value="">
+          <input type="date" class="form-control" id="attendanceDate" style="width:auto;" value="" onchange="loadTodayStats()">
           <button class="btn btn-primary" onclick="Modal.open('markAttendanceModal')">✅ Mark Attendance</button>
         </div>
       </div>
@@ -116,21 +153,8 @@
             </div>
           </div>
           <div class="card-body" style="padding:0;">
-            <div class="table-wrapper">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>Student</th>
-                    <th>Course</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th>Marked By</th>
-                  </tr>
-                </thead>
-                <tbody id="attendanceBody">
-                  <tr><td colspan="5" class="text-center" style="padding:30px;"><div class="loading-spinner"></div></td></tr>
-                </tbody>
-              </table>
+            <div id="attendanceBody" style="max-height:500px;overflow-y:auto;">
+              <div style="text-align:center;padding:40px;"><div class="loading-spinner" style="margin:0 auto;width:32px;height:32px;border-width:3px;"></div></div>
             </div>
           </div>
         </div>
@@ -194,7 +218,7 @@
   // Set today's date
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('attendanceDate').value = today;
-  document.getElementById('filterDate').value = today;
+  document.getElementById('filterDate').value = '';  // Don't default – show all records
   document.getElementById('markDate').value = today;
 
   let allCourses = [];
@@ -226,35 +250,92 @@
     if (date) url += `date=${date}&`;
     if (status) url += `status=${status}&`;
 
-    document.getElementById('attendanceBody').innerHTML = '<tr><td colspan="5" class="text-center" style="padding:30px;"><div class="loading-spinner"></div></td></tr>';
+    document.getElementById('attendanceBody').innerHTML = '<div style="text-align:center;padding:40px;"><div class="loading-spinner" style="margin:0 auto;width:32px;height:32px;border-width:3px;"></div><div style="margin-top:12px;color:var(--text-muted);">Loading records...</div></div>';
 
     try {
+      console.log('[Attendance] Fetching:', url);
       const data = await API.get(url);
-      const records = data.results || data;
+      console.log('[Attendance] Data received:', data);
+      const records = Array.isArray(data) ? data : (data.results || []);
+      console.log('[Attendance] Records count:', records.length);
       if (!records.length) {
-        document.getElementById('attendanceBody').innerHTML = '<tr><td colspan="5" class="text-center" style="padding:30px;color:var(--text-muted);">No attendance records found for this filter.</td></tr>';
+        document.getElementById('attendanceBody').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">No attendance records found for this filter.</div>';
         return;
       }
-      document.getElementById('attendanceBody').innerHTML = records.map(r => `
-        <tr>
-          <td>
-            <div class="avatar-cell">
-              <div class="table-avatar">${Utils.getInitials(r.student_name || 'S')}</div>
-              <span style="font-weight:600;">${r.student_name || r.student}</span>
+
+      // Group records by date
+      const grouped = {};
+      records.forEach(r => {
+        const d = r.date;
+        if (!grouped[d]) grouped[d] = [];
+        grouped[d].push(r);
+      });
+
+      // Sort dates descending (newest first)
+      const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+
+      let html = '';
+      sortedDates.forEach(dateKey => {
+        const dateRecords = grouped[dateKey];
+        const formattedDate = Utils.formatDate(dateKey);
+        const presentCount = dateRecords.filter(r => r.status === 'present').length;
+        const absentCount = dateRecords.filter(r => r.status === 'absent').length;
+        const lateCount = dateRecords.filter(r => r.status === 'late').length;
+        const total = dateRecords.length;
+
+        html += `
+          <div class="date-group">
+            <div class="date-group-header">
+              <div class="date-group-title">
+                <span class="date-group-icon">📅</span>
+                <span class="date-group-label">${formattedDate}</span>
+              </div>
+              <div class="date-group-stats">
+                <span class="date-stat present-stat">✅ ${presentCount}</span>
+                <span class="date-stat absent-stat">❌ ${absentCount}</span>
+                ${lateCount > 0 ? `<span class="date-stat late-stat">⏰ ${lateCount}</span>` : ''}
+                <span class="date-stat total-stat">${total} total</span>
+              </div>
             </div>
-          </td>
-          <td style="color:var(--primary-light);font-weight:500;">${r.course_name || r.course}</td>
-          <td>${Utils.formatDate(r.date)}</td>
-          <td>${Utils.getStatusBadge(r.status)}</td>
-          <td style="color:var(--text-muted);">${r.marked_by || 'System'}</td>
-        </tr>
-      `).join('');
-    } catch (e) { console.error(e); }
+            <table class="table date-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Course</th>
+                  <th>Status</th>
+                  <th>Marked By</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${dateRecords.map(r => `
+                  <tr>
+                    <td>
+                      <div class="avatar-cell">
+                        <div class="table-avatar">${Utils.getInitials(r.student_name || 'S')}</div>
+                        <span style="font-weight:600;">${r.student_name || r.student}</span>
+                      </div>
+                    </td>
+                    <td style="color:var(--primary-light);font-weight:500;">${r.course_name || r.course}</td>
+                    <td>${Utils.getStatusBadge(r.status)}</td>
+                    <td style="color:var(--text-muted);">${r.marked_by || 'System'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      });
+
+      document.getElementById('attendanceBody').innerHTML = html;
+    } catch (e) {
+      console.error('[Attendance] Error:', e);
+      document.getElementById('attendanceBody').innerHTML = '<div style="text-align:center;padding:40px;color:#f87171;">Error loading attendance records. Check console for details.</div>';
+    }
   }
 
   async function loadTodayStats() {
     try {
-      const data = await API.get('/attendance/stats/');
+      const date = document.getElementById('attendanceDate').value || new Date().toISOString().split('T')[0];
+      const data = await API.get(`/attendance/stats/?date=${date}`);
       document.getElementById('statPresent').textContent = data.present || 0;
       document.getElementById('statAbsent').textContent = data.absent || 0;
       document.getElementById('statLate').textContent = data.late || 0;
@@ -294,9 +375,9 @@
                 <div class="table-avatar">${Utils.getInitials(e.student_name || 'S')}</div>
                 <span style="font-weight:600;">${e.student_name || 'Student ' + e.student}</span>
               </div></td>
-              <td><button class="attendance-btn present" id="btn-${e.student}-present" onclick="setStatus(${e.student}, 'present')">P</button></td>
-              <td><button class="attendance-btn" id="btn-${e.student}-absent" onclick="setStatus(${e.student}, 'absent')">A</button></td>
-              <td><button class="attendance-btn" id="btn-${e.student}-late" onclick="setStatus(${e.student}, 'late')">L</button></td>
+              <td><button class="attendance-btn present" id="btn-${e.student}-present" onclick="setStatus('${e.student}', 'present')">P</button></td>
+              <td><button class="attendance-btn" id="btn-${e.student}-absent" onclick="setStatus('${e.student}', 'absent')">A</button></td>
+              <td><button class="attendance-btn" id="btn-${e.student}-late" onclick="setStatus('${e.student}', 'late')">L</button></td>
             </tr>
           `).join('')}
           </tbody>
@@ -326,7 +407,7 @@
     if (!courseId || !date) return Toast.warning('Select a course and date first.');
 
     const records = Object.entries(attendanceStatuses).map(([studentId, status]) => ({
-      student: parseInt(studentId), course: parseInt(courseId),
+      student: studentId, course: courseId,
       date, status
     }));
 
@@ -336,6 +417,7 @@
       Toast.success(`Attendance marked for ${records.length} students!`);
       loadAttendance();
       loadTodayStats();
+      initChart();
 
       // Emit via socket
       if (socket?.connected) {
@@ -348,45 +430,105 @@
     } catch (e) { Toast.error('Failed to save attendance.'); }
   }
 
-  function initChart() {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    new Chart(document.getElementById('attendanceTrendChart'), {
-      type: 'line',
-      data: {
-        labels: days,
-        datasets: [{
-          label: 'Attendance %',
-          data: [85, 90, 78, 92, 88, 75, 95],
-          borderColor: '#6C63FF',
-          backgroundColor: 'rgba(108,99,255,0.15)',
-          fill: true, tension: 0.4,
-          pointBackgroundColor: '#6C63FF', pointRadius: 4,
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#A0A0C0', font: { size: 11 } } },
-          y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#A0A0C0', font: { size: 11 } } }
-        }
-      }
-    });
+  let attendanceChartInstance = null;
+  async function initChart() {
+    try {
+      const data = await API.get('/attendance/');
+      const records = Array.isArray(data) ? data : (data.results || []);
 
-    // Course attendance bars
-    document.getElementById('courseAttendance').innerHTML = [
-      { name: 'Data Structures', pct: 88, color: '#6C63FF' },
-      { name: 'DBMS', pct: 92, color: '#00D4AA' },
-      { name: 'Networks', pct: 75, color: '#FF9F43' },
-    ].map(c => `
-      <div style="margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:4px;">
-          <span style="color:var(--text-secondary);">${c.name}</span>
-          <span style="font-weight:700;color:${c.color};">${c.pct}%</span>
-        </div>
-        <div class="progress"><div class="progress-bar" style="width:${c.pct}%;background:${c.color};"></div></div>
-      </div>
-    `).join('');
+      if (!records.length) {
+        const ctx = document.getElementById('attendanceTrendChart');
+        if (ctx) ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+        document.getElementById('courseAttendance').innerHTML = '<div style="font-size:0.8rem;color:var(--text-muted);text-align:center;padding:10px;">No attendance data available</div>';
+        return;
+      }
+
+      // Calculate 7-day trend (7 most recent dates that have records)
+      const groupedByDate = {};
+      records.forEach(r => {
+        const d = r.date;
+        if (!groupedByDate[d]) groupedByDate[d] = { present: 0, total: 0 };
+        groupedByDate[d].total++;
+        if (r.status === 'present' || r.status === 'P' || r.status === 'p' || r.status === 'late' || r.status === 'L' || r.status === 'l') {
+          groupedByDate[d].present++;
+        }
+      });
+
+      const sortedDates = Object.keys(groupedByDate).sort((a, b) => new Date(a) - new Date(b));
+      const last7Dates = sortedDates.slice(-7);
+
+      const labels = last7Dates.map(d => {
+        const dateObj = new Date(d);
+        return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      });
+      const chartData = last7Dates.map(d => {
+        const stats = groupedByDate[d];
+        return Math.round((stats.present / stats.total) * 100);
+      });
+
+      if (attendanceChartInstance) {
+        attendanceChartInstance.destroy();
+      }
+
+      const ctx = document.getElementById('attendanceTrendChart');
+      if (ctx && labels.length > 0) {
+        attendanceChartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Attendance %',
+              data: chartData,
+              borderColor: '#6C63FF',
+              backgroundColor: 'rgba(108,99,255,0.15)',
+              fill: true, tension: 0.4,
+              pointBackgroundColor: '#6C63FF', pointRadius: 4,
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#A0A0C0', font: { size: 11 } } },
+              y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#A0A0C0', font: { size: 11 } } }
+            }
+          }
+        });
+      }
+
+      // Calculate course-wise attendance
+      const groupedByCourse = {};
+      records.forEach(r => {
+        const courseId = r.course || r.subject_id;
+        const courseName = r.course_name || r.course || 'Unknown';
+        if (!groupedByCourse[courseId]) {
+          groupedByCourse[courseId] = { name: courseName, present: 0, total: 0 };
+        }
+        groupedByCourse[courseId].total++;
+        if (r.status === 'present' || r.status === 'P' || r.status === 'p' || r.status === 'late' || r.status === 'L' || r.status === 'l') {
+          groupedByCourse[courseId].present++;
+        }
+      });
+
+      const colors = ['#6C63FF', '#00D4AA', '#FF9F43', '#FF4D4D', '#4BC0C0', '#9966FF'];
+      const courseHtml = Object.values(groupedByCourse).map((c, i) => {
+        const pct = Math.round((c.present / c.total) * 100);
+        const color = colors[i % colors.length];
+        return `
+          <div style="margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:4px;">
+              <span style="color:var(--text-secondary);">${c.name}</span>
+              <span style="font-weight:700;color:${color};">${pct}%</span>
+            </div>
+            <div class="progress"><div class="progress-bar" style="width:${pct}%;background:${color};"></div></div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('courseAttendance').innerHTML = courseHtml || '<div style="font-size:0.8rem;color:var(--text-muted);text-align:center;padding:10px;">No course data available</div>';
+    } catch (chartErr) {
+      console.error('Error rendering chart:', chartErr);
+    }
   }
 
   function initSocket() {
@@ -399,6 +541,7 @@
         Toast.info(`Attendance updated for ${data.courseName || 'a course'}`, 'Live Update');
         loadAttendance();
         loadTodayStats();
+        initChart();
       });
     } catch (e) {}
   }

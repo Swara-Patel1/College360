@@ -223,8 +223,14 @@
           <p>Manage all student records, enrollments, and profiles</p>
         </div>
         <div class="page-header-right">
-          <button class="btn btn-secondary btn-sm" onclick="exportStudents()">📥 Export</button>
-          <button class="btn btn-primary" onclick="openAddModal()">➕ Add Student</button>
+          <div class="dropdown">
+            <button class="btn btn-secondary btn-sm dropdown-toggle" id="exportBtn">📥 Export ▾</button>
+            <div class="dropdown-menu" id="exportDropdown">
+              <a href="#" onclick="exportStudents('csv'); return false;">📄 Export as CSV</a>
+              <a href="#" onclick="exportStudents('excel'); return false;">📊 Export as Excel</a>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="addStudentHeaderBtn" onclick="openAddModal()">➕ Add Student</button>
         </div>
       </div>
 
@@ -298,7 +304,7 @@
                 <th>Year / Sem</th>
                 <th>Roll No.</th>
                 <th>Status</th>
-                <th style="text-align:center;">Actions</th>
+                <th style="text-align:center;" id="actionsHeader">Actions</th>
               </tr>
             </thead>
             <tbody id="studentsTableBody">
@@ -591,6 +597,14 @@
   const user = Auth.requireAuth();
   if (!user) throw new Error('Not authenticated');
 
+  const isAdmin = (user.role === 'admin');
+  if (!isAdmin) {
+    const addBtn = document.getElementById('addStudentHeaderBtn');
+    if (addBtn) addBtn.style.display = 'none';
+    const actionsHeader = document.getElementById('actionsHeader');
+    if (actionsHeader) actionsHeader.style.display = 'none';
+  }
+
   document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-IN', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
@@ -647,7 +661,7 @@
     const status = document.getElementById('statusFilter').value;
 
     return allStudents.filter(s => {
-      const name = `${s.user?.first_name || ''} ${s.user?.last_name || ''}`.toLowerCase();
+      const name = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
       const email = (s.user?.email || '').toLowerCase();
       const sid = (s.student_id || '').toLowerCase();
 
@@ -669,15 +683,16 @@
     const pageData = filtered.slice(start, start + perPage);
 
     const tbody = document.getElementById('studentsTableBody');
+    const colSpan = isAdmin ? 7 : 6;
 
     if (total === 0) {
       tbody.innerHTML = `
-        <tr><td colspan="7">
+        <tr><td colspan="${colSpan}">
           <div class="empty-state">
             <div class="empty-state-icon">🎓</div>
             <h3>No Students Found</h3>
             <p>Try adjusting your search or filters, or add a new student.</p>
-            <button class="btn btn-primary btn-sm" onclick="openAddModal()">➕ Add First Student</button>
+            ${isAdmin ? `<button class="btn btn-primary btn-sm" onclick="openAddModal()">➕ Add First Student</button>` : ''}
           </div>
         </td></tr>`;
       document.getElementById('paginationInfo').textContent = '0 students';
@@ -686,7 +701,7 @@
     }
 
     tbody.innerHTML = pageData.map(s => {
-      const name = `${s.user?.first_name || ''} ${s.user?.last_name || ''}`.trim();
+      const name = `${s.first_name || ''} ${s.last_name || ''}`.trim();
       const initials = Utils.getInitials(name);
       const color = Utils.getRandomColor(s.student_id);
       const deptName = s.department_name || departments.find(d => d.id == s.department)?.name || '—';
@@ -704,14 +719,15 @@
           <td><span style="font-weight:700;color:var(--primary-light);font-family:'Outfit',sans-serif;">${s.student_id || '—'}</span></td>
           <td><span style="color:var(--text-secondary);">${deptName}</span></td>
           <td><span class="badge badge-primary">Y${s.year_of_study} / S${s.semester || '—'}</span></td>
-          <td style="font-size:0.8rem;color:var(--text-muted);">${s.roll_number || '—'}</td>
+          <td style="font-size:0.8rem;color:var(--text-muted);">${s.current_rollno || s.roll_number || '—'}</td>
           <td>${Utils.getStatusBadge(s.status || 'active')}</td>
+          ${isAdmin ? `
           <td>
             <div class="table-actions" style="justify-content:center;">
               <button class="action-btn edit" title="Edit Student" onclick="openEditModal(${s.id})">✏️</button>
               <button class="action-btn delete" title="Delete Student" onclick="openDeleteModal(${s.id}, '${name.replace(/'/g, "\\'")}')">🗑️</button>
             </div>
-          </td>
+          </td>` : ''}
         </tr>`;
     }).join('');
 
@@ -744,16 +760,18 @@
   }
 
   function showTableLoading() {
+    const colSpan = (user.role === 'admin') ? 7 : 6;
     document.getElementById('studentsTableBody').innerHTML = `
-      <tr><td colspan="7" class="text-center" style="padding:60px;">
+      <tr><td colspan="${colSpan}" class="text-center" style="padding:60px;">
         <div class="loading-spinner" style="margin:0 auto;width:40px;height:40px;border-width:3px;"></div>
         <div style="margin-top:12px;color:var(--text-muted);font-size:0.8rem;">Loading students...</div>
       </td></tr>`;
   }
 
   function showEmpty(msg, icon = '🎓') {
+    const colSpan = (user.role === 'admin') ? 7 : 6;
     document.getElementById('studentsTableBody').innerHTML = `
-      <tr><td colspan="7">
+      <tr><td colspan="${colSpan}">
         <div class="empty-state">
           <div class="empty-state-icon">${icon}</div>
           <h3>No Data Available</h3>
@@ -845,7 +863,7 @@
       // Step 2: Create student profile
       const studentPayload = {
         user_id: userRes.id,
-        department_id: parseInt(department),
+        department_id: department,
         student_id,
         year_of_study,
         semester,
@@ -878,8 +896,8 @@
 
     document.getElementById('edit_student_pk').value = s.id;
     document.getElementById('edit_user_pk').value = s.user?.id || '';
-    document.getElementById('edit_first_name').value = s.user?.first_name || '';
-    document.getElementById('edit_last_name').value = s.user?.last_name || '';
+    document.getElementById('edit_first_name').value = s.first_name || '';
+    document.getElementById('edit_last_name').value = s.last_name || '';
     document.getElementById('edit_email').value = s.user?.email || '';
     document.getElementById('edit_phone').value = s.user?.phone || '';
     document.getElementById('edit_department').value = s.department || s.department_id || '';
@@ -921,11 +939,17 @@
 
     try {
       await API.patch(`/students/${pk}/`, {
-        year_of_study, semester, status, gender,
+        first_name,
+        last_name,
+        email,
+        year_of_study,
+        semester,
+        status,
+        gender,
         blood_group: blood_group || null,
         guardian_name: guardian_name || null,
         guardian_phone: guardian_phone || null,
-        department_id: parseInt(department),
+        department_id: department,
       });
 
       Modal.close('editStudentModal');
@@ -963,23 +987,57 @@
   }
 
   // ---- Export ----
-  function exportStudents() {
+  function exportStudents(format = 'csv') {
     const filtered = getFilteredStudents();
-    const rows = [['Student ID', 'First Name', 'Last Name', 'Email', 'Department', 'Year', 'Semester', 'Status']];
+    const headers = ['Student ID', 'First Name', 'Last Name', 'Email', 'Department', 'Year', 'Semester', 'Status'];
+    const rows = [];
     filtered.forEach(s => {
       const dept = s.department_name || departments.find(d => d.id == s.department)?.name || '';
-      rows.push([s.student_id, s.user?.first_name, s.user?.last_name, s.user?.email, dept, s.year_of_study, s.semester, s.status]);
+      rows.push([s.student_id, s.first_name, s.last_name, s.user?.email, dept, s.year_of_study, s.semester, s.status]);
     });
-    const csv = rows.map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `students_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    Toast.success('Students exported as CSV!');
+
+    if (format === 'csv') {
+      const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `students_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      Toast.success('Students exported as CSV!');
+    } else if (format === 'excel') {
+      let content = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Students</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table><tr style="background-color:#6C63FF;color:white;font-weight:bold;">';
+      headers.forEach(h => { content += `<th>${h}</th>`; });
+      content += '</tr>';
+      rows.forEach(r => {
+        content += '<tr>';
+        r.forEach(val => { content += `<td>${val || ''}</td>`; });
+        content += '</tr>';
+      });
+      content += '</table></body></html>';
+
+      const blob = new Blob([content], { type: 'application/vnd.ms-excel' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `students_${new Date().toISOString().split('T')[0]}.xls`;
+      a.click();
+      URL.revokeObjectURL(url);
+      Toast.success('Students exported as Excel!');
+    }
   }
+
+  // Toggle export dropdown
+  document.getElementById('exportBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('exportDropdown').classList.toggle('show');
+  });
+
+  document.addEventListener('click', () => {
+    const dropdown = document.getElementById('exportDropdown');
+    if (dropdown) dropdown.classList.remove('show');
+  });
 
   // Keyboard shortcut
   document.addEventListener('keydown', e => {

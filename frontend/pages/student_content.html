@@ -192,15 +192,25 @@
         ? await SupaAPI.content.byFaculty(user.id)
         : await SupaAPI.content.all();
 
+      // Normalize data for UI compatibility
+      allContent.forEach(c => {
+        c.id = c.content_id;
+        c.content_type = (c.content_type || '').toLowerCase();
+        c.subject_code = c.subject?.code || '—';
+        c.subject_name = c.subject?.name || '—';
+        c.faculty_name = c.faculty ? `${c.faculty.first_name || ''} ${c.faculty.last_name || ''}`.trim() : '—';
+      });
+
       // Build subject set
       subjectSet = new Map();
-      allContent.forEach(c => { if (c.subject_name) subjectSet.set(c.subject_id, c.subject_name); });
+      allContent.forEach(c => { if (c.subject_name && c.subject_name !== '—') subjectSet.set(c.subject_id, c.subject_name); });
       renderSubjectPills();
 
       updateStats();
       renderContent();
     } catch (e) {
-      document.getElementById('contentGrid').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📚</div><p>Could not load materials.</p></div>';
+      console.error('Content Load Error:', e);
+      document.getElementById('contentGrid').innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Could not load materials: ${e.message || JSON.stringify(e)}</p></div>`;
     }
   }
 
@@ -216,7 +226,7 @@
     if (subjectSet.size === 0) { bar.innerHTML = ''; return; }
     bar.innerHTML = `<button class="btn ${currentSubject === null ? 'btn-secondary' : 'btn-ghost'} btn-sm" onclick="filterSubject(null)">All Subjects</button>`
       + [...subjectSet.entries()].map(([id, name]) =>
-          `<button class="btn ${currentSubject === id ? 'btn-secondary' : 'btn-ghost'} btn-sm" onclick="filterSubject(${id})">${name}</button>`
+          `<button class="btn ${currentSubject === id ? 'btn-secondary' : 'btn-ghost'} btn-sm" onclick="filterSubject('${id}')">${name}</button>`
         ).join('');
   }
 
@@ -252,7 +262,7 @@
     document.getElementById('contentGrid').innerHTML = list.map(c => {
       const cfg = getTypeConfig(c.content_type);
       const url = c.file_url || c.video_url || '#';
-      return `<div class="content-card" onclick="openContent(${c.id}, '${url}', '${c.content_type}')">
+      return `<div class="content-card" onclick="openContent('${c.id}', '${url}', '${c.content_type}')">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <span class="content-type-badge ${cfg.cls}">${cfg.icon} ${cfg.label}</span>
           ${c.topic_tag ? `<span class="content-tag">${c.topic_tag}</span>` : ''}
@@ -270,7 +280,15 @@
 
   async function openContent(id, url, type) {
     const item = allContent.find(c => c.id === id);
-    if (item) await SupaAPI.content.incrDownloads(id, item.downloads || 0);
+    if (item) {
+      try {
+        if (SupaAPI.content.incrDownloads) {
+          await SupaAPI.content.incrDownloads(id, item.downloads || 0);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
     if (url && url !== '#') window.open(url, '_blank');
     else Toast.info('No link available for this resource yet.');
   }

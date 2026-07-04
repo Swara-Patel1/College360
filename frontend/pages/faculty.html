@@ -249,6 +249,13 @@
           <p>Manage faculty members, departments, and designations</p>
         </div>
         <div class="page-header-right">
+          <div class="dropdown">
+            <button class="btn btn-secondary btn-sm dropdown-toggle" id="exportBtn">📥 Export ▾</button>
+            <div class="dropdown-menu" id="exportDropdown">
+              <a href="#" onclick="exportFaculty('csv'); return false;">📄 Export as CSV</a>
+              <a href="#" onclick="exportFaculty('excel'); return false;">📊 Export as Excel</a>
+            </div>
+          </div>
           <button class="btn btn-secondary btn-sm" id="addDeptTopBtn" onclick="openAddDeptModal()" style="display:none;">🏛️ Add Department</button>
           <button class="btn btn-primary" id="addFacultyTopBtn" onclick="openAddFacultyModal()">➕ Add Faculty</button>
         </div>
@@ -965,6 +972,71 @@
       btn.disabled = false; btn.textContent = '💾 Save Changes';
     }
   }
+  // ---- Export ----
+  function exportFaculty(format = 'csv') {
+    const search = document.getElementById('searchInput')?.value.toLowerCase().trim() || '';
+    const dept = document.getElementById('deptFilter')?.value || '';
+    
+    const filtered = allFaculty.filter(f => {
+      const name = `${f.first_name || ''} ${f.last_name || ''}`.toLowerCase();
+      const empId = (f.employee_id || '').toLowerCase();
+      const email = (f.user?.email || '').toLowerCase();
+      
+      const matchSearch = !search || name.includes(search) || empId.includes(search) || email.includes(search);
+      const matchDept = !dept || String(f.department) === dept || String(f.department_id) === dept;
+      
+      return matchSearch && matchDept;
+    });
+
+    const headers = ['Employee ID', 'First Name', 'Last Name', 'Email', 'Department'];
+    const rows = [];
+    filtered.forEach(f => {
+      const deptName = f.department_name || departments.find(d => d.id == f.department_id)?.name || '';
+      rows.push([f.employee_id, f.first_name, f.last_name, f.user?.email, deptName]);
+    });
+
+    if (format === 'csv') {
+      const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `faculty_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      Toast.success('Faculty exported as CSV!');
+    } else if (format === 'excel') {
+      let content = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Faculty</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table><tr style="background-color:#6C63FF;color:white;font-weight:bold;">';
+      headers.forEach(h => { content += `<th>${h}</th>`; });
+      content += '</tr>';
+      rows.forEach(r => {
+        content += '<tr>';
+        r.forEach(val => { content += `<td>${val || ''}</td>`; });
+        content += '</tr>';
+      });
+      content += '</table></body></html>';
+
+      const blob = new Blob([content], { type: 'application/vnd.ms-excel' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `faculty_${new Date().toISOString().split('T')[0]}.xls`;
+      a.click();
+      URL.revokeObjectURL(url);
+      Toast.success('Faculty exported as Excel!');
+    }
+  }
+
+  // Toggle export dropdown
+  document.getElementById('exportBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('exportDropdown').classList.toggle('show');
+  });
+
+  document.addEventListener('click', () => {
+    const dropdown = document.getElementById('exportDropdown');
+    if (dropdown) dropdown.classList.remove('show');
+  });
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape') Modal.closeAll(); });
   loadAll();

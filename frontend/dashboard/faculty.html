@@ -25,6 +25,7 @@
       <a class="nav-item" href="../pages/attendance.html"><span class="nav-icon">✅</span> Mark Attendance</a>
       <a class="nav-item" href="../pages/grades.html"><span class="nav-icon">📝</span> Enter Grades</a>
       <a class="nav-item" href="../pages/faculty_timetable.html"><span class="nav-icon">📅</span> My Timetable</a>
+      <a class="nav-item" href="../pages/leaves.html"><span class="nav-icon">📝</span> Leave Application</a>
       <div class="nav-section-title">HOD Actions</div>
       <a class="nav-item" href="../pages/hod_complaints.html"><span class="nav-icon">📣</span> Student Complaints</a>
       <a class="nav-item" href="../pages/timetable.html"><span class="nav-icon">🗓️</span> Manage Timetable</a>
@@ -192,7 +193,7 @@
     try {
       const facultyData = await API.get('/faculty/my_profile/');
       const coursesData = await API.get('/courses/');
-      const courses = (coursesData.results || coursesData).filter(c => c.faculty === facultyData.id);
+      const courses = (coursesData.results || coursesData).filter(c => c.faculty_id === facultyData.id);
       document.getElementById('myCourses').textContent = courses.length;
       document.getElementById('myStudents').textContent = courses.reduce((a, c) => a + (c.enrolled_count || 0), 0);
       document.getElementById('myCoursesSection').innerHTML = courses.length ? courses.map(c => `

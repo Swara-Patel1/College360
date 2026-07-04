@@ -39,7 +39,8 @@ echo  - Frontend:     http://localhost:5500/index.html
 echo.
 echo  Demo Credentials:
 echo  Admin:   admin / admin123
-echo  Faculty: rajesh.kumar / faculty123
-echo  Student: arjun.verma / student123
+echo  Hod: hod@lju.edu.in/hod123
+echo  Faculty: fac@lju.edu.in / fac123
+echo  Student: rushi@lju.edu.in / rushi123
 echo.
 pause
