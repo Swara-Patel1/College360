@@ -62,3 +62,5 @@ supabase/
 # Tool outputs
 .claude/
 graphify-out/
+
+frontend/
