@@ -1,48 +1,12 @@
-/* ============================================================
-   EDUPULSE — Unified Supabase UUID API & Auth Adapter
-   Maps all legacy Django REST endpoints to the new UUID-based
-   Supabase PostgreSQL tables on-the-fly.
-   ============================================================ */
+export const SUPABASE_URL = 'https://olaqwoxycxdbcmqegifi.supabase.co';
+export const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sYXF3b3h5Y3hkYmNtcWVnaWZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MDYyODgsImV4cCI6MjA5ODM4MjI4OH0.JUYUKKGAAd7fx8s840meU0Ayd5VE7sfSMwDbiG8twlU';
 
-const SUPABASE_URL  = 'https://olaqwoxycxdbcmqegifi.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sYXF3b3h5Y3hkYmNtcWVnaWZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MDYyODgsImV4cCI6MjA5ODM4MjI4OH0.JUYUKKGAAd7fx8s840meU0Ayd5VE7sfSMwDbiG8twlU';
-var SOCKET_URL      = 'http://127.0.0.1:3001';
-
-// ---- Auth Utilities ----
-const Auth = {
+export const Auth = {
   getToken: () => localStorage.getItem('access_token'),
   getUser: () => JSON.parse(localStorage.getItem('user') || 'null'),
   isLoggedIn: () => !!localStorage.getItem('access_token'),
-
-  logout() {
-    localStorage.clear();
-    window.location.href = '../index.html';
-  },
-
-  requireAuth() {
-    if (!this.isLoggedIn()) {
-      window.location.href = '../index.html';
-      return null;
-    }
-    return this.getUser();
-  },
-
-  requireRole(role) {
-    const user = this.requireAuth();
-    if (!user) return null;
-    const userRole = (user.role || '').toLowerCase();
-    const reqRole = (role || '').toLowerCase();
-    if (userRole !== reqRole) {
-      const base = window.location.pathname.includes('/pages/') ? '../dashboard/' : 'dashboard/';
-      const destinations = { admin: base + 'admin.html', faculty: base + 'faculty.html', student: base + 'student.html' };
-      window.location.href = destinations[userRole] || '../index.html';
-      return null;
-    }
-    return user;
-  }
 };
 
-// ---- Raw Supabase REST Fetcher ----
 const SupaFetch = {
   headers(token) {
     return {
@@ -73,8 +37,7 @@ const SupaFetch = {
   }
 };
 
-// ---- Translation/Adapter Layer ----
-const API = {
+export const API = {
   async request(endpoint, options = {}) {
     const method = options.method || 'GET';
     const body = options.body ? JSON.parse(options.body) : null;
@@ -86,7 +49,7 @@ const API = {
     const params = new URLSearchParams(queryStr || '');
 
     try {
-      // 1. AUTH LOGIN (Direct database check bypassing Supabase Auth completely)
+      // 1. AUTH LOGIN
       if (path === 'auth/login') {
         const emailInput = body.email || body.username;
         const password = body.password;
@@ -105,7 +68,7 @@ const API = {
         const emailPrefix = dbUser.email.split('@')[0];
         const firstName = emailPrefix.split('.')[0] || 'User';
         const lastName = emailPrefix.split('.')[1] || '';
-        const role = (dbUser.role || '').toLowerCase();
+        const role = (dbUser.roles || dbUser.role || '').toLowerCase();
 
         const loginResponse = {
           access: 'mock_access_token_' + Math.floor(Math.random() * 1000000),
@@ -126,7 +89,7 @@ const API = {
         localStorage.setItem('user', JSON.stringify(loginResponse.user));
         localStorage.removeItem('student_profile'); // clear stale cache
 
-        // Pre-fetch role-specific profile in background so dashboard loads instantly
+        // Pre-fetch role-specific profile in background
         if (role === 'student') {
           SupaFetch.request(`students?select=*,user:users(*),department:departments(*),current_semester:semesters(*)&user_id=eq.${dbUser.id}`)
             .then(sRows => {
@@ -169,13 +132,13 @@ const API = {
         };
       }
 
-      // 3. STUDENT PROFILE — serve from localStorage cache first for instant load
+      // 3. STUDENT PROFILE
       if (path === 'students/my_profile') {
         const cached = localStorage.getItem('student_profile');
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed && parsed.semester && parsed.year_of_study) {
-            // Refresh cache in background without blocking the page
+            // Refresh in background
             SupaFetch.request(`students?select=*,user:users(*),department:departments(*),current_semester:semesters(*)&user_id=eq.${loggedInUser.id}`)
               .then(rows => {
                 if (rows && rows.length) {
@@ -203,7 +166,8 @@ const API = {
           department_name: rows[0].department?.name || '—',
           semester: rows[0].current_semester?.number || '—',
           year_of_study: rows[0].current_semester?.number ? Math.ceil(rows[0].current_semester.number / 2) : '—',
-          user: rows[0].user
+          user: rows[0].user,
+          status: rows[0].user?.is_active ? 'active' : 'inactive'
         };
         localStorage.setItem('student_profile', JSON.stringify(result));
         return result;
@@ -237,7 +201,8 @@ const API = {
               first_name: s.first_name || '',
               last_name: s.last_name || ''
             },
-            roll_number: s.current_rollno // Map current_rollno to roll_number for frontend compatibility
+            roll_number: s.current_rollno,
+            status: s.user?.is_active ? 'active' : 'inactive'
           }));
         }
         if (method === 'POST') {
@@ -262,7 +227,6 @@ const API = {
           });
           const createdStudent = Array.isArray(newStudent) ? newStudent[0] : newStudent;
           
-          // Auto-enroll student into matching subjects
           if (createdStudent && createdStudent.student_id) {
             const subjects = await SupaFetch.request(`subjects?department_id=eq.${createdStudent.department_id}&semester_id=eq.${createdStudent.current_semester_id}`);
             if (subjects && subjects.length > 0) {
@@ -287,12 +251,8 @@ const API = {
             updateBody.current_semester_id = `e0000000-0000-0000-0000-00000000000${updateBody.semester}`;
             delete updateBody.semester;
           }
-          if (updateBody.year_of_study !== undefined) {
-            delete updateBody.year_of_study;
-          }
-          if (updateBody.status !== undefined) {
-            delete updateBody.status;
-          }
+          if (updateBody.year_of_study !== undefined) delete updateBody.year_of_study;
+          if (updateBody.status !== undefined) delete updateBody.status;
           if (updateBody.roll_number !== undefined) {
             updateBody.current_rollno = updateBody.roll_number;
             delete updateBody.roll_number;
@@ -313,7 +273,6 @@ const API = {
           const row = await SupaFetch.request(`students?student_id=eq.${studentUuid}`, 'PATCH', updateBody);
           const updatedStudent = Array.isArray(row) ? row[0] : row;
 
-          // Automatically enroll/re-enroll student in all subjects matching department and semester
           if (updatedStudent && updatedStudent.student_id) {
             const subjects = await SupaFetch.request(`subjects?department_id=eq.${updatedStudent.department_id}&semester_id=eq.${updatedStudent.current_semester_id}`);
             if (subjects && subjects.length > 0) {
@@ -343,7 +302,6 @@ const API = {
           ...f,
           id: f.faculty_id,
           department_name: f.department?.name || '—',
-          // Normalize: expose first_name/last_name on user so pages using f.user?.first_name work
           user: {
             ...(f.user || {}),
             first_name: f.first_name || f.user?.email?.split('@')[0] || '',
@@ -352,7 +310,7 @@ const API = {
         }));
       }
 
-      // 7b. DEPARTMENTS (also aliased as faculty/departments)
+      // 7b. DEPARTMENTS
       if (path === 'faculty/departments' || path === 'departments') {
         const rows = await SupaFetch.request('departments?select=*&order=name.asc');
         return rows.map(d => ({
@@ -373,11 +331,9 @@ const API = {
             id: c.subject_id,
             enrolled_count: enrolledCount,
             department_name: c.department?.name || '—',
-            // faculty has first_name/last_name directly on the record
             faculty_name: c.faculty
               ? `${c.faculty.first_name || ''} ${c.faculty.last_name || ''}`.trim() || '—'
               : '—',
-            // expose semester number for the table display
             semester: c.semester?.number || '—',
             is_active: true
           };
@@ -421,27 +377,31 @@ const API = {
             studentUuid = studentRow[0].student_id;
           }
           let query = 'marks?select=*,course:subjects(*),student:students(*)';
-          if (studentUuid) {
-            query += `&student_id=eq.${studentUuid}`;
-          }
-          if (courseUuid) {
-            query += `&subject_id=eq.${courseUuid}`;
-          }
+          if (studentUuid) query += `&student_id=eq.${studentUuid}`;
+          if (courseUuid) query += `&subject_id=eq.${courseUuid}`;
           const rows = await SupaFetch.request(query);
           return rows.map(r => {
-            const obtained = parseFloat(r.total_marks || (parseFloat(r.internal_marks || 0) + parseFloat(r.external_marks || 0)) || 0);
+            const internal = parseFloat(r.internal_marks || 0);
+            const external = parseFloat(r.external_marks || 0);
+            const obtained = parseFloat(r.total_marks || (internal + external) || 0);
             const maxMarks = obtained > 100 ? 150 : 100;
             const percentage = Math.round((obtained / maxMarks) * 100);
             const studentName = r.student ? `${r.student.first_name || ''} ${r.student.last_name || ''}`.trim() : 'Student';
             
-            let computedGrade = 'F';
-            if (percentage >= 90) computedGrade = 'O';
-            else if (percentage >= 85) computedGrade = 'A+';
-            else if (percentage >= 75) computedGrade = 'A';
-            else if (percentage >= 65) computedGrade = 'B+';
-            else if (percentage >= 55) computedGrade = 'B';
-            else if (percentage >= 45) computedGrade = 'C';
-            else if (percentage >= 35) computedGrade = 'D';
+            // Use DB grade as-is (Indian system: O, AA, AB, BB, BC, CC, CD, DD, F)
+            // Only recompute if the DB grade field is empty
+            let displayGrade = r.grade || '';
+            if (!displayGrade) {
+              if (percentage >= 90) displayGrade = 'O';
+              else if (percentage >= 80) displayGrade = 'AA';
+              else if (percentage >= 70) displayGrade = 'AB';
+              else if (percentage >= 60) displayGrade = 'BB';
+              else if (percentage >= 55) displayGrade = 'BC';
+              else if (percentage >= 50) displayGrade = 'CC';
+              else if (percentage >= 45) displayGrade = 'CD';
+              else if (percentage >= 40) displayGrade = 'DD';
+              else displayGrade = 'F';
+            }
 
             return {
               ...r,
@@ -449,7 +409,7 @@ const API = {
               marks_obtained: obtained,
               total_marks: maxMarks,
               percentage: percentage,
-              grade: computedGrade,
+              grade: displayGrade,
               course_name: r.course?.name || '—',
               course_code: r.course?.code || '—',
               student_name: studentName,
@@ -520,11 +480,18 @@ const API = {
       }
 
       // 11. TIMETABLE
-      if (path === 'timetable') {
+      if (path === 'timetable' && method === 'GET') {
         const day = params.get('day');
         const facultyUuid = params.get('faculty');
         let query = 'timetable?select=*,course:subjects(*),faculty:faculty(*,user:users(*))';
-        if (day) query += `&day_of_week=eq.${day}`;
+        if (day) {
+          const apiDayMap = {
+            'monday': 'MON', 'tuesday': 'TUE', 'wednesday': 'WED',
+            'thursday': 'THU', 'friday': 'FRI', 'saturday': 'SAT', 'sunday': 'SUN'
+          };
+          const dbDay = apiDayMap[day.toLowerCase()] || day.toUpperCase();
+          query += `&day_of_week=eq.${dbDay}`;
+        }
         if (facultyUuid) query += `&faculty_id=eq.${facultyUuid}`;
         const rows = await SupaFetch.request(query);
         const dayMap = {
@@ -562,15 +529,9 @@ const API = {
         const attended = present + late;
         const percentage = ((attended / totalEligible) * 100).toFixed(1);
 
-        return {
-          total,
-          present,
-          absent,
-          late,
-          excused,
-          percentage
-        };
+        return { total, present, absent, late, excused, percentage };
       }
+      
       if (path === 'attendance') {
         if (method === 'GET') {
           const studentUuid = params.get('student');
@@ -579,78 +540,36 @@ const API = {
           const status = params.get('status');
           
           let query = 'attendance_records?select=*,course:subjects(*),student:students(*)';
-          if (studentUuid) {
-            query += `&student_id=eq.${studentUuid}`;
-          }
-          if (courseUuid) {
-            query += `&subject_id=eq.${courseUuid}`;
-          }
-          if (date) {
-            query += `&date=eq.${date}`;
-          }
+          if (studentUuid) query += `&student_id=eq.${studentUuid}`;
+          if (courseUuid) query += `&subject_id=eq.${courseUuid}`;
+          if (date) query += `&date=eq.${date}`;
           if (status) {
-            // Map UI status request to database status enum value if filtering
-            const uiToDbStatus = {
-              'present': 'P',
-              'absent': 'A',
-              'late': 'L'
-            };
+            const uiToDbStatus = { 'present': 'P', 'absent': 'A', 'late': 'L' };
             query += `&status=eq.${uiToDbStatus[status] || status}`;
           }
           
-          let rows;
-          try {
-            console.log('[API] Querying attendance:', query);
-            rows = await SupaFetch.request(query);
-            console.log('[API] Attendance rows received:', rows);
-          } catch (queryErr) {
-            console.error('[API] SupaFetch query error:', queryErr);
-            throw queryErr;
-          }
-
-          if (!rows) {
-            console.warn('[API] Attendance returned falsy rows:', rows);
-            rows = [];
-          }
-          if (!Array.isArray(rows)) {
-            console.warn('[API] Attendance rows is not an array:', rows);
-            rows = [rows];
-          }
-
-          // Resolve faculty names for marked_by (best-effort, won't block if lookup fails)
-          const uniqueMarkerIds = [...new Set(rows.map(r => r ? r.marked_by : null).filter(Boolean))];
+          const rows = await SupaFetch.request(query);
+          const uniqueMarkerIds = [...new Set(rows.map(r => r?.marked_by).filter(Boolean))];
           let markerMap = {};
           if (uniqueMarkerIds.length > 0) {
             try {
-              console.log('[API] Resolving marker names for:', uniqueMarkerIds);
               const facultyRows = await SupaFetch.request(`faculty?select=faculty_id,first_name,last_name&faculty_id=in.(${uniqueMarkerIds.join(',')})`);
-              console.log('[API] Faculty rows resolved:', facultyRows);
               if (Array.isArray(facultyRows)) {
                 facultyRows.forEach(f => {
                   markerMap[f.faculty_id] = `${f.first_name || ''} ${f.last_name || ''}`.trim();
                 });
               }
-            } catch (markerErr) {
-              console.warn('[API] Could not resolve marker names:', markerErr);
-            }
+            } catch (err) {}
           }
 
           return rows.map(r => {
             if (!r) return null;
             const studentName = r.student ? `${r.student.first_name || ''} ${r.student.last_name || ''}`.trim() : 'Student';
             const markedByName = markerMap[r.marked_by] || 'System';
-            
-            // Map database status enum ('P', 'A', 'L') to UI values ('present', 'absent', 'late')
-            const dbToUiStatus = {
-              'P': 'present',
-              'A': 'absent',
-              'L': 'late'
-            };
-            const statusVal = dbToUiStatus[r.status] || r.status || 'present';
-
+            const dbToUiStatus = { 'P': 'present', 'A': 'absent', 'L': 'late' };
             return {
               ...r,
-              status: statusVal,
+              status: dbToUiStatus[r.status] || r.status || 'present',
               student_name: studentName,
               course_name: r.course?.name || '—',
               course_code: r.course?.code || '—',
@@ -659,21 +578,15 @@ const API = {
           }).filter(Boolean);
         }
       }
+
       if (path === 'attendance/bulk-mark' && method === 'POST') {
         let facultyId = null;
-        if (loggedInUser && loggedInUser.id) {
+        if (loggedInUser?.id) {
           const facultyRow = await SupaFetch.request(`faculty?select=faculty_id&user_id=eq.${loggedInUser.id}`);
-          if (facultyRow && facultyRow.length > 0) {
-            facultyId = facultyRow[0].faculty_id;
-          }
+          if (facultyRow && facultyRow.length > 0) facultyId = facultyRow[0].faculty_id;
         }
 
-        const uiToDbStatus = {
-          'present': 'P',
-          'absent': 'A',
-          'late': 'L'
-        };
-
+        const uiToDbStatus = { 'present': 'P', 'absent': 'A', 'late': 'L' };
         const payload = body.records.map(r => ({
           student_id: r.student,
           subject_id: r.course,
@@ -682,11 +595,10 @@ const API = {
           marked_by: facultyId,
           ip_address: '127.0.0.1'
         }));
-        const response = await SupaFetch.request('attendance_records', 'POST', payload);
-        return response;
+        return await SupaFetch.request('attendance_records', 'POST', payload);
       }
 
-      // 13. FEES / FEE STRUCTURE & PAYMENTS
+      // 13. FEES
       if (path === 'fees') {
         const studentUuid = params.get('student');
         const payments = await SupaFetch.request(`fee_payments?select=*,fee_structures(*)&student_id=eq.${studentUuid || 'st000000-0000-0000-0000-000000000001'}`);
@@ -699,19 +611,15 @@ const API = {
         }));
       }
 
-      // 14. GLOBAL NOTICES
+      // 14. NOTICES
       if (path === 'notices') {
         if (method === 'GET') {
           const audience = params.get('audience');
           let query = 'notices?select=*,author:users(*)&order=published_at.desc';
           if (audience) {
-            if (audience === 'students') {
-              query += '&target_audience=in.(ALL,STUDENTS_ONLY)';
-            } else if (audience === 'faculty') {
-              query += '&target_audience=in.(ALL,FACULTY_ONLY)';
-            } else {
-              query += `&target_audience=in.(ALL,${audience.toUpperCase()})`;
-            }
+            if (audience === 'students') query += '&target_audience=in.(ALL,STUDENTS_ONLY)';
+            else if (audience === 'faculty') query += '&target_audience=in.(ALL,FACULTY_ONLY)';
+            else query += `&target_audience=in.(ALL,${audience.toUpperCase()})`;
           }
           const rows = await SupaFetch.request(query);
           return rows.map(n => {
@@ -720,8 +628,7 @@ const API = {
             if (prio === 'URGENT') notice_type = 'urgent';
             else if (prio === 'HIGH') notice_type = 'exam';
             else if (prio === 'LOW') notice_type = 'holiday';
-            else if (prio === 'NORMAL') notice_type = 'general';
-
+            
             let audienceVal = 'all';
             const aud = (n.target_audience || '').toUpperCase();
             if (aud === 'STUDENTS_ONLY') audienceVal = 'students';
@@ -738,10 +645,9 @@ const API = {
           });
         }
         if (method === 'POST') {
-          let role = (loggedInUser.role || 'admin').toLowerCase();
-          if (role === 'student') {
-            throw { error: 'unauthorized', message: 'Students are not authorized to post notices.' };
-          }
+          let role = (loggedInUser?.role || 'admin').toLowerCase();
+          if (role === 'student') throw { error: 'unauthorized', message: 'Students not authorized.' };
+          
           let dbAudience = 'ALL';
           if (body.audience === 'students') dbAudience = 'STUDENTS_ONLY';
           else if (body.audience === 'faculty') dbAudience = 'FACULTY_ONLY';
@@ -750,12 +656,8 @@ const API = {
           if (body.notice_type === 'urgent') dbPriority = 'URGENT';
           else if (body.notice_type === 'exam') dbPriority = 'HIGH';
           else if (body.notice_type === 'holiday') dbPriority = 'LOW';
-          else if (body.notice_type === 'event') dbPriority = 'NORMAL';
 
-          let dbRole = 'ADMIN';
-          if (role === 'faculty') dbRole = 'FACULTY';
-          else if (role === 'hod') dbRole = 'HOD';
-
+          let dbRole = role.toUpperCase();
           const row = await SupaFetch.request('notices', 'POST', {
             author_id: loggedInUser.id,
             author_role: dbRole,
@@ -778,32 +680,18 @@ const API = {
         }
       }
 
-      // notices EDIT / DELETE
       if (path.startsWith('notices/')) {
         const noticeUuid = path.split('/')[1];
-        let role = (loggedInUser.role || 'admin').toLowerCase();
-        if (role === 'student') {
-          throw { error: 'unauthorized', message: 'Students are not authorized to modify notices.' };
-        }
         if (method === 'PATCH' || method === 'PUT') {
           const patchBody = {};
           if (body.title !== undefined) patchBody.title = body.title;
           if (body.content !== undefined) patchBody.content = body.content;
           if (body.audience !== undefined) {
-            let dbAudience = 'ALL';
-            if (body.audience === 'students') dbAudience = 'STUDENTS_ONLY';
-            else if (body.audience === 'faculty') dbAudience = 'FACULTY_ONLY';
-            patchBody.target_audience = dbAudience;
+            patchBody.target_audience = body.audience === 'students' ? 'STUDENTS_ONLY' : body.audience === 'faculty' ? 'FACULTY_ONLY' : 'ALL';
           }
           if (body.notice_type !== undefined) {
-            let dbPriority = 'NORMAL';
-            if (body.notice_type === 'urgent') dbPriority = 'URGENT';
-            else if (body.notice_type === 'exam') dbPriority = 'HIGH';
-            else if (body.notice_type === 'holiday') dbPriority = 'LOW';
-            else if (body.notice_type === 'event') dbPriority = 'NORMAL';
-            patchBody.priority = dbPriority;
+            patchBody.priority = body.notice_type === 'urgent' ? 'URGENT' : body.notice_type === 'exam' ? 'HIGH' : body.notice_type === 'holiday' ? 'LOW' : 'NORMAL';
           }
-
           const row = await SupaFetch.request(`notices?notice_id=eq.${noticeUuid}`, 'PATCH', patchBody);
           const updated = Array.isArray(row) ? row[0] : row;
           if (updated) {
@@ -823,91 +711,50 @@ const API = {
         }
       }
 
-      // 15. COMPLAINTS / GRIEVANCES
+      // 15. COMPLAINTS
       if (path === 'complaints') {
         if (method === 'GET') {
-          const loggedUser = Auth.getUser();
-          let query = 'grievances?select=*,student:students(*,user:users(*))&order=submitted_at.desc';
-          // Filter to only this student's complaints if role is student
-          if (loggedUser && (loggedUser.role || '').toLowerCase() === 'student') {
-            const stuRows = await SupaFetch.request(`students?select=student_id&user_id=eq.${loggedUser.id}`);
-            if (stuRows && stuRows.length > 0) {
-              query = `grievances?select=*,student:students(*,user:users(*))&student_id=eq.${stuRows[0].student_id}&order=submitted_at.desc`;
-            }
-          }
-          const rows = await SupaFetch.request(query);
-          const catLabel = { academic:'Academic', facility:'Facility', faculty:'Faculty Behaviour', administrative:'Administrative', hostel:'Hostel', other:'Other' };
-          const statusMap = { pending:'pending', in_review:'in_review', resolved:'resolved', dismissed:'dismissed', open:'pending' };
+          const rows = await SupaFetch.request('grievances?select=*,student:students(*,user:users(*))&order=submitted_at.desc');
           return rows.map(c => ({
             ...c,
-            id: c.grievance_id,
-            title: c.title || catLabel[c.category] || c.category || 'Complaint',
             created_at: c.submitted_at,
-            status: statusMap[c.status] || c.status || 'pending',
-            is_anonymous: c.is_anonymous || c.is_critical || false,
-            hod_response: c.hod_response || c.resolution_note || null,
-            student_name: (c.is_anonymous || c.is_critical) ? 'Anonymous Student'
-              : (c.student ? `${c.student.first_name || ''} ${c.student.last_name || ''}`.trim() : 'Student'),
+            student_name: c.is_anonymous ? 'Anonymous Student' : `${c.student?.first_name || ''} ${c.student?.last_name || ''}`,
           }));
         }
         if (method === 'POST') {
           const studentRow = await SupaFetch.request(`students?user_id=eq.${loggedInUser.id}`);
-          const insertData = {
+          const row = await SupaFetch.request('grievances', 'POST', {
             student_id: studentRow[0].student_id,
             description: body.title ? `[${body.title}] ${body.description}` : body.description,
             category: body.category || 'other',
-            is_critical: body.is_anonymous || false,
-            status: 'pending'
-          };
-          const row = await SupaFetch.request('grievances', 'POST', insertData);
-          const created = Array.isArray(row) ? row[0] : row;
-          return created ? { ...created, title: body.title || created.category, created_at: created.submitted_at } : created;
+            is_anonymous: body.is_anonymous || false,
+            status: 'OPEN'
+          });
+          return Array.isArray(row) ? row[0] : row;
         }
       }
 
       // 16. HOD CHECK
       if (path === 'hod/check') {
-        if (method === 'GET') {
-          const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
-          if (hodRow && hodRow.length > 0) {
-            return { isHod: true, hod: hodRow[0] };
-          }
-          return { isHod: false };
-        }
+        const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
+        return { isHod: !!hodRow?.length, hod: hodRow?.[0] || null };
       }
 
       // 17. FACULTY LEAVE
       if (path === 'faculty/leave') {
+        const facultyRow = await SupaFetch.request(`faculty?user_id=eq.${loggedInUser.id}`);
+        if (!facultyRow?.length) throw { error: 'not_found', message: 'Faculty not found.' };
+        const facId = facultyRow[0].faculty_id;
+        
         if (method === 'GET') {
-          const facultyRow = await SupaFetch.request(`faculty?user_id=eq.${loggedInUser.id}`);
-          if (!facultyRow || !facultyRow.length) {
-            throw { error: 'not_found', message: 'Faculty profile not found.' };
-          }
-          const leaveRows = await SupaFetch.request(`leave_requests?select=*&faculty_id=eq.${facultyRow[0].faculty_id}&order=applied_at.desc`);
-          return leaveRows;
+          return await SupaFetch.request(`leave_requests?select=*&faculty_id=eq.${facId}&order=applied_at.desc`);
         }
         if (method === 'POST') {
-          const facultyRow = await SupaFetch.request(`faculty?user_id=eq.${loggedInUser.id}`);
-          if (!facultyRow || !facultyRow.length) {
-            throw { error: 'not_found', message: 'Faculty profile not found.' };
-          }
-          const facId = facultyRow[0].faculty_id;
-          
-          // Validation: Leave dates must not overlap with already-approved leave
-          const existingApproved = await SupaFetch.request(`leave_requests?select=*&faculty_id=eq.${facId}&status=eq.approved`);
-          
+          const approved = await SupaFetch.request(`leave_requests?select=*&faculty_id=eq.${facId}&status=eq.approved`);
           const fromDateVal = new Date(body.fromDate);
           const toDateVal = new Date(body.toDate);
-          
-          const overlap = existingApproved.some(leave => {
-            const start = new Date(leave.from_date);
-            const end = new Date(leave.to_date);
-            return (fromDateVal <= end && toDateVal >= start);
-          });
-          
-          if (overlap) {
-            throw { error: 'validation_error', message: 'Requested dates overlap with an already approved leave.' };
-          }
+          const overlap = approved.some(l => fromDateVal <= new Date(l.to_date) && toDateVal >= new Date(l.from_date));
+          if (overlap) throw { error: 'validation_error', message: 'Dates overlap approved leaves.' };
           
           const row = await SupaFetch.request('leave_requests', 'POST', {
             faculty_id: facId,
@@ -923,57 +770,103 @@ const API = {
 
       // 18. HOD LEAVE MANAGEMENT
       if (path === 'hod/leaves') {
-        if (method === 'GET') {
-          const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
-          if (!hodRow || !hodRow.length) {
-            throw { error: 'unauthorized', message: 'Only HODs can access department leaves.' };
-          }
-          
-          const facultyInDept = await SupaFetch.request(`faculty?select=faculty_id,first_name,last_name&department_id=eq.${hodRow[0].department_id}`);
-          if (!facultyInDept || !facultyInDept.length) {
-            return [];
-          }
-          
-          const facIds = facultyInDept.map(f => f.faculty_id);
-          const leaveRows = await SupaFetch.request(`leave_requests?select=*,faculty:faculty(*)&faculty_id=in.(${facIds.join(',')})&order=applied_at.desc`);
-          return leaveRows;
-        }
+        const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
+        if (!hodRow?.length) throw { error: 'unauthorized', message: 'HOD access only.' };
+        const faculty = await SupaFetch.request(`faculty?select=faculty_id&department_id=eq.${hodRow[0].department_id}`);
+        if (!faculty?.length) return [];
+        return await SupaFetch.request(`leave_requests?select=*,faculty:faculty(*)&faculty_id=in.(${faculty.map(f => f.faculty_id).join(',')})&order=applied_at.desc`);
       }
 
       if (path.startsWith('hod/leaves/')) {
         const parts = path.split('/');
         const leaveUuid = parts[2];
         const action = parts[3];
-        
-        if (method === 'PATCH' || method === 'POST' || method === 'PUT') {
-          const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
-          if (!hodRow || !hodRow.length) {
-            throw { error: 'unauthorized', message: 'Only HODs can approve/reject leaves.' };
-          }
+        const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
+        if (!hodRow?.length) throw { error: 'unauthorized', message: 'HOD only.' };
+        const status = action === 'approve' ? 'approved' : 'rejected';
+        const row = await SupaFetch.request(`leave_requests?leave_id=eq.${leaveUuid}`, 'PATCH', {
+          status,
+          approved_by_hod: hodRow[0].hod_id,
+          decision_at: new Date().toISOString()
+        });
+        return Array.isArray(row) ? row[0] : row;
+      }
+
+      // 19. STUDY MATERIALS / CONTENT
+      if (path === 'content' || path === 'study_materials') {
+        const rows = await SupaFetch.request('content?select=*,subject:subjects(*),faculty:faculty(*,user:users(*))&is_active=eq.true&order=uploaded_at.desc');
+        return (rows || []).map(c => ({
+          ...c,
+          id: c.content_id,
+          content_type: c.content_type?.toLowerCase() || 'note',
+          subject_code: c.subject?.code || '—',
+          subject_name: c.subject?.name || '—',
+          faculty_name: c.faculty ? `${c.faculty.first_name || ''} ${c.faculty.last_name || ''}`.trim() : '—'
+        }));
+      }
+
+      // 20. SEMINARS
+      if (path === 'seminars') {
+        if (method === 'GET') {
+          const localSeminars = localStorage.getItem('mock_seminars');
+          if (localSeminars) return JSON.parse(localSeminars);
           
-          const status = action === 'approve' ? 'approved' : 'rejected';
-          const updateData = {
-            status: status,
-            approved_by_hod: hodRow[0].hod_id,
-            decision_at: new Date().toISOString()
+          const defaultSeminars = [
+            {
+              id: 'sem-001',
+              title: 'Introduction to Cloud Computing & AWS',
+              description: 'Learn the fundamentals of cloud infrastructure, virtualization, and key AWS services.',
+              speaker: 'Dr. Rajesh Kumar',
+              seminar_date: '2026-07-15T10:00:00Z',
+              room: 'Seminar Hall 1',
+              target: 'all'
+            },
+            {
+              id: 'sem-002',
+              title: 'Resume Building & Technical Interview Prep',
+              description: 'Crack coding interviews and build an outstanding resume to attract top recruiters.',
+              speaker: 'Swara Mehta (HR Recruiter)',
+              seminar_date: '2026-07-18T14:00:00Z',
+              room: 'Placement Auditorium',
+              target: 'low_placement'
+            }
+          ];
+          localStorage.setItem('mock_seminars', JSON.stringify(defaultSeminars));
+          return defaultSeminars;
+        }
+        if (method === 'POST') {
+          const newSem = {
+            id: 'sem-' + Math.floor(Math.random() * 1000000),
+            title: body.title,
+            description: body.description,
+            speaker: body.speaker,
+            seminar_date: body.seminar_date || new Date().toISOString(),
+            room: body.room || 'TBD',
+            target: body.target || 'all'
           };
-          
-          const row = await SupaFetch.request(`leave_requests?leave_id=eq.${leaveUuid}`, 'PATCH', updateData);
-          return Array.isArray(row) ? row[0] : row;
+          const current = JSON.parse(localStorage.getItem('mock_seminars') || '[]');
+          current.push(newSem);
+          localStorage.setItem('mock_seminars', JSON.stringify(current));
+          return newSem;
         }
       }
 
-      // Fallback API Call
+      // Fallback
       const token = Auth.getToken();
+      const useToken = (token && !token.startsWith('mock_')) ? token : SUPABASE_ANON;
       const headers = {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        'apikey': SUPABASE_ANON,
+        'Authorization': `Bearer ${useToken}`
       };
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...options, headers });
-      return response.status === 204 ? null : await response.json();
+      const querySuffix = queryStr ? `?${queryStr}` : '';
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}${querySuffix}`, { ...options, headers });
+      if (response.status === 204) return null;
+      const text = await response.text();
+      return text ? JSON.parse(text) : null;
 
     } catch (err) {
-      console.error('Translation error:', JSON.stringify(err), err);
+      console.error('Translation error:', err);
       throw err;
     }
   },
@@ -986,52 +879,64 @@ const API = {
   delete: (url) => API.request(url, { method: 'DELETE' }),
 };
 
-// ---- Toast Notifications ----
-const Toast = {
-  container: null,
-  icons: { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' },
-  init() {
-    if (!this.container) {
-      this.container = document.createElement('div');
-      this.container.className = 'toast-container';
-      document.body.appendChild(this.container);
-    }
+export const SupaAPI = {
+  content: {
+    bySubject: (subjId)  => API.get(`content?select=*,subject:subjects(code,name),faculty:faculty(first_name,last_name)&subject_id=eq.${subjId}&is_active=eq.true&order=uploaded_at.desc`),
+    byFaculty: (facId)   => API.get(`content?select=*,subject:subjects(code,name),faculty:faculty(first_name,last_name)&faculty_id=eq.${facId}&is_active=eq.true&order=uploaded_at.desc`),
+    all:       ()        => API.get('content?select=*,subject:subjects(code,name),faculty:faculty(first_name,last_name)&is_active=eq.true&order=uploaded_at.desc'),
+    add:       (data)    => API.post('content', data),
+    delete:    (id)      => API.delete(`content?content_id=eq.${id}`),
   },
-  show(message, type = 'info', title = null, duration = 4000) {
-    this.init();
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-      <div class="toast-icon">${this.icons[type]}</div>
-      <div class="toast-content">
-        ${title ? `<div class="toast-title">${title}</div>` : ''}
-        <div class="toast-message">${message}</div>
-      </div>
-    `;
-    this.container.appendChild(toast);
-    setTimeout(() => {
-      toast.classList.add('removing');
-      setTimeout(() => toast.remove(), 300);
-    }, duration);
+
+  doubts: {
+    byStudent: (studId) => API.get(`doubts?student_id=eq.${studId}&order=submitted_at.desc`),
+    byFaculty: (facId)  => API.get(`doubts?assigned_faculty_id=eq.${facId}&order=submitted_at.desc`),
+    all:       ()       => API.get('doubts?order=submitted_at.desc'),
+    add:       (data)   => API.post('doubts', data),
+    resolve:   (id, res)=> API.patch(`doubts?doubt_id=eq.${id}`, { status: 'resolved', resolution: res, resolved_at: new Date().toISOString() }),
   },
-  success: (msg, title) => Toast.show(msg, 'success', title),
-  error: (msg, title) => Toast.show(msg, 'error', title),
-  info: (msg, title) => Toast.show(msg, 'info', title),
-  warning: (msg, title) => Toast.show(msg, 'warning', title),
+
+  companies: {
+    all: () => API.get('placement_companies?is_active=eq.true'),
+  },
+
+  placement: {
+    forStudent: (studId) => API.get(`placement_scores?student_id=eq.${studId}`),
+    all:        ()       => API.get('placement_scores?order=total_score.desc'),
+  },
+
+  wellness: {
+    history: (studId, limit = 12) => API.get(`wellness_records?student_id=eq.${studId}&order=assessment_date.desc&limit=${limit}`),
+    submit:  (data)               => API.post('wellness_records', data),
+  },
+
+  leave: {
+    byFaculty: (facId) => API.get(`leave_requests?faculty_id=eq.${facId}&order=applied_at.desc`),
+    pending:   ()      => API.get('leave_requests?status=eq.pending&order=applied_at.asc'),
+    apply:     (data)  => API.post('leave_requests', data),
+  },
+
+  lectureChanges: {
+    upcoming: () => API.get('lecture_changes?order=change_date.asc'),
+  },
+
+  notifications: {
+    forUser:  (uId, limit = 20) => API.get(`notifications?recipient_id=eq.${uId}&order=sent_at.desc&limit=${limit}`),
+    unread:   (uId)             => API.get(`notifications?recipient_id=eq.${uId}&is_read=eq.false&order=sent_at.desc`),
+    markRead: (id)              => API.patch(`notifications?notification_id=eq.${id}`, { is_read: true }),
+  },
+
+  seminars: {
+    upcoming: () => API.get('seminars?order=seminar_date.asc'),
+  },
+
+  audit: {
+    log: (actId, act, type, entId) =>
+      API.post('audit_logs', { actor_id: actId, action: act, entity_type: type, entity_id: entId, ip_address: '127.0.0.1' }),
+  },
 };
 
-// ---- Modal ----
-const Modal = {
-  open(id) { document.getElementById(id)?.classList.add('open'); },
-  close(id) { document.getElementById(id)?.classList.remove('open'); },
-  closeAll() { document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open')); },
-};
-document.addEventListener('click', (e) => {
-  if (e.target.classList.contains('modal-overlay')) Modal.closeAll();
-});
-
-// ---- Helpers ----
-const Utils = {
+export const Utils = {
   formatDate(dateStr) {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -1059,169 +964,24 @@ const Utils = {
     const start = (page - 1) * perPage;
     return arr.slice(start, start + perPage);
   },
-  getStatusBadge(status) {
+  getStatusBadgeClass(status) {
     const s = (status || '').toLowerCase();
     const cleanStatus = s === 'p' ? 'present' : s === 'a' ? 'absent' : s === 'l' ? 'late' : s === 'e' ? 'excused' : s;
     const map = {
       active: 'success', inactive: 'muted', graduated: 'info',
       paid: 'success', pending: 'warning', overdue: 'danger', waived: 'muted',
       present: 'success', absent: 'danger', late: 'warning', excused: 'info',
+      approved: 'success', rejected: 'danger'
     };
-    const label = cleanStatus.charAt(0).toUpperCase() + cleanStatus.slice(1);
-    return `<span class="badge badge-${map[cleanStatus] || 'muted'}">${label}</span>`;
+    return `badge badge-${map[cleanStatus] || 'muted'}`;
   },
-  getGradeBadge(grade) {
-    const map = { 'O': 'success', 'A+': 'success', 'A': 'info', 'B+': 'info', 'B': 'primary', 'C': 'warning', 'D': 'warning', 'F': 'danger' };
-    return `<span class="badge badge-${map[grade] || 'muted'}">${grade}</span>`;
+  getGradeBadgeClass(grade) {
+    const map = {
+      // Standard
+      'O': 'success', 'A+': 'success', 'A': 'info', 'B+': 'info', 'B': 'primary', 'C': 'warning', 'D': 'warning', 'F': 'danger',
+      // Indian grading system
+      'AA': 'success', 'AB': 'info', 'BB': 'primary', 'BC': 'primary', 'CC': 'warning', 'CD': 'warning', 'DD': 'muted'
+    };
+    return `badge badge-${map[grade] || 'muted'}`;
   }
 };
-
-// ---- Navigation & Dynamic Sidebar ----
-function generateNavItems(items, currentPage) {
-  return items.map(item => {
-    if (item.section) {
-      return `<div class="nav-section-title">${item.section}</div>`;
-    }
-    const isActive = item.page === currentPage ? 'active' : '';
-    return `<a class="nav-item ${isActive}" href="${item.href}"><span class="nav-icon">${item.icon}</span> ${item.label}</a>`;
-  }).join('');
-}
-
-function buildGlobalSidebar() {
-  const sidebarEl = document.querySelector('.sidebar');
-  if (!sidebarEl) return;
-
-  const user = Auth.getUser();
-  if (!user) return;
-
-  const role = (user.role || '').toLowerCase();
-  const isDashboard = window.location.pathname.includes('/dashboard/');
-  const pagesBase = isDashboard ? '../pages/' : '';
-  const dashBase = isDashboard ? '' : '../dashboard/';
-
-  const currentPath = window.location.pathname;
-  const currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1) || 'index.html';
-
-  const initials = (user.first_name?.[0] || '') + (user.last_name?.[0] || '');
-  const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'User';
-
-  let brandTitle = 'EduPulse';
-  let brandSubtitle = 'Portal';
-  let brandHref = '#';
-  let navHtml = '';
-
-  if (role === 'student') {
-    brandTitle = 'EduPulse';
-    brandSubtitle = 'Student Portal';
-    brandHref = `${dashBase}student.html`;
-
-    const items = [
-      { section: 'Main' },
-      { label: 'My Dashboard', icon: '📊', href: `${dashBase}student.html`, page: 'student.html' },
-      { section: 'Academics' },
-      { label: 'My Attendance', icon: '✅', href: `${pagesBase}student_attendance.html`, page: 'student_attendance.html' },
-      { label: 'My Grades', icon: '📝', href: `${pagesBase}student_grades.html`, page: 'student_grades.html' },
-      { label: 'Timetable', icon: '📅', href: `${pagesBase}student_timetable.html`, page: 'student_timetable.html' },
-      { label: 'Courses', icon: '📚', href: `${pagesBase}courses.html`, page: 'courses.html' },
-      { label: 'Study Materials', icon: '📖', href: `${pagesBase}student_content.html`, page: 'student_content.html' },
-      { label: 'My Doubts Q&A', icon: '❓', href: `${pagesBase}student_doubts.html`, page: 'student_doubts.html' },
-      { section: 'Support & Info' },
-      { label: 'My Complaints', icon: '📣', href: `${pagesBase}student_complaints.html`, page: 'student_complaints.html' },
-      { label: 'Notices', icon: '📢', href: `${pagesBase}notices.html`, page: 'notices.html' },
-      { section: 'Career' },
-      { label: 'Placement Score', icon: '🎯', href: `${pagesBase}student_placement.html`, page: 'student_placement.html' }
-    ];
-
-    navHtml = generateNavItems(items, currentPage);
-  } else if (role === 'faculty' || role === 'hod') {
-    brandTitle = 'EduPulse';
-    brandSubtitle = role === 'hod' ? 'HOD Portal' : 'Faculty Portal';
-    brandHref = `${dashBase}faculty.html`;
-
-    const items = [
-      { section: 'Main' },
-      { label: 'My Dashboard', icon: '📊', href: `${dashBase}faculty.html`, page: 'faculty.html' },
-      { section: 'My Classes' },
-      { label: 'Mark Attendance', icon: '✅', href: `${pagesBase}attendance.html`, page: 'attendance.html' },
-      { label: 'Enter Grades', icon: '📝', href: `${pagesBase}grades.html`, page: 'grades.html' },
-      { label: 'My Timetable', icon: '📅', href: `${pagesBase}faculty_timetable.html`, page: 'faculty_timetable.html' }
-    ];
-
-    if (role === 'hod') {
-      items.push(
-        { section: 'HOD Actions' },
-        { label: 'Student Complaints', icon: '📣', href: `${pagesBase}hod_complaints.html`, page: 'hod_complaints.html' },
-        { label: 'Manage Timetable', icon: '🗓️', href: `${pagesBase}timetable.html`, page: 'timetable.html' }
-      );
-    }
-
-    items.push(
-      { section: 'Information' },
-      { label: 'View Students', icon: '🎓', href: `${pagesBase}students.html`, page: 'students.html' },
-      { label: 'Courses', icon: '📚', href: `${pagesBase}courses.html`, page: 'courses.html' },
-      { label: 'Notices', icon: '📢', href: `${pagesBase}notices.html`, page: 'notices.html' }
-    );
-
-    navHtml = generateNavItems(items, currentPage);
-  } else if (role === 'admin') {
-    brandTitle = 'EduPulse';
-    brandSubtitle = 'Admin Panel';
-    brandHref = `${dashBase}admin.html`;
-
-    const items = [
-      { section: 'Main' },
-      { label: 'Dashboard', icon: '📊', href: `${dashBase}admin.html`, page: 'admin.html' },
-      { section: 'Management' },
-      { label: 'Students', icon: '🎓', href: `${pagesBase}students.html`, page: 'students.html' },
-      { label: 'Faculty', icon: '👨‍🏫', href: `${pagesBase}faculty.html`, page: 'faculty.html' },
-      { label: 'Courses', icon: '📚', href: `${pagesBase}courses.html`, page: 'courses.html' },
-      { label: 'Departments', icon: '🏛️', href: `${pagesBase}departments.html`, page: 'departments.html' },
-      { section: 'Academic' },
-      { label: 'Attendance', icon: '✅', href: `${pagesBase}attendance.html`, page: 'attendance.html' },
-      { label: 'Grades', icon: '📝', href: `${pagesBase}grades.html`, page: 'grades.html' },
-      { label: 'Timetable', icon: '📅', href: `${pagesBase}timetable.html`, page: 'timetable.html' },
-      { section: 'Finance & Comms' },
-      { label: 'Fee Management', icon: '💰', href: `${pagesBase}fees.html`, page: 'fees.html' },
-      { label: 'Notices', icon: '📢', href: `${pagesBase}notices.html`, page: 'notices.html' }
-    ];
-
-    navHtml = generateNavItems(items, currentPage);
-  }
-
-  sidebarEl.innerHTML = `
-    <a class="sidebar-brand" href="${brandHref}">
-      <div class="sidebar-brand-icon">🎓</div>
-      <div class="sidebar-brand-text">
-        <div class="sidebar-brand-title">${brandTitle}</div>
-        <div class="sidebar-brand-subtitle">${brandSubtitle}</div>
-      </div>
-    </a>
-    <nav class="sidebar-nav">
-      ${navHtml}
-    </nav>
-    <div class="sidebar-footer">
-      <div class="sidebar-user" onclick="Auth.logout()">
-        <div class="user-avatar">${initials.toUpperCase() || 'U'}</div>
-        <div class="user-info">
-          <div class="user-name">${userName}</div>
-          <div class="user-role">${role === 'hod' ? 'HOD' : role.charAt(0).toUpperCase() + role.slice(1)}</div>
-        </div>
-        <span style="color:var(--text-muted); cursor:pointer;">⏻</span>
-      </div>
-    </div>
-  `;
-}
-
-// ---- User Display ----
-function initUserDisplay() {
-  const user = Auth.getUser();
-  if (!user) return;
-  document.querySelectorAll('[data-user-name]').forEach(el => el.textContent = user.first_name + ' ' + user.last_name);
-  document.querySelectorAll('[data-user-role]').forEach(el => el.textContent = user.role);
-  document.querySelectorAll('[data-user-initials]').forEach(el => el.textContent = Utils.getInitials(user.first_name + ' ' + user.last_name));
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  buildGlobalSidebar();
-  initUserDisplay();
-});
