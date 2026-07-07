@@ -826,25 +826,42 @@ const API = {
       // 15. COMPLAINTS / GRIEVANCES
       if (path === 'complaints') {
         if (method === 'GET') {
-          const query = 'grievances?select=*,student:students(*,user:users(*))&order=submitted_at.desc';
+          const loggedUser = Auth.getUser();
+          let query = 'grievances?select=*,student:students(*,user:users(*))&order=submitted_at.desc';
+          // Filter to only this student's complaints if role is student
+          if (loggedUser && (loggedUser.role || '').toLowerCase() === 'student') {
+            const stuRows = await SupaFetch.request(`students?select=student_id&user_id=eq.${loggedUser.id}`);
+            if (stuRows && stuRows.length > 0) {
+              query = `grievances?select=*,student:students(*,user:users(*))&student_id=eq.${stuRows[0].student_id}&order=submitted_at.desc`;
+            }
+          }
           const rows = await SupaFetch.request(query);
+          const catLabel = { academic:'Academic', facility:'Facility', faculty:'Faculty Behaviour', administrative:'Administrative', hostel:'Hostel', other:'Other' };
+          const statusMap = { pending:'pending', in_review:'in_review', resolved:'resolved', dismissed:'dismissed', open:'pending' };
           return rows.map(c => ({
             ...c,
+            id: c.grievance_id,
+            title: c.title || catLabel[c.category] || c.category || 'Complaint',
             created_at: c.submitted_at,
-            student_name: c.is_anonymous ? 'Anonymous Student' : `${c.student?.first_name || ''} ${c.student?.last_name || ''}`,
+            status: statusMap[c.status] || c.status || 'pending',
+            is_anonymous: c.is_anonymous || c.is_critical || false,
+            hod_response: c.hod_response || c.resolution_note || null,
+            student_name: (c.is_anonymous || c.is_critical) ? 'Anonymous Student'
+              : (c.student ? `${c.student.first_name || ''} ${c.student.last_name || ''}`.trim() : 'Student'),
           }));
         }
         if (method === 'POST') {
           const studentRow = await SupaFetch.request(`students?user_id=eq.${loggedInUser.id}`);
-          const row = await SupaFetch.request('grievances', 'POST', {
+          const insertData = {
             student_id: studentRow[0].student_id,
-            title: body.title,
-            description: body.description,
+            description: body.title ? `[${body.title}] ${body.description}` : body.description,
             category: body.category || 'other',
-            is_anonymous: body.is_anonymous || false,
+            is_critical: body.is_anonymous || false,
             status: 'pending'
-          });
-          return Array.isArray(row) ? row[0] : row;
+          };
+          const row = await SupaFetch.request('grievances', 'POST', insertData);
+          const created = Array.isArray(row) ? row[0] : row;
+          return created ? { ...created, title: body.title || created.category, created_at: created.submitted_at } : created;
         }
       }
 

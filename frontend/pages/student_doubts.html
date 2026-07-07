@@ -177,34 +177,45 @@
   let currentFilter = 'all';
 
   async function loadEnrolledCourses() {
+    const sel = document.getElementById('doubtSubject');
     try {
-      const data = await API.get('/enrollments/?expand=course');
-      myCourses = data.results || data;
-      const sel = document.getElementById('doubtSubject');
-      myCourses.forEach(e => {
-        const c = e.course || e;
-        const opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = `${c.name} (${c.code})`;
-        opt.dataset.name = c.name;
-        opt.dataset.code = c.code;
-        sel.appendChild(opt);
-      });
-    } catch {
-      // fallback: load all courses
-      try {
-        const data = await API.get('/courses/');
-        const courses = data.results || data;
-        const sel = document.getElementById('doubtSubject');
-        courses.forEach(c => {
+      // Look up student_id for the logged-in user
+      const studentRows = await SupaDB.select('students', { select: 'student_id', user_id: `eq.${user.id}` });
+      if (studentRows && studentRows.length > 0) {
+        const studentId = studentRows[0].student_id;
+        const rows = await SupaDB.select('enrollments', {
+          select: '*,course:subjects(subject_id,name,code)',
+          student_id: `eq.${studentId}`
+        });
+        myCourses = rows;
+        rows.forEach(e => {
+          const c = e.course;
+          if (!c) return;
           const opt = document.createElement('option');
-          opt.value = c.id;
+          opt.value = c.subject_id;
           opt.textContent = `${c.name} (${c.code})`;
           opt.dataset.name = c.name;
           opt.dataset.code = c.code;
           sel.appendChild(opt);
         });
-      } catch {}
+        if (rows.length > 0) return; // success — stop here
+      }
+    } catch(e) {
+      console.warn('Could not load enrollments from Supabase:', e);
+    }
+    // Fallback: load all subjects
+    try {
+      const subjects = await SupaDB.select('subjects', { select: 'subject_id,name,code', order: 'name.asc' });
+      subjects.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.subject_id;
+        opt.textContent = `${c.name} (${c.code})`;
+        opt.dataset.name = c.name;
+        opt.dataset.code = c.code;
+        sel.appendChild(opt);
+      });
+    } catch(e) {
+      console.warn('Could not load subjects from Supabase:', e);
     }
   }
 
