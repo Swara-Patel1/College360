@@ -82,9 +82,9 @@ export default function HODPerformance() {
 
   const handleOpenEmail = (alertItem) => {
     setEmailTarget(alertItem);
-    setEmailSubject(`Academic Alert: Performance Update for ${alertItem.studentName}`);
+    setEmailSubject(`Academic Alert: Performance Update for ${alertItem.student_name}`);
     setEmailBody(
-      `Dear Parent,\n\nThis is to notify you regarding your child ${alertItem.studentName}'s performance in the subject "${alertItem.course?.name || 'Course'}".\n\nThey obtained ${alertItem.marks_obtained}/${alertItem.total_marks} (${alertItem.percentage}%) and received a grade of "${alertItem.grade}".\n\nWe would like to schedule a review discussion or direct them to extra lectures to improve their scoring.\n\nBest regards,\nHOD Office`
+      `Dear Parent,\n\nThis is to notify you regarding your child ${alertItem.student_name}'s performance in the subject "${alertItem.course?.name || 'Course'}".\n\nThey obtained ${alertItem.marks_obtained}/${alertItem.total_marks} (${alertItem.percentage}%) and received a grade of "${alertItem.grade}".\n\nWe would like to schedule a review discussion or direct them to extra lectures to improve their scoring.\n\nBest regards,\nHOD Office`
     );
     setIsEmailOpen(true);
   };
@@ -187,7 +187,7 @@ export default function HODPerformance() {
               <tbody>
                 {lowPerformers.map((alert, idx) => (
                   <tr key={alert.mark_id || idx}>
-                    <td style={{ fontWeight: 600 }}>{alert.studentName}</td>
+                    <td style={{ fontWeight: 600 }}>{alert.student_name}</td>
                     <td>{alert.course?.name || '—'}</td>
                     <td>
                       <strong style={{ color: '#FF6B6B' }}>
@@ -239,7 +239,7 @@ export default function HODPerformance() {
 
       {/* ======================== EMAIL PARENT MODAL ======================== */}
       {isEmailOpen && emailTarget && (
-        <Modal isOpen={isEmailOpen} onClose={() => setIsEmailOpen(false)} title={`✉️ Contact Parent of ${emailTarget.studentName}`}>
+        <Modal isOpen={isEmailOpen} onClose={() => setIsEmailOpen(false)} title={`✉️ Contact Parent of ${emailTarget.student_name}`}>
           <form onSubmit={handleSendEmail}>
             <div className="form-group" style={{ marginBottom: '15px' }}>
               <label className="form-label">Parent Email Address</label>

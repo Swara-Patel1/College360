@@ -480,32 +480,54 @@ export const API = {
       }
 
       // 11. TIMETABLE
-      if (path === 'timetable' && method === 'GET') {
-        const day = params.get('day');
-        const facultyUuid = params.get('faculty');
-        let query = 'timetable?select=*,course:subjects(*),faculty:faculty(*,user:users(*))';
-        if (day) {
-          const apiDayMap = {
-            'monday': 'MON', 'tuesday': 'TUE', 'wednesday': 'WED',
-            'thursday': 'THU', 'friday': 'FRI', 'saturday': 'SAT', 'sunday': 'SUN'
-          };
-          const dbDay = apiDayMap[day.toLowerCase()] || day.toUpperCase();
-          query += `&day_of_week=eq.${dbDay}`;
-        }
-        if (facultyUuid) query += `&faculty_id=eq.${facultyUuid}`;
-        const rows = await SupaFetch.request(query);
-        const dayMap = {
-          'MON': 'monday', 'TUE': 'tuesday', 'WED': 'wednesday',
-          'THU': 'thursday', 'FRI': 'friday', 'SAT': 'saturday', 'SUN': 'sunday'
+      if (path === 'timetable') {
+        const apiDayMap = {
+          'monday': 'monday', 'tuesday': 'tuesday', 'wednesday': 'wednesday',
+          'thursday': 'thursday', 'friday': 'friday', 'saturday': 'saturday', 'sunday': 'sunday',
+          'mon': 'monday', 'tue': 'tuesday', 'wed': 'wednesday',
+          'thu': 'thursday', 'fri': 'friday', 'sat': 'saturday', 'sun': 'sunday'
         };
-        return rows.map(t => ({
-          ...t,
-          day: dayMap[t.day_of_week] || t.day_of_week?.toLowerCase() || 'monday',
-          room: t.room_no || '—',
-          course_name: t.course?.name || '—',
-          course_code: t.course?.code || '—',
-          faculty_name: t.faculty ? `${t.faculty.first_name} ${t.faculty.last_name}` : '—'
-        }));
+
+        if (method === 'GET') {
+          const day = params.get('day');
+          const facultyUuid = params.get('faculty');
+          let query = 'timetable?select=*,course:subjects(*),faculty:faculty(*,user:users(*))';
+          if (day) {
+            const dbDay = apiDayMap[day.toLowerCase()] || day.toLowerCase();
+            query += `&day_of_week=eq.${dbDay}`;
+          }
+          if (facultyUuid) query += `&faculty_id=eq.${facultyUuid}`;
+          const rows = await SupaFetch.request(query);
+          return rows.map(t => ({
+            ...t,
+            day: t.day_of_week?.toLowerCase() || 'monday',
+            room: t.room_no || '—',
+            course_name: t.course?.name || '—',
+            course_code: t.course?.code || '—',
+            faculty_name: t.faculty ? `${t.faculty.first_name} ${t.faculty.last_name}` : '—'
+          }));
+        } else {
+          if (body && body.day_of_week) {
+            body.day_of_week = apiDayMap[body.day_of_week.toLowerCase()] || body.day_of_week.toLowerCase();
+          }
+          const token = Auth.getToken();
+          const useToken = (token && !token.startsWith('mock_')) ? token : SUPABASE_ANON;
+          const headers = {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON,
+            'Authorization': `Bearer ${useToken}`,
+            'Prefer': 'return=representation'
+          };
+          const querySuffix = queryStr ? `?${queryStr}` : '';
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/timetable${querySuffix}`, {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : undefined
+          });
+          if (response.status === 204) return null;
+          const text = await response.text();
+          return text ? JSON.parse(text) : null;
+        }
       }
 
       // 12. ATTENDANCE STATS

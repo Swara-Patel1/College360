@@ -3,6 +3,16 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const pino = require('pino');
+const rateLimit = require('express-rate-limit');
+
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  transport: process.env.NODE_ENV !== 'production' ? {
+    target: 'pino-pretty',
+    options: { colorize: true }
+  } : undefined
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -16,8 +26,18 @@ const io = new Server(server, {
   },
 });
 
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
 app.use(cors());
 app.use(express.json());
+app.use('/health', apiLimiter);
+app.use('/online-users', apiLimiter);
 
 // In-memory store for connected users and chat messages
 const connectedUsers = new Map();
@@ -38,14 +58,38 @@ io.use((socket, next) => {
     next();
   } catch (err) {
     // Allow connection anyway in dev mode
-    console.log('JWT verification failed (dev mode - allowing):', err.message);
+    logger.warn({ err: err.message }, 'JWT verification failed (dev mode - allowing)');
     socket.user = { user_id: 'guest', role: 'guest' };
     next();
   }
 });
 
+// Track events for rate limiting per socket connection
+const RATE_LIMIT_WINDOW_MS = 1000;
+const MAX_EVENTS_PER_WINDOW = 10;
+const socketEventTimestamps = new Map();
+
+// Apply socket event rate limiter
+io.use((socket, next) => {
+  socket.use(([event, ...args], nextEvent) => {
+    const now = Date.now();
+    let timestamps = socketEventTimestamps.get(socket.id) || [];
+    timestamps = timestamps.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+    
+    if (timestamps.length >= MAX_EVENTS_PER_WINDOW) {
+      logger.warn({ socketId: socket.id, userId: socket.user?.user_id, event }, 'Socket rate limit exceeded, event dropped');
+      return nextEvent(new Error('Rate limit exceeded. Event dropped.'));
+    }
+    
+    timestamps.push(now);
+    socketEventTimestamps.set(socket.id, timestamps);
+    nextEvent();
+  });
+  next();
+});
+
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id} | User: ${socket.user?.user_id}`);
+  logger.info({ socketId: socket.id, userId: socket.user?.user_id, role: socket.user?.role }, 'User connected');
   
   // Store user connection
   connectedUsers.set(socket.id, {
@@ -71,7 +115,7 @@ io.on('connection', (socket) => {
 
   // ==================== ATTENDANCE ====================
   socket.on('attendance:mark', (data) => {
-    console.log('Attendance marked:', data);
+    logger.info({ userId: socket.user?.user_id, attendance: data }, 'Attendance marked');
     const event = {
       type: 'attendance',
       ...data,
@@ -110,7 +154,7 @@ io.on('connection', (socket) => {
     } else {
       io.to(data.audience).emit('notification:new', notif);
     }
-    console.log('Notification sent:', notif);
+    logger.info({ notification: notif }, 'Notification sent');
   });
 
   // ==================== CHAT ====================
@@ -178,8 +222,9 @@ io.on('connection', (socket) => {
   // ==================== DISCONNECT ====================
   socket.on('disconnect', () => {
     connectedUsers.delete(socket.id);
+    socketEventTimestamps.delete(socket.id);
     io.emit('online_count', connectedUsers.size);
-    console.log(`User disconnected: ${socket.id}`);
+    logger.info({ socketId: socket.id, userId: socket.user?.user_id }, 'User disconnected');
   });
 });
 
@@ -203,6 +248,6 @@ app.get('/online-users', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`Real-time server running on http://localhost:${PORT}`);
-  console.log(`Socket.io ready for connections`);
+  logger.info({ port: PORT }, 'Real-time server started and listening');
+  logger.info('Socket.io ready for connections');
 });
