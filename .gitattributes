@@ -1,0 +1,37 @@
+# Exclude specific files from GitHub language statistics to achieve a 50/50 Python/JS split
+edumanage_frontend/src/components/Sidebar.jsx linguist-vendored
+edumanage_frontend/src/main.jsx linguist-vendored
+edumanage_frontend/src/pages/Courses.jsx linguist-vendored
+edumanage_frontend/src/pages/Notices.jsx linguist-vendored
+edumanage_frontend/src/pages/faculty/Attendance.jsx linguist-vendored
+edumanage_frontend/src/pages/faculty/Dashboard.jsx linguist-vendored
+edumanage_frontend/src/pages/faculty/Grades.jsx linguist-vendored
+edumanage_frontend/src/pages/faculty/Timetable.jsx linguist-vendored
+edumanage_frontend/src/pages/hod/Classes.jsx linguist-vendored
+edumanage_frontend/src/pages/hod/Complaints.jsx linguist-vendored
+edumanage_frontend/src/pages/hod/Fees.jsx linguist-vendored
+edumanage_frontend/src/pages/hod/Performance.jsx linguist-vendored
+edumanage_frontend/src/pages/hod/Seminars.jsx linguist-vendored
+edumanage_frontend/src/pages/hod/TimetableManagement.jsx linguist-vendored
+edumanage_frontend/src/pages/student/Attendance.jsx linguist-vendored
+edumanage_frontend/src/pages/student/Complaints.jsx linguist-vendored
+edumanage_frontend/src/pages/student/Content.jsx linguist-vendored
+edumanage_frontend/src/pages/student/Dashboard.jsx linguist-vendored
+edumanage_frontend/src/pages/student/Doubts.jsx linguist-vendored
+edumanage_frontend/src/pages/student/Grades.jsx linguist-vendored
+edumanage_frontend/src/pages/student/Placement.jsx linguist-vendored
+edumanage_frontend/src/pages/student/Timetable.jsx linguist-vendored
+edumanage_frontend/src/pages/student/Wellness.jsx linguist-vendored
+edumanage_frontend/src/routes/AppRoutes.jsx linguist-vendored
+edumanage_frontend/src/routes/ProtectedRoute.jsx linguist-vendored
+edumanage_frontend/src/store/useAuthStore.js linguist-vendored
+edumanage_frontend/src/store/useNotifStore.js linguist-vendored
+edumanage_frontend/vite.config.js linguist-vendored
+realtime/ecosystem.config.js linguist-vendored
+realtime/server.js linguist-vendored
+
+# Exclude assets, package-lock, styles, etc.
+edumanage_frontend/src/css/** linguist-vendored
+edumanage_frontend/package-lock.json linguist-vendored
+realtime/package-lock.json linguist-vendored
+package-lock.json linguist-vendored
