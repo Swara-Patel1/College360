@@ -44,12 +44,16 @@ export default function Sidebar() {
       { type: 'section', label: 'My Classes' },
       { type: 'link', label: 'Mark Attendance', icon: '✅', to: '/faculty/attendance' },
       { type: 'link', label: 'Enter Grades', icon: '📝', to: '/faculty/grades' },
-      { type: 'link', label: 'My Timetable', icon: '📅', to: '/faculty/timetable' }
+      { type: 'link', label: 'My Timetable', icon: '📅', to: '/faculty/timetable' },
+      { type: 'section', label: 'Leave & Schedule' },
+      { type: 'link', label: 'Apply Leave', icon: '🏖️', to: '/faculty/leaves' },
+      { type: 'link', label: 'Lecture Interchange', icon: '🔄', to: '/faculty/interchange' }
     ];
 
     if (role === 'hod') {
       navItems.push(
         { type: 'section', label: 'HOD Actions' },
+        { type: 'link', label: 'Leave Requests', icon: '📋', to: '/hod/leaves' },
         { type: 'link', label: 'Student Complaints', icon: '📣', to: '/hod/complaints' },
         { type: 'link', label: 'Academic Alerts', icon: '⚠️', to: '/hod/performance' },
         { type: 'link', label: 'Pending Fees', icon: '💰', to: '/hod/fees' },

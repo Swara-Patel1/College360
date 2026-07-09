@@ -12,8 +12,21 @@ export const initSocket = () => {
 
   if (socket?.connected) return socket;
 
+  let userId = 'guest';
+  let role = 'guest';
+  try {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      userId = user.id || 'guest';
+      role = user.role || 'guest';
+    }
+  } catch (e) {
+    console.error('Failed to parse user for socket auth:', e);
+  }
+
   socket = io('http://localhost:3001', {
-    auth: { token },
+    auth: { token, userId, role },
     timeout: 2000,
     transports: ['websocket']
   });

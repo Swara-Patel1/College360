@@ -59,7 +59,11 @@ io.use((socket, next) => {
   } catch (err) {
     // Allow connection anyway in dev mode
     logger.warn({ err: err.message }, 'JWT verification failed (dev mode - allowing)');
-    socket.user = { user_id: 'guest', role: 'guest' };
+    const auth = socket.handshake.auth || {};
+    socket.user = { 
+      user_id: auth.userId || 'guest', 
+      role: auth.role || 'guest' 
+    };
     next();
   }
 });

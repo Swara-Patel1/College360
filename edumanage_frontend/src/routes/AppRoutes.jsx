@@ -22,14 +22,16 @@ import FacultyDashboard from '../pages/faculty/Dashboard.jsx';
 import AttendanceMarking from '../pages/faculty/Attendance.jsx';
 import GradesEntry from '../pages/faculty/Grades.jsx';
 import FacultyTimetable from '../pages/faculty/Timetable.jsx';
+import FacultyLeaves from '../pages/faculty/Leaves.jsx';
+import FacultyInterchange from '../pages/faculty/Interchange.jsx';
 import ManageStudents from '../pages/ManageStudents.jsx';
 import HODComplaints from '../pages/hod/Complaints.jsx';
 import HODPerformance from '../pages/hod/Performance.jsx';
 import HODFees from '../pages/hod/Fees.jsx';
 import HODSeminars from '../pages/hod/Seminars.jsx';
 import HODClasses from '../pages/hod/Classes.jsx';
+import HODLeaves from '../pages/hod/Leaves.jsx';
 import TimetableManagement from '../pages/hod/TimetableManagement.jsx';
-const Leaves = () => <div><h1>Leaves Placeholder</h1></div>;
 
 const AdminDashboard = () => <div><h1>Admin Dashboard Placeholder</h1></div>;
 const ManageFaculty = () => <div><h1>Manage Faculty Placeholder</h1></div>;
@@ -99,7 +101,8 @@ export const AppRoutes = () => {
         <Route path="/faculty/attendance" element={<MainLayout><AttendanceMarking /></MainLayout>} />
         <Route path="/faculty/grades" element={<MainLayout><GradesEntry /></MainLayout>} />
         <Route path="/faculty/timetable" element={<MainLayout><FacultyTimetable /></MainLayout>} />
-        <Route path="/faculty/leaves" element={<MainLayout><Leaves /></MainLayout>} />
+        <Route path="/faculty/leaves" element={<MainLayout><FacultyLeaves /></MainLayout>} />
+        <Route path="/faculty/interchange" element={<MainLayout><FacultyInterchange /></MainLayout>} />
         <Route path="/faculty/students" element={<MainLayout><ManageStudents /></MainLayout>} />
         <Route path="/faculty/courses" element={<MainLayout><Courses /></MainLayout>} />
         <Route path="/faculty/notices" element={<MainLayout><Notices /></MainLayout>} />
@@ -107,6 +110,7 @@ export const AppRoutes = () => {
 
       {/* HOD Specific Protected Routes */}
       <Route element={<ProtectedRoute allowedRoles={['hod']} />}>
+        <Route path="/hod/leaves" element={<MainLayout><HODLeaves /></MainLayout>} />
         <Route path="/hod/complaints" element={<MainLayout><HODComplaints /></MainLayout>} />
         <Route path="/hod/performance" element={<MainLayout><HODPerformance /></MainLayout>} />
         <Route path="/hod/fees" element={<MainLayout><HODFees /></MainLayout>} />

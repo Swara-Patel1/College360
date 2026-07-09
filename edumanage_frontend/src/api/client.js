@@ -639,9 +639,9 @@ export const API = {
           const audience = params.get('audience');
           let query = 'notices?select=*,author:users(*)&order=published_at.desc';
           if (audience) {
-            if (audience === 'students') query += '&target_audience=in.(ALL,STUDENTS_ONLY)';
-            else if (audience === 'faculty') query += '&target_audience=in.(ALL,FACULTY_ONLY)';
-            else query += `&target_audience=in.(ALL,${audience.toUpperCase()})`;
+            if (audience === 'students') query += '&target_audience=in.(all,students)';
+            else if (audience === 'faculty') query += '&target_audience=in.(all,faculty)';
+            else query += `&target_audience=in.(all,${audience.toLowerCase()})`;
           }
           const rows = await SupaFetch.request(query);
           return rows.map(n => {
@@ -652,9 +652,9 @@ export const API = {
             else if (prio === 'LOW') notice_type = 'holiday';
             
             let audienceVal = 'all';
-            const aud = (n.target_audience || '').toUpperCase();
-            if (aud === 'STUDENTS_ONLY') audienceVal = 'students';
-            else if (aud === 'FACULTY_ONLY') audienceVal = 'faculty';
+            const aud = (n.target_audience || '').toLowerCase();
+            if (aud === 'students') audienceVal = 'students';
+            else if (aud === 'faculty') audienceVal = 'faculty';
 
             return {
               ...n,
@@ -670,9 +670,9 @@ export const API = {
           let role = (loggedInUser?.role || 'admin').toLowerCase();
           if (role === 'student') throw { error: 'unauthorized', message: 'Students not authorized.' };
           
-          let dbAudience = 'ALL';
-          if (body.audience === 'students') dbAudience = 'STUDENTS_ONLY';
-          else if (body.audience === 'faculty') dbAudience = 'FACULTY_ONLY';
+          let dbAudience = 'all';
+          if (body.audience === 'students') dbAudience = 'students';
+          else if (body.audience === 'faculty') dbAudience = 'faculty';
 
           let dbPriority = 'NORMAL';
           if (body.notice_type === 'urgent') dbPriority = 'URGENT';
@@ -709,7 +709,7 @@ export const API = {
           if (body.title !== undefined) patchBody.title = body.title;
           if (body.content !== undefined) patchBody.content = body.content;
           if (body.audience !== undefined) {
-            patchBody.target_audience = body.audience === 'students' ? 'STUDENTS_ONLY' : body.audience === 'faculty' ? 'FACULTY_ONLY' : 'ALL';
+            patchBody.target_audience = body.audience === 'students' ? 'students' : body.audience === 'faculty' ? 'faculty' : 'all';
           }
           if (body.notice_type !== undefined) {
             patchBody.priority = body.notice_type === 'urgent' ? 'URGENT' : body.notice_type === 'exam' ? 'HIGH' : body.notice_type === 'holiday' ? 'LOW' : 'NORMAL';
@@ -827,7 +827,139 @@ export const API = {
         }));
       }
 
-      // 20. SEMINARS
+      // 20. LECTURE INTERCHANGE (localStorage mock)
+      if (path === 'faculty/interchange') {
+        const facultyRow = await SupaFetch.request(`faculty?user_id=eq.${loggedInUser.id}`);
+        if (!facultyRow?.length) throw { error: 'not_found', message: 'Faculty not found.' };
+        const myFacId = facultyRow[0].faculty_id;
+
+        if (method === 'GET') {
+          const all = JSON.parse(localStorage.getItem('mock_interchange_requests') || '[]');
+          // Return requests where I'm sender or receiver
+          return all.filter(r => r.requester_faculty_id === myFacId || r.target_faculty_id === myFacId);
+        }
+
+        if (method === 'POST') {
+          const all = JSON.parse(localStorage.getItem('mock_interchange_requests') || '[]');
+          const newReq = {
+            interchange_id: 'ic-' + Date.now(),
+            requester_faculty_id: myFacId,
+            requester_faculty_name: body.requester_faculty_name || `${facultyRow[0].first_name || ''} ${facultyRow[0].last_name || ''}`.trim(),
+            target_faculty_id: body.target_faculty_id,
+            target_faculty_name: body.target_faculty_name || '',
+            requester_slot: body.requester_slot,   // { day, start_time, end_time, course_name, course_code, room, date }
+            target_slot: body.target_slot,         // { day, start_time, end_time, course_name, course_code, room, date }
+            reason: body.reason || '',
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          all.push(newReq);
+          localStorage.setItem('mock_interchange_requests', JSON.stringify(all));
+          return newReq;
+        }
+      }
+
+      if (path.startsWith('faculty/interchange/')) {
+        const parts = path.split('/');
+        const interchangeId = parts[2];
+        const action = parts[3]; // accept | reject
+
+        const all = JSON.parse(localStorage.getItem('mock_interchange_requests') || '[]');
+        const idx = all.findIndex(r => r.interchange_id === interchangeId);
+        if (idx === -1) throw { error: 'not_found', message: 'Request not found.' };
+
+        const req = all[idx];
+
+        if (action === 'accept') {
+          all[idx] = { ...req, status: 'accepted', updated_at: new Date().toISOString() };
+          localStorage.setItem('mock_interchange_requests', JSON.stringify(all));
+
+          // Auto-notify: create notice for students
+          try {
+            await SupaFetch.request('notices', 'POST', {
+              author_id: loggedInUser.id,
+              author_role: 'FACULTY',
+              title: `📅 Lecture Interchange: ${req.requester_slot?.course_name || 'Course'}`,
+              content: `Dear Students,\n\nPlease note that there will be a lecture interchange on ${req.requester_slot?.date || 'the scheduled date'}.\n\n• ${req.requester_faculty_name}'s ${req.requester_slot?.course_name} lecture (${req.requester_slot?.start_time?.substring(0,5)} – ${req.requester_slot?.end_time?.substring(0,5)}) will be taken by ${req.target_faculty_name}.\n• ${req.target_faculty_name}'s ${req.target_slot?.course_name} lecture will be taken by ${req.requester_faculty_name}.\n\nKindly plan accordingly.`,
+              target_audience: 'students',
+              priority: 'NORMAL'
+            });
+          } catch (e) { /* notices are non-critical */ }
+
+          // Auto-notify HOD via notice
+          try {
+            await SupaFetch.request('notices', 'POST', {
+              author_id: loggedInUser.id,
+              author_role: 'FACULTY',
+              title: `🔄 Lecture Interchange Approved — ${req.requester_slot?.course_name}`,
+              content: `For HOD Information:\n\n${req.requester_faculty_name} and ${req.target_faculty_name} have agreed to interchange their lectures on ${req.requester_slot?.date || 'the scheduled date'}.\n\nDetails:\n• ${req.requester_faculty_name}: ${req.requester_slot?.course_name} → ${req.requester_slot?.day} ${req.requester_slot?.start_time?.substring(0,5)}\n• ${req.target_faculty_name}: ${req.target_slot?.course_name} → ${req.target_slot?.day} ${req.target_slot?.start_time?.substring(0,5)}`,
+              target_audience: 'faculty',
+              priority: 'NORMAL'
+            });
+          } catch (e) { /* non-critical */ }
+
+          return all[idx];
+        }
+
+        if (action === 'reject') {
+          all[idx] = { ...req, status: 'rejected', reject_reason: body?.reason || '', updated_at: new Date().toISOString() };
+          localStorage.setItem('mock_interchange_requests', JSON.stringify(all));
+          return all[idx];
+        }
+      }
+
+      // 20b. HOD LEAVE APPROVE / REJECT with auto-notification
+      if (path.startsWith('hod/leaves/') && (path.endsWith('/approve') || path.endsWith('/reject'))) {
+        const parts = path.split('/');
+        const leaveUuid = parts[2];
+        const action = parts[3];
+
+        const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
+        if (!hodRow?.length) throw { error: 'unauthorized', message: 'HOD only.' };
+
+        const newStatus = action === 'approve' ? 'approved' : 'rejected';
+        const row = await SupaFetch.request(`leave_requests?leave_id=eq.${leaveUuid}`, 'PATCH', {
+          status: newStatus,
+          approved_by_hod: hodRow[0].hod_id,
+          decision_at: new Date().toISOString(),
+          hod_remarks: body?.remarks || ''
+        });
+
+        if (action === 'approve') {
+          // Fetch the leave request details
+          const leaveDetails = await SupaFetch.request(`leave_requests?leave_id=eq.${leaveUuid}&select=*,faculty:faculty(*)`);
+          const leave = leaveDetails?.[0];
+          const facultyName = leave?.faculty ? `${leave.faculty.first_name || ''} ${leave.faculty.last_name || ''}`.trim() : 'Faculty';
+
+          // Try to find substitute faculty from same department
+          let substituteMsg = 'Substitute faculty will be assigned shortly.';
+          try {
+            const deptFaculty = await SupaFetch.request(`faculty?department_id=eq.${hodRow[0].department_id}&faculty_id=neq.${leave?.faculty_id}`);
+            if (deptFaculty?.length) {
+              const substitute = deptFaculty[0];
+              const subName = `${substitute.first_name || ''} ${substitute.last_name || ''}`.trim();
+              substituteMsg = `${subName} has been assigned as substitute faculty.`;
+            }
+          } catch (e) { /* non-critical */ }
+
+          // Post student notice
+          try {
+            await SupaFetch.request('notices', 'POST', {
+              author_id: loggedInUser.id,
+              author_role: 'HOD',
+              title: `📢 Lecture Change: ${facultyName} on Leave`,
+              content: `Dear Students,\n\nPlease be informed that ${facultyName} will be on leave from ${leave?.from_date || 'N/A'} to ${leave?.to_date || 'N/A'}.\n\n${substituteMsg}\n\nKindly check the updated timetable for any changes. Apologies for any inconvenience.`,
+              target_audience: 'students',
+              priority: 'HIGH'
+            });
+          } catch (e) { /* non-critical */ }
+        }
+
+        return Array.isArray(row) ? row[0] : row;
+      }
+
+      // 21. SEMINARS
       if (path === 'seminars') {
         if (method === 'GET') {
           const localSeminars = localStorage.getItem('mock_seminars');
@@ -941,6 +1073,14 @@ export const SupaAPI = {
   lectureChanges: {
     upcoming: () => API.get('lecture_changes?order=change_date.asc'),
   },
+
+  interchange: {
+    myRequests: () => API.get('faculty/interchange'),
+    send: (data) => API.post('faculty/interchange', data),
+    accept: (id) => API.post(`faculty/interchange/${id}/accept`, {}),
+    reject: (id, reason) => API.post(`faculty/interchange/${id}/reject`, { reason }),
+  },
+
 
   notifications: {
     forUser:  (uId, limit = 20) => API.get(`notifications?recipient_id=eq.${uId}&order=sent_at.desc&limit=${limit}`),

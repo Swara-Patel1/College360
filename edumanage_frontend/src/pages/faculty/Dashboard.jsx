@@ -158,7 +158,7 @@ export default function Dashboard() {
             <div className="card-title">⚡ Quick Actions</div>
           </div>
           <div className="card-body">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px' }}>
               <NavLink to="/faculty/attendance" className="btn btn-secondary" style={{ height: '80px', flexDirection: 'column', gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontSize: '1.5rem' }}>✅</span>
                 <span>Mark Attendance</span>
@@ -175,9 +175,18 @@ export default function Dashboard() {
                 <span style={{ fontSize: '1.5rem' }}>📢</span>
                 <span>Post Notice</span>
               </NavLink>
+              <NavLink to="/faculty/leaves" className="btn btn-secondary" style={{ height: '80px', flexDirection: 'column', gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderColor: 'rgba(255,159,67,0.4)', background: 'rgba(255,159,67,0.06)' }}>
+                <span style={{ fontSize: '1.5rem' }}>🏖️</span>
+                <span style={{ color: '#FF9F43' }}>Apply Leave</span>
+              </NavLink>
+              <NavLink to="/faculty/interchange" className="btn btn-secondary" style={{ height: '80px', flexDirection: 'column', gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderColor: 'rgba(0,212,170,0.4)', background: 'rgba(0,212,170,0.06)' }}>
+                <span style={{ fontSize: '1.5rem' }}>🔄</span>
+                <span style={{ color: '#00D4AA' }}>Swap Lecture</span>
+              </NavLink>
             </div>
           </div>
         </div>
+
       </div>
     </>
   );
