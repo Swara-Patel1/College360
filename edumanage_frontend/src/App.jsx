@@ -2,6 +2,8 @@ import { BrowserRouter as Router } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppRoutes } from './routes/AppRoutes.jsx';
 import { useNotifStore } from './store/useNotifStore.js';
+import { useAuthStore } from './store/useAuthStore.js';
+import ChatBot from './components/ChatBot.jsx';
 import './css/fonts.css';
 import './css/main.css';
 
@@ -18,6 +20,9 @@ const queryClient = new QueryClient({
 function App() {
   const toasts = useNotifStore((state) => state.toasts);
   const removeToast = useNotifStore((state) => state.removeToast);
+  const { isLoggedIn, user } = useAuthStore();
+
+  const isStudent = isLoggedIn && user?.role?.toLowerCase() === 'student';
 
   const toastIcons = {
     success: '✅',
@@ -50,9 +55,13 @@ function App() {
             ))}
           </div>
         )}
+
+        {/* LJU Student Assistant Chatbot — visible only for students */}
+        {isStudent && <ChatBot />}
       </Router>
     </QueryClientProvider>
   );
 }
 
 export default App;
+

@@ -33,7 +33,7 @@ To align the codebase with **Phases 3, 4, and 5** of the Development Roadmap:
 
 ### Phase 3 — Intelligence & Automation
 1. **AI RAG (Retrieval-Augmented Generation) for Doubts:**
-   - Integrate Gemini/LLM API in `realtime/server.js` or frontend api client to parse submitted student doubt questions.
+   - Integrate Groq/LLM API in `realtime/server.js` or frontend api client to parse submitted student doubt questions.
    - Suggest immediate answers from syllabus context materials before assigning the doubt to a faculty member.
 2. **ML Placement Predictor API:**
    - Replace the static placement score calculations in `Placement.jsx` with a real backend model service (using a simple Python Flask/FastAPI service with TensorFlow or scikit-learn).

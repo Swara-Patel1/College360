@@ -15,4 +15,5 @@ urlpatterns = [
     path('api/timetable/', include('timetable.urls')),
     path('api/notices/', include('notices.urls')),
     path('api/complaints/', include('complaints.urls')),
+    path('api/chat/', include('chatbot.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
