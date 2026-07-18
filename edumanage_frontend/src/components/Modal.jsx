@@ -1,4 +1,4 @@
-export default function Modal({ isOpen, onClose, title, children, footer = null }) {
+export default function Modal({ isOpen = true, onClose, title, children, footer = null }) {
   if (!isOpen) return null;
 
   const handleOverlayClick = (e) => {

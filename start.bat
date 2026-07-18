@@ -9,6 +9,9 @@ echo.
 echo  Starting all services...
 echo.
 
+:: Start Django Backend
+start "Django Backend (Port 8000)" cmd /k "cd /d %~dp0backend && python manage.py runserver 8000"
+
 :: Start Node.js Real-time Server
 start "Node.js Real-time (Port 3001)" cmd /k "cd /d %~dp0realtime && npm run dev"
 
@@ -30,7 +33,7 @@ echo  - Real-time:    http://localhost:3001
 echo  - Frontend:     http://localhost:5173
 echo.
 echo  Demo Credentials:
-echo  Admin:   admin / admin123
+echo  Admin:   admin@lju.edu.in / admin123
 echo  Hod: hod@lju.edu.in / hod123
 echo  Faculty: fac@lju.edu.in / fac123
 echo  Student: rushi@lju.edu.in / rushi123

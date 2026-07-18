@@ -21,6 +21,7 @@ export default function ManageStudents() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
 
   // Form Fields
   const [firstName, setFirstName] = useState('');
@@ -33,6 +34,8 @@ export default function ManageStudents() {
   const [password, setPassword] = useState('');
   const [editingStudent, setEditingStudent] = useState(null);
   const [deletingStudent, setDeletingStudent] = useState(null);
+  const [viewingStudent, setViewingStudent] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const isAdmin = user?.role === 'admin';
 
@@ -84,19 +87,19 @@ export default function ManageStudents() {
 
   const handleAddSubmit = async (e) => {
     e.preventDefault();
-    if (!firstName || !lastName || !email || !rollNumber || !deptId || !semId) {
+    if (!firstName || !lastName || !email || !rollNumber || !deptId) {
       Toast.warning('Please fill in all required fields.');
       return;
     }
     try {
-      setLoading(true);
+      setSubmitting(true);
       await API.post('students', {
         first_name: firstName,
         last_name: lastName,
         email,
         roll_number: rollNumber,
         department_id: deptId,
-        current_semester_id: semId,
+        current_semester_id: semId || null,
         status,
         password: password || undefined
       });
@@ -106,8 +109,10 @@ export default function ManageStudents() {
       loadData();
     } catch (err) {
       console.error(err);
-      Toast.error('Failed to add student.');
-      setLoading(false);
+      const msg = err?.message || err?.error || (typeof err === 'string' ? err : null);
+      Toast.error(msg ? `Failed to add student: ${msg}` : 'Failed to add student. Please check the details and try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -125,19 +130,19 @@ export default function ManageStudents() {
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
-    if (!firstName || !lastName || !email || !rollNumber || !deptId || !semId) {
+    if (!firstName || !lastName || !email || !rollNumber || !deptId) {
       Toast.warning('Please fill in all required fields.');
       return;
     }
     try {
-      setLoading(true);
+      setSubmitting(true);
       await API.patch(`students/${editingStudent.id}`, {
         first_name: firstName,
         last_name: lastName,
         email,
         roll_number: rollNumber,
         department_id: deptId,
-        current_semester_id: semId,
+        current_semester_id: semId || null,
         status
       });
       Toast.success('Student updated successfully!');
@@ -146,9 +151,16 @@ export default function ManageStudents() {
       loadData();
     } catch (err) {
       console.error(err);
-      Toast.error('Failed to update student.');
-      setLoading(false);
+      const msg = err?.message || err?.error || (typeof err === 'string' ? err : null);
+      Toast.error(msg ? `Failed to update student: ${msg}` : 'Failed to update student.');
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const handleViewClick = (student) => {
+    setViewingStudent(student);
+    setIsViewOpen(true);
   };
 
   const handleDeleteClick = (student) => {
@@ -158,7 +170,7 @@ export default function ManageStudents() {
 
   const handleDeleteConfirm = async () => {
     try {
-      setLoading(true);
+      setSubmitting(true);
       await API.delete(`students/${deletingStudent.id}`);
       Toast.success('Student deleted successfully!');
       setIsDeleteOpen(false);
@@ -167,7 +179,8 @@ export default function ManageStudents() {
     } catch (err) {
       console.error(err);
       Toast.error('Failed to delete student.');
-      setLoading(false);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -300,35 +313,36 @@ export default function ManageStudents() {
               <thead>
                 <tr>
                   <th>Student</th>
-                  <th>Email</th>
+                  <th>Enrollment No.</th>
                   <th>Department</th>
                   <th>Semester</th>
-                  <th>Roll No.</th>
                   <th>Status</th>
-                  {isAdmin && <th style={{ textAlign: 'center' }}>Actions</th>}
+                  <th style={{ textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredStudents.map((s) => (
                   <tr key={s.id}>
                     <td style={{ fontWeight: 600 }}>{s.first_name} {s.last_name}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{s.email}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{s.enrollment_no || s.student_id}</td>
                     <td>{s.department_name}</td>
-                    <td>Semester {s.semester}</td>
-                    <td><strong>{s.roll_number || '—'}</strong></td>
+                    <td>{s.semester}</td>
                     <td>
                       <span className={`badge badge-${s.status === 'active' ? 'success' : s.status === 'graduated' ? 'primary' : 'danger'}`}>
                         {s.status?.toUpperCase()}
                       </span>
                     </td>
-                    {isAdmin && (
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                          <button className="btn btn-ghost btn-sm" onClick={() => handleEditClick(s)}>📝 Edit</button>
-                          <button className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => handleDeleteClick(s)}>🗑️ Delete</button>
-                        </div>
-                      </td>
-                    )}
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleViewClick(s)}>🔍 View</button>
+                        {isAdmin && (
+                          <>
+                            <button className="btn btn-ghost btn-sm" onClick={() => handleEditClick(s)}>📝 Edit</button>
+                            <button className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => handleDeleteClick(s)}>🗑️ Delete</button>
+                          </>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -381,8 +395,8 @@ export default function ManageStudents() {
                 </select>
               </div>
               <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">Current Semester *</label>
-                <select className="form-input" required value={semId} onChange={e => setSemId(e.target.value)}>
+                <label className="form-label">Current Semester</label>
+                <select className="form-input" value={semId} onChange={e => setSemId(e.target.value)}>
                   <option value="">Select Semester</option>
                   {semesters.map(s => (
                     <option key={s.semester_id} value={s.semester_id}>Semester {s.number}</option>
@@ -399,8 +413,10 @@ export default function ManageStudents() {
               </select>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setIsAddOpen(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary">➕ Save Student</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setIsAddOpen(false)} disabled={submitting}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? '⏳ Saving...' : '➕ Save Student'}
+              </button>
             </div>
           </form>
         </Modal>
@@ -439,8 +455,8 @@ export default function ManageStudents() {
                 </select>
               </div>
               <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">Semester *</label>
-                <select className="form-input" required value={semId} onChange={e => setSemId(e.target.value)}>
+                <label className="form-label">Semester</label>
+                <select className="form-input" value={semId} onChange={e => setSemId(e.target.value)}>
                   <option value="">Select Semester</option>
                   {semesters.map(s => (
                     <option key={s.semester_id} value={s.semester_id}>Semester {s.number}</option>
@@ -457,8 +473,10 @@ export default function ManageStudents() {
               </select>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setIsEditOpen(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary">💾 Save Changes</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setIsEditOpen(false)} disabled={submitting}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? '⏳ Saving...' : '💾 Save Changes'}
+              </button>
             </div>
           </form>
         </Modal>
@@ -471,8 +489,74 @@ export default function ManageStudents() {
             <h3 style={{ marginBottom: '10px' }}>{deletingStudent?.first_name} {deletingStudent?.last_name}</h3>
             <p>Are you sure you want to delete this student profile? This action will permanently remove their records from the portal.</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-              <button className="btn btn-ghost" onClick={() => setIsDeleteOpen(false)}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleDeleteConfirm}>🗑️ Delete Student</button>
+              <button className="btn btn-ghost" onClick={() => setIsDeleteOpen(false)} disabled={submitting}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleDeleteConfirm} disabled={submitting}>
+                {submitting ? '⏳ Deleting...' : '🗑️ Delete Student'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ======================== VIEW DETAILS MODAL ======================== */}
+      {isViewOpen && viewingStudent && (
+        <Modal onClose={() => setIsViewOpen(false)} title="🔍 Student Details">
+          <div className="student-details-view" style={{ display: 'grid', gap: '20px', padding: '10px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', borderBottom: '1px solid var(--border)', paddingBottom: '15px' }}>
+              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(108,99,255,0.15)', color: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 700 }}>
+                {`${(viewingStudent.first_name || '')[0] || ''}${(viewingStudent.last_name || '')[0] || ''}`.toUpperCase()}
+              </div>
+              <div>
+                <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>{viewingStudent.first_name} {viewingStudent.last_name}</h3>
+                <span className={`badge badge-${viewingStudent.status === 'active' ? 'success' : viewingStudent.status === 'graduated' ? 'primary' : 'danger'}`} style={{ marginTop: '5px', display: 'inline-block' }}>
+                  {viewingStudent.status?.toUpperCase()}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Enrollment Number</span>
+                <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.enrollment_no || viewingStudent.student_id || '—'}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Roll Number</span>
+                <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.roll_number || '—'}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Email Address</span>
+                <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.email || '—'}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Department</span>
+                <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.department_name || '—'}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Current Semester</span>
+                <strong style={{ color: 'var(--text-primary)' }}>Semester {viewingStudent.semester || '—'}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Date of Birth</span>
+                <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.date_of_birth ? new Date(viewingStudent.date_of_birth).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</strong>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '15px', marginTop: '10px' }}>
+              <h4 style={{ margin: '0 0 10px 0', color: 'var(--primary-light)' }}>Parent/Guardian Details</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Parent Email</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.parent_email || '—'}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Parent Phone</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.parent_phone || '—'}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '15px' }}>
+              <button className="btn btn-primary" onClick={() => setIsViewOpen(false)}>Close</button>
             </div>
           </div>
         </Modal>

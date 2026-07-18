@@ -49,15 +49,14 @@ export const API = {
     const params = new URLSearchParams(queryStr || '');
 
     try {
-      // 1. AUTH LOGIN
       if (path === 'auth/login') {
         const emailInput = body.email || body.username;
         const password = body.password;
 
+        // Query the email exactly as typed — no hardcoded mapping
         const encEmail = encodeURIComponent(emailInput);
         const encPassword = encodeURIComponent(password);
         
-        // Find user by email AND password_hash
         const rows = await SupaFetch.request(`users?select=*&email=eq.${encEmail}&password_hash=eq.${encPassword}`);
 
         if (!rows || rows.length === 0) {
@@ -112,23 +111,41 @@ export const API = {
       }
 
       // 2. ADMIN DASHBOARD STATS
-      if (path === 'auth/dashboard/stats') {
-        const [students, faculty, subjects, users, feePayments] = await Promise.all([
-          SupaFetch.request('students?select=student_id'),
-          SupaFetch.request('faculty?select=faculty_id'),
-          SupaFetch.request('subjects?select=subject_id'),
-          SupaFetch.request('users?select=id'),
-          SupaFetch.request('fee_payments?select=amount_paid,status')
-        ]);
-        const paidFees = (feePayments || []).filter(f => f.status === 'paid').reduce((acc, curr) => acc + parseFloat(curr.amount_paid), 0);
-        const pendFees = (feePayments || []).filter(f => f.status === 'pending').reduce((acc, curr) => acc + parseFloat(curr.amount_paid), 0);
+      if (path === 'auth/dashboard/stats' || path === 'admin/stats') {
+        const safeReq = async (q) => {
+          try {
+            const r = await SupaFetch.request(q);
+            return Array.isArray(r) ? r : [];
+          } catch (e) {
+            console.warn('Stats query failed:', q, e);
+            return [];
+          }
+        };
+
+        const students   = await safeReq('students?select=student_id');
+        const faculty    = await safeReq('faculty?select=faculty_id');
+        const hods       = await safeReq('hod?select=hod_id');
+        const subjects   = await safeReq('subjects?select=subject_id');
+        const feePayments = await safeReq('fee_payments?select=student_id,amount_paid,status');
+        const users      = await safeReq('users?select=id,is_active');
+
+        const paidFees    = feePayments.filter(f => f.status === 'paid').reduce((a, c) => a + parseFloat(c.amount_paid || 0), 0);
+        const pendingFees = feePayments.filter(f => f.status !== 'paid').reduce((a, c) => a + parseFloat(c.amount_paid || 0), 0);
+        const paidIds     = new Set(feePayments.filter(f => f.status === 'paid').map(f => f.student_id));
+        const feesDue     = students.filter(s => !paidIds.has(s.student_id)).length;
+        const activeU     = users.filter(u => u.is_active !== false).length;
+        const inactiveU   = users.filter(u => u.is_active === false).length;
+
         return {
-          total_students: students.length,
-          total_faculty: faculty.length,
-          total_courses: subjects.length,
-          total_fees_collected: paidFees,
-          total_fees_pending: pendFees,
-          total_users: users.length
+          total_students:        students.length,
+          active_users:          activeU,
+          inactive_users:        inactiveU,
+          total_faculty:         faculty.length,
+          total_hod:             hods.length,
+          total_courses:         subjects.length,
+          total_fees_collected:  paidFees,
+          total_fees_pending:    pendingFees,
+          fees_pending_students: feesDue,
         };
       }
 
@@ -202,29 +219,47 @@ export const API = {
               last_name: s.last_name || ''
             },
             roll_number: s.current_rollno,
-            status: s.user?.is_active ? 'active' : 'inactive'
+            email: s.user?.email || s.email || '',
+            // Use DB status field if present; otherwise derive from is_active
+            status: s.status || (s.user?.is_active === false ? 'inactive' : 'active')
           }));
         }
         if (method === 'POST') {
+          const username = body.username || (body.email ? body.email.split('@')[0] : `std_${Math.floor(100000 + Math.random() * 900000)}`);
+          const passwordHash = body.password || 'student123';
+          // is_active is false for both inactive and graduated students
+          const is_active = body.status !== 'inactive' && body.status !== 'graduated';
+          
+          // Production users table: email, password_hash, roles, is_active (NO username column)
           const newUser = await SupaFetch.request('users', 'POST', {
-            email: body.email || `${body.username}@student.college.edu`,
-            username: body.username,
-            password_hash: 'student123',
-            role: 'student'
+            email: body.email || `${username}@student.college.edu`,
+            password_hash: passwordHash,
+            roles: 'student',
+            is_active: is_active
           });
           const createdUser = Array.isArray(newUser) ? newUser[0] : newUser;
-          const newStudent = await SupaFetch.request('students', 'POST', {
+          
+          const enrollmentNo = body.student_id || body.roll_number || `ENR${Math.floor(100000 + Math.random() * 900000)}`;
+          // Use provided semester UUID directly; only fall back if truly absent (not empty string)
+          const currentSemesterId = (body.current_semester_id && body.current_semester_id.trim())
+            ? body.current_semester_id
+            : (body.semester ? `e0000000-0000-0000-0000-00000000000${body.semester}` : null);
+          
+          const studentPayload = {
             user_id: createdUser.id,
-            enrollment_no: body.student_id,
-            first_name: body.first_name || body.username,
+            enrollment_no: enrollmentNo,
+            first_name: body.first_name || username,
             last_name: body.last_name || '',
             date_of_birth: body.date_of_birth || '2005-01-01',
             parent_email: body.parent_email || 'parent@college.edu',
             parent_phone: body.parent_phone || '',
             department_id: body.department_id || 'd0000000-0000-0000-0000-000000000001',
-            current_semester_id: body.semester ? `e0000000-0000-0000-0000-00000000000${body.semester}` : 'e0000000-0000-0000-0000-000000000005',
-            current_rollno: body.roll_number || body.current_rollno || ''
-          });
+            current_rollno: body.roll_number || body.current_rollno || '',
+            status: body.status || 'active',
+          };
+          // Only include current_semester_id if we have a valid UUID
+          if (currentSemesterId) studentPayload.current_semester_id = currentSemesterId;
+          const newStudent = await SupaFetch.request('students', 'POST', studentPayload);
           const createdStudent = Array.isArray(newStudent) ? newStudent[0] : newStudent;
           
           if (createdStudent && createdStudent.student_id) {
@@ -252,17 +287,24 @@ export const API = {
             delete updateBody.semester;
           }
           if (updateBody.year_of_study !== undefined) delete updateBody.year_of_study;
-          if (updateBody.status !== undefined) delete updateBody.status;
+          
+          let is_active = undefined;
+          if (updateBody.status !== undefined) {
+            is_active = updateBody.status === 'active';
+            delete updateBody.status;
+          }
+          
           if (updateBody.roll_number !== undefined) {
             updateBody.current_rollno = updateBody.roll_number;
             delete updateBody.roll_number;
           }
-          if (updateBody.email !== undefined || updateBody.phone !== undefined) {
+          if (updateBody.email !== undefined || updateBody.phone !== undefined || is_active !== undefined) {
             const stRows = await SupaFetch.request(`students?select=user_id&student_id=eq.${studentUuid}`);
             if (stRows && stRows.length) {
               const uId = stRows[0].user_id;
               const userUpdate = {};
               if (updateBody.email !== undefined) userUpdate.email = updateBody.email;
+              if (is_active !== undefined) userUpdate.is_active = is_active;
               if (Object.keys(userUpdate).length > 0) {
                 await SupaFetch.request(`users?id=eq.${uId}`, 'PATCH', userUpdate);
               }
@@ -295,19 +337,80 @@ export const API = {
         }
       }
 
-      // 7. ALL FACULTY LIST
+      // 7. ALL FACULTY LIST / CRUD
       if (path === 'faculty') {
-        const rows = await SupaFetch.request('faculty?select=*,user:users(*),department:departments(*)&order=employee_id.asc');
-        return rows.map(f => ({
-          ...f,
-          id: f.faculty_id,
-          department_name: f.department?.name || '—',
-          user: {
-            ...(f.user || {}),
-            first_name: f.first_name || f.user?.email?.split('@')[0] || '',
-            last_name: f.last_name || ''
+        if (method === 'GET') {
+          const rows = await SupaFetch.request('faculty?select=*,user:users(*),department:departments(*)&order=employee_id.asc');
+          return rows.map(f => ({
+            ...f,
+            id: f.faculty_id,
+            email: f.user?.email || '',
+            status: f.user?.is_active !== false ? 'active' : 'inactive',
+            department_name: f.department?.name || '—',
+            user: {
+              ...(f.user || {}),
+              first_name: f.first_name || f.user?.email?.split('@')[0] || '',
+              last_name: f.last_name || ''
+            }
+          }));
+        }
+        if (method === 'POST') {
+          const username = body.username || (body.email ? body.email.split('@')[0] : `fac_${Math.floor(100000 + Math.random() * 900000)}`);
+          const passwordHash = body.password || 'faculty123';
+          const is_active = body.status !== 'inactive';
+          // Production users table: email, password_hash, roles, is_active (NO username column)
+          const newUser = await SupaFetch.request('users', 'POST', {
+            email: body.email || `${username}@college.edu`,
+            password_hash: passwordHash,
+            roles: body.role === 'hod' ? 'hod' : 'faculty',
+            is_active
+          });
+          const createdUser = Array.isArray(newUser) ? newUser[0] : newUser;
+          const empId = body.employee_id || `F${Math.floor(100 + Math.random() * 900)}`;
+          const newFaculty = await SupaFetch.request('faculty', 'POST', {
+            user_id: createdUser.id,
+            employee_id: empId,
+            first_name: body.first_name || username,
+            last_name: body.last_name || '',
+            department_id: body.department_id || 'd0000000-0000-0000-0000-000000000001',
+          });
+          return Array.isArray(newFaculty) ? newFaculty[0] : newFaculty;
+        }
+      }
+
+      // 7a. FACULTY BY ID (PATCH / DELETE)
+      const facultyIdMatch = path.match(/^faculty\/([^/]+)$/);
+      if (facultyIdMatch) {
+        const facultyUuid = facultyIdMatch[1];
+        if (method === 'PATCH' || method === 'PUT') {
+          const updateBody = { ...body };
+          const facultyUpdate = {};
+          if (updateBody.first_name !== undefined) facultyUpdate.first_name = updateBody.first_name;
+          if (updateBody.last_name  !== undefined) facultyUpdate.last_name  = updateBody.last_name;
+          if (updateBody.department_id !== undefined) facultyUpdate.department_id = updateBody.department_id;
+          if (updateBody.employee_id !== undefined) facultyUpdate.employee_id = updateBody.employee_id;
+          if (Object.keys(facultyUpdate).length) {
+            await SupaFetch.request(`faculty?faculty_id=eq.${facultyUuid}`, 'PATCH', facultyUpdate);
           }
-        }));
+          if (updateBody.status !== undefined || updateBody.email !== undefined) {
+            const fRow = await SupaFetch.request(`faculty?select=user_id&faculty_id=eq.${facultyUuid}`);
+            if (fRow && fRow.length > 0) {
+              const userUpdate = {};
+              if (updateBody.status !== undefined) userUpdate.is_active = updateBody.status !== 'inactive';
+              if (updateBody.email   !== undefined) userUpdate.email = updateBody.email;
+              await SupaFetch.request(`users?id=eq.${fRow[0].user_id}`, 'PATCH', userUpdate);
+            }
+          }
+          return { success: true };
+        }
+        if (method === 'DELETE') {
+          const fRow = await SupaFetch.request(`faculty?select=user_id&faculty_id=eq.${facultyUuid}`);
+          await SupaFetch.request(`faculty?faculty_id=eq.${facultyUuid}`, 'DELETE');
+          if (fRow && fRow.length > 0) {
+            await SupaFetch.request(`users?id=eq.${fRow[0].user_id}`, 'DELETE').catch(() => {});
+          }
+          return null;
+        }
       }
 
       // 7b. DEPARTMENTS
@@ -318,6 +421,17 @@ export const API = {
           id: d.department_id,
           name: d.name,
           code: d.code,
+        }));
+      }
+
+      // 7c. SEMESTERS
+      if (path === 'semesters') {
+        const rows = await SupaFetch.request('semesters?select=*&order=number.asc');
+        return rows.map(s => ({
+          ...s,
+          id: s.semester_id,
+          name: `Semester ${s.number}`,
+          number: s.number,
         }));
       }
 

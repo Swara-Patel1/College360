@@ -33,8 +33,8 @@ import HODClasses from '../pages/hod/Classes.jsx';
 import HODLeaves from '../pages/hod/Leaves.jsx';
 import TimetableManagement from '../pages/hod/TimetableManagement.jsx';
 
-const AdminDashboard = () => <div><h1>Admin Dashboard Placeholder</h1></div>;
-const ManageFaculty = () => <div><h1>Manage Faculty Placeholder</h1></div>;
+import AdminDashboard from '../pages/admin/AdminDashboard.jsx';
+import ManageFaculty from '../pages/ManageFaculty.jsx';
 const ManageDepartments = () => <div><h1>Manage Departments Placeholder</h1></div>;
 const FeeManagement = () => <div><h1>Fee Management Placeholder</h1></div>;
 
