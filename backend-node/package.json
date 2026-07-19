@@ -1,0 +1,19 @@
+{
+  "name": "college360-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MongoDB-backed PostgREST-compatible API for College360 (replaces Supabase)",
+  "scripts": {
+    "start": "node server.js",
+    "migrate": "node migrate.js",
+    "import-db": "node import-db.mjs",
+    "export-db": "node export-db.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
+    "mongodb": "^6.12.0",
+    "node-windows": "^1.0.0-beta.8"
+  }
+}

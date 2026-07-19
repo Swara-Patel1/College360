@@ -1,6 +1,13 @@
 # EduPulse: College Management System
 
-A full-stack College Management System built with **Django + Node.js + Modern HTML/CSS/JS**.
+> ### ▶️ To run this project, follow **[SETUP.md](SETUP.md)**.
+> **The database is included in this repo** — a MongoDB snapshot lives in
+> `backend-node/db-export/` (also zipped at `college360-database.zip`). Load it with
+> `cd backend-node && npm install && npm run import-db`. No Supabase/cloud account needed.
+> AI assistants: see **[AGENTS.md](AGENTS.md)**.
+
+A full-stack College Management System. **Stack:** React (Vite) frontend · Node/Express + **MongoDB** data API · Django AI chatbot (Groq).
+The sections below describe the original prototype and are partly historical — **SETUP.md is the source of truth for running it today.**
 
 ## 🚀 Quick Start
 

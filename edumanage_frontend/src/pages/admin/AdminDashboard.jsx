@@ -75,7 +75,7 @@ export default function AdminDashboard() {
           <StatCard icon="🏛️" label="HOD"
             value={fmt(stats?.total_hod)}
             sub="Heads of Department"
-            color="#8b5cf6" loading={loading} />
+            color="#8b5cf6" loading={loading} onClick={() => navigate('/admin/hod')} />
           <StatCard icon="📚" label="Total Courses"
             value={fmt(stats?.total_courses)}
             sub={`Across ${fmt(stats?.total_departments)} departments`}
@@ -107,6 +107,7 @@ export default function AdminDashboard() {
           {[
             { icon: '🎓', label: 'Students',    path: '/admin/students',    color: '#6366f1' },
             { icon: '🧑‍🏫', label: 'Faculty',     path: '/admin/faculty',     color: '#0ea5e9' },
+            { icon: '🏷️', label: 'HODs',        path: '/admin/hod',         color: '#a855f7' },
             { icon: '📚', label: 'Courses',     path: '/admin/courses',     color: '#06b6d4' },
             { icon: '🏛️', label: 'Departments', path: '/admin/departments', color: '#8b5cf6' },
             { icon: '📝', label: 'Notices',     path: '/admin/notices',     color: '#f59e0b' },

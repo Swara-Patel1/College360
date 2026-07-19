@@ -56,7 +56,7 @@ export default function FacultyInterchange() {
 
       const mySlots = (scheduleData || []).filter(s => s.faculty_id === prof?.id || s.faculty_name?.toLowerCase().includes((prof?.user?.first_name || '').toLowerCase()));
       setMySchedule(mySlots);
-      setAllFaculty((facData || []).filter(f => f.id !== prof?.id));
+      setAllFaculty((facData || []).filter(f => f.id !== prof?.id && f.department_id === prof?.department_id));
       setRequests(Array.isArray(reqData) ? reqData : []);
     } catch (e) {
       console.error('Interchange load error:', e);
@@ -403,7 +403,11 @@ export default function FacultyInterchange() {
               {/* Step 2: Pick target faculty */}
               {modalStep === 2 && (
                 <div>
-                  <h3 style={{margin:'0 0 16px 0',fontSize:'1.1rem'}}>Step 2: Select Faculty to Swap With</h3>
+                  <h3 style={{margin:'0 0 16px 0',fontSize:'1.1rem'}}>Step 2: Select Faculty to Swap With (Same Department)</h3>
+                  <div style={{background:'rgba(108,99,255,0.08)',border:'1px solid rgba(108,99,255,0.25)',borderRadius:'10px',padding:'10px 14px',marginBottom:'14px',fontSize:'0.84rem',color:'var(--text-secondary)',display:'flex',alignItems:'center',gap:'8px'}}>
+                    <span style={{fontSize:'1.1rem'}}>ℹ️</span>
+                    <span>Only faculty from your department (<strong>{myProfile?.department_name || 'your department'}</strong>) can participate in lecture interchanges.</span>
+                  </div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:'10px'}}>
                     {allFaculty.map(fac => {
                       const name = `${fac.user?.first_name || ''} ${fac.user?.last_name || ''}`.trim() || fac.user?.email?.split('@')[0] || 'Faculty';

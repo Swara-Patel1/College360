@@ -78,6 +78,7 @@ export default function Sidebar() {
       { type: 'section', label: 'Management' },
       { type: 'link', label: 'Students', icon: '🎓', to: '/admin/students' },
       { type: 'link', label: 'Faculty', icon: '👨‍🏫', to: '/admin/faculty' },
+      { type: 'link', label: 'HODs', icon: '🏷️', to: '/admin/hod' },
       { type: 'link', label: 'Courses', icon: '📚', to: '/admin/courses' },
       { type: 'link', label: 'Departments', icon: '🏛️', to: '/admin/departments' },
       { type: 'section', label: 'Academic' },

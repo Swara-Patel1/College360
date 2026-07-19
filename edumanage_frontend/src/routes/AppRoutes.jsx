@@ -35,8 +35,9 @@ import TimetableManagement from '../pages/hod/TimetableManagement.jsx';
 
 import AdminDashboard from '../pages/admin/AdminDashboard.jsx';
 import ManageFaculty from '../pages/ManageFaculty.jsx';
-const ManageDepartments = () => <div><h1>Manage Departments Placeholder</h1></div>;
-const FeeManagement = () => <div><h1>Fee Management Placeholder</h1></div>;
+import ManageDepartments from '../pages/ManageDepartments.jsx';
+import ManageHOD from '../pages/ManageHOD.jsx';
+import FeeManagement from '../pages/FeeManagement.jsx';
 
 const MainLayout = ({ children, title }) => {
   const { isLoggedIn } = useAuthStore();
@@ -124,6 +125,7 @@ export const AppRoutes = () => {
         <Route path="/dashboard/admin" element={<MainLayout><AdminDashboard /></MainLayout>} />
         <Route path="/admin/students" element={<MainLayout><ManageStudents /></MainLayout>} />
         <Route path="/admin/faculty" element={<MainLayout><ManageFaculty /></MainLayout>} />
+        <Route path="/admin/hod" element={<MainLayout><ManageHOD /></MainLayout>} />
         <Route path="/admin/courses" element={<MainLayout><Courses /></MainLayout>} />
         <Route path="/admin/departments" element={<MainLayout><ManageDepartments /></MainLayout>} />
         <Route path="/admin/attendance" element={<MainLayout><AttendanceMarking /></MainLayout>} />

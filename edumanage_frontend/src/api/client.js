@@ -1,5 +1,8 @@
-export const SUPABASE_URL = 'https://olaqwoxycxdbcmqegifi.supabase.co';
-export const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sYXF3b3h5Y3hkYmNtcWVnaWZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MDYyODgsImV4cCI6MjA5ODM4MjI4OH0.JUYUKKGAAd7fx8s840meU0Ayd5VE7sfSMwDbiG8twlU';
+// Data API — now served by the local MongoDB-backed backend (backend-node/),
+// which speaks the same PostgREST dialect Supabase did. To switch back to
+// Supabase, restore the old URL + anon key below.
+export const SUPABASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+export const SUPABASE_ANON = 'local-mongo'; // kept for header compatibility; ignored by backend
 
 export const Auth = {
   getToken: () => localStorage.getItem('access_token'),
@@ -415,13 +418,121 @@ export const API = {
 
       // 7b. DEPARTMENTS
       if (path === 'faculty/departments' || path === 'departments') {
-        const rows = await SupaFetch.request('departments?select=*&order=name.asc');
-        return rows.map(d => ({
-          ...d,
-          id: d.department_id,
-          name: d.name,
-          code: d.code,
-        }));
+        if (method === 'GET') {
+          const rows = await SupaFetch.request('departments?select=*&order=name.asc');
+          return rows.map(d => ({
+            ...d,
+            id: d.department_id,
+            name: d.name,
+            code: d.code,
+          }));
+        }
+        if (method === 'POST') {
+          if (!body.name || !body.code) throw { error: 'validation_error', message: 'Name and code are required.' };
+          const created = await SupaFetch.request('departments', 'POST', {
+            name: body.name,
+            code: body.code,
+          });
+          const dept = Array.isArray(created) ? created[0] : created;
+          return { ...dept, id: dept?.department_id };
+        }
+      }
+
+      // 7b-ii. DEPARTMENT BY ID (PATCH / DELETE)
+      const deptIdMatch = path.match(/^departments\/([^/]+)$/);
+      if (deptIdMatch) {
+        const deptUuid = deptIdMatch[1];
+        if (method === 'PATCH' || method === 'PUT') {
+          const patch = {};
+          if (body.name !== undefined) patch.name = body.name;
+          if (body.code !== undefined) patch.code = body.code;
+          const row = await SupaFetch.request(`departments?department_id=eq.${deptUuid}`, 'PATCH', patch);
+          const dept = Array.isArray(row) ? row[0] : row;
+          return { ...dept, id: dept?.department_id };
+        }
+        if (method === 'DELETE') {
+          await SupaFetch.request(`departments?department_id=eq.${deptUuid}`, 'DELETE');
+          return null;
+        }
+      }
+
+      // 7d. HOD MANAGEMENT (assign / list / remove Heads of Department)
+      if (path === 'hod') {
+        if (method === 'GET') {
+          const rows = await SupaFetch.request('hod?select=*,user:users(*),department:departments!hod_department_id_fkey(*)');
+          // HOD names live in the faculty table, keyed by user_id
+          const userIds = (rows || []).map(h => h.user_id).filter(Boolean);
+          let facMap = {};
+          if (userIds.length) {
+            const facs = await SupaFetch.request(`faculty?select=user_id,faculty_id,first_name,last_name,employee_id&user_id=in.(${userIds.join(',')})`);
+            (facs || []).forEach(f => { facMap[f.user_id] = f; });
+          }
+          return (rows || []).map(h => {
+            const fac = facMap[h.user_id] || {};
+            return {
+              ...h,
+              id: h.hod_id,
+              department_id: h.department_id,
+              department_name: h.department?.name || '—',
+              email: h.user?.email || '',
+              first_name: fac.first_name || h.user?.email?.split('@')[0] || '',
+              last_name: fac.last_name || '',
+              employee_id: fac.employee_id || '',
+              faculty_id: fac.faculty_id || null,
+            };
+          });
+        }
+        if (method === 'POST') {
+          // body: { faculty_id, department_id } — promote an existing faculty member to HOD
+          if (!body.faculty_id || !body.department_id) {
+            throw { error: 'validation_error', message: 'Faculty and department are required.' };
+          }
+          const facRow = await SupaFetch.request(`faculty?select=user_id&faculty_id=eq.${body.faculty_id}`);
+          if (!facRow || !facRow.length) throw { error: 'not_found', message: 'Faculty not found.' };
+          const userId = facRow[0].user_id;
+
+          // Clear any existing HOD on this department (department_id is UNIQUE)
+          const existingByDept = await SupaFetch.request(`hod?select=hod_id,user_id&department_id=eq.${body.department_id}`);
+          for (const ex of (existingByDept || [])) {
+            await SupaFetch.request(`departments?department_id=eq.${body.department_id}`, 'PATCH', { hod_id: null }).catch(() => {});
+            await SupaFetch.request(`hod?hod_id=eq.${ex.hod_id}`, 'DELETE').catch(() => {});
+            await SupaFetch.request(`users?id=eq.${ex.user_id}`, 'PATCH', { roles: 'faculty' }).catch(() => {});
+          }
+          // Clear any existing HOD row for this user (user_id is UNIQUE)
+          const existingByUser = await SupaFetch.request(`hod?select=hod_id,department_id&user_id=eq.${userId}`);
+          for (const ex of (existingByUser || [])) {
+            await SupaFetch.request(`departments?department_id=eq.${ex.department_id}`, 'PATCH', { hod_id: null }).catch(() => {});
+            await SupaFetch.request(`hod?hod_id=eq.${ex.hod_id}`, 'DELETE').catch(() => {});
+          }
+
+          const created = await SupaFetch.request('hod', 'POST', {
+            user_id: userId,
+            department_id: body.department_id,
+          });
+          const hodRow = Array.isArray(created) ? created[0] : created;
+          await SupaFetch.request(`users?id=eq.${userId}`, 'PATCH', { roles: 'hod' }).catch(() => {});
+          if (hodRow?.hod_id) {
+            await SupaFetch.request(`departments?department_id=eq.${body.department_id}`, 'PATCH', { hod_id: hodRow.hod_id }).catch(() => {});
+          }
+          return hodRow;
+        }
+      }
+
+      // 7d-ii. HOD BY ID (DELETE — demote back to faculty)
+      const hodIdMatch = path.match(/^hod\/([^/]+)$/);
+      if (hodIdMatch && hodIdMatch[1] !== 'check' && hodIdMatch[1] !== 'leaves' && hodIdMatch[1] !== 'leave') {
+        const hodUuid = hodIdMatch[1];
+        if (method === 'DELETE') {
+          const hRow = await SupaFetch.request(`hod?select=user_id,department_id&hod_id=eq.${hodUuid}`);
+          if (hRow && hRow.length) {
+            await SupaFetch.request(`departments?department_id=eq.${hRow[0].department_id}`, 'PATCH', { hod_id: null }).catch(() => {});
+          }
+          await SupaFetch.request(`hod?hod_id=eq.${hodUuid}`, 'DELETE');
+          if (hRow && hRow.length) {
+            await SupaFetch.request(`users?id=eq.${hRow[0].user_id}`, 'PATCH', { roles: 'faculty' }).catch(() => {});
+          }
+          return null;
+        }
       }
 
       // 7c. SEMESTERS
@@ -680,7 +791,7 @@ export const API = {
           if (courseUuid) query += `&subject_id=eq.${courseUuid}`;
           if (date) query += `&date=eq.${date}`;
           if (status) {
-            const uiToDbStatus = { 'present': 'P', 'absent': 'A', 'late': 'L' };
+            const uiToDbStatus = { 'present': 'present', 'absent': 'absent', 'late': 'late' };
             query += `&status=eq.${uiToDbStatus[status] || status}`;
           }
           
@@ -702,7 +813,7 @@ export const API = {
             if (!r) return null;
             const studentName = r.student ? `${r.student.first_name || ''} ${r.student.last_name || ''}`.trim() : 'Student';
             const markedByName = markerMap[r.marked_by] || 'System';
-            const dbToUiStatus = { 'P': 'present', 'A': 'absent', 'L': 'late' };
+            const dbToUiStatus = { 'P': 'present', 'A': 'absent', 'L': 'late', 'p': 'present', 'a': 'absent', 'l': 'late' };
             return {
               ...r,
               status: dbToUiStatus[r.status] || r.status || 'present',
@@ -722,16 +833,45 @@ export const API = {
           if (facultyRow && facultyRow.length > 0) facultyId = facultyRow[0].faculty_id;
         }
 
-        const uiToDbStatus = { 'present': 'P', 'absent': 'A', 'late': 'L' };
+        const uiToDbStatus = { 'present': 'present', 'absent': 'absent', 'late': 'late' };
         const payload = body.records.map(r => ({
           student_id: r.student,
           subject_id: r.course,
           date: r.date,
-          status: uiToDbStatus[r.status] || r.status || 'P',
+          status: uiToDbStatus[r.status] || r.status || 'present',
           marked_by: facultyId,
           ip_address: '127.0.0.1'
         }));
         return await SupaFetch.request('attendance_records', 'POST', payload);
+      }
+
+      // 13. FEES — ADMIN (all payments across students)
+      if (path === 'admin/fees') {
+        const payments = await SupaFetch.request('fee_payments?select=*,student:students(*,department:departments(*)),fee_structures(*)');
+        return (payments || []).map(p => ({
+          ...p,
+          id: p.payment_id,
+          student_name: p.student ? `${p.student.first_name || ''} ${p.student.last_name || ''}`.trim() || '—' : '—',
+          enrollment_no: p.student?.enrollment_no || '—',
+          department_name: p.student?.department?.name || '—',
+          component_name: p.fee_structures?.component_name || 'Tuition Fee',
+          amount: parseFloat(p.fee_structures?.amount ?? p.amount_paid ?? 0),
+          amount_paid: parseFloat(p.amount_paid || 0),
+          due_date: p.fee_structures?.due_date || '',
+          status: p.status || 'pending',
+          transaction_ref: p.transaction_ref || '',
+        }));
+      }
+
+      // 13a. FEES — mark a payment paid (admin action)
+      if (path.startsWith('fees/') && path.endsWith('/mark-paid') && method === 'POST') {
+        const paymentId = path.split('/')[1];
+        const row = await SupaFetch.request(`fee_payments?payment_id=eq.${paymentId}`, 'PATCH', {
+          status: 'paid',
+          payment_date: new Date().toISOString().split('T')[0],
+          transaction_ref: body?.transaction_ref || ('TXN' + Date.now()),
+        });
+        return Array.isArray(row) ? row[0] : row;
       }
 
       // 13. FEES
@@ -954,6 +1094,13 @@ export const API = {
         }
 
         if (method === 'POST') {
+          // Validate same-department constraint
+          const targetFacultyRow = await SupaFetch.request(`faculty?faculty_id=eq.${body.target_faculty_id}`);
+          if (!targetFacultyRow?.length) throw { error: 'not_found', message: 'Target faculty not found.' };
+          if (facultyRow[0].department_id !== targetFacultyRow[0].department_id) {
+            throw { error: 'department_mismatch', message: 'Lecture interchange is only allowed between faculty of the same department.' };
+          }
+
           const all = JSON.parse(localStorage.getItem('mock_interchange_requests') || '[]');
           const newReq = {
             interchange_id: 'ic-' + Date.now(),
@@ -1047,13 +1194,18 @@ export const API = {
           const facultyName = leave?.faculty ? `${leave.faculty.first_name || ''} ${leave.faculty.last_name || ''}`.trim() : 'Faculty';
 
           // Try to find substitute faculty from same department
-          let substituteMsg = 'Substitute faculty will be assigned shortly.';
+          let substituteMsg = 'A substitute faculty from the same department will be assigned shortly.';
+          let deptName = '';
           try {
+            // Fetch department name for the notice
+            const deptRow = await SupaFetch.request(`departments?department_id=eq.${hodRow[0].department_id}`);
+            deptName = deptRow?.[0]?.name || '';
+
             const deptFaculty = await SupaFetch.request(`faculty?department_id=eq.${hodRow[0].department_id}&faculty_id=neq.${leave?.faculty_id}`);
             if (deptFaculty?.length) {
               const substitute = deptFaculty[0];
               const subName = `${substitute.first_name || ''} ${substitute.last_name || ''}`.trim();
-              substituteMsg = `${subName} has been assigned as substitute faculty.`;
+              substituteMsg = `${subName} (${deptName || 'same department'}) has been assigned as substitute faculty for the affected lectures.`;
             }
           } catch (e) { /* non-critical */ }
 

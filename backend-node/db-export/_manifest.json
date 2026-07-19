@@ -1,0 +1,106 @@
+{
+  "db": "college360",
+  "exported_at": "2026-07-19T16:18:02.982Z",
+  "collections": [
+    {
+      "collection": "departments",
+      "count": 4
+    },
+    {
+      "collection": "content",
+      "count": 40
+    },
+    {
+      "collection": "doubts",
+      "count": 40
+    },
+    {
+      "collection": "marks",
+      "count": 121
+    },
+    {
+      "collection": "fee_structures",
+      "count": 40
+    },
+    {
+      "collection": "fee_payments",
+      "count": 40
+    },
+    {
+      "collection": "enrollments",
+      "count": 120
+    },
+    {
+      "collection": "users",
+      "count": 86
+    },
+    {
+      "collection": "placement_scores",
+      "count": 40
+    },
+    {
+      "collection": "grievances",
+      "count": 40
+    },
+    {
+      "collection": "notices",
+      "count": 41
+    },
+    {
+      "collection": "attendance_summary",
+      "count": 40
+    },
+    {
+      "collection": "placement_companies",
+      "count": 40
+    },
+    {
+      "collection": "hod",
+      "count": 4
+    },
+    {
+      "collection": "attendance_records",
+      "count": 41
+    },
+    {
+      "collection": "class_sections",
+      "count": 40
+    },
+    {
+      "collection": "audit_logs",
+      "count": 40
+    },
+    {
+      "collection": "semesters",
+      "count": 40
+    },
+    {
+      "collection": "leave_requests",
+      "count": 41
+    },
+    {
+      "collection": "students",
+      "count": 40
+    },
+    {
+      "collection": "subjects",
+      "count": 40
+    },
+    {
+      "collection": "faculty",
+      "count": 40
+    },
+    {
+      "collection": "timetable",
+      "count": 40
+    },
+    {
+      "collection": "notifications",
+      "count": 40
+    },
+    {
+      "collection": "lecture_changes",
+      "count": 40
+    }
+  ]
+}
