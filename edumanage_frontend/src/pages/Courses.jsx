@@ -78,8 +78,8 @@ export default function Courses() {
       // Role-based filtering
       if (isStudent) {
         const enrollData = await API.get('enrollments');
-        const myCourseIds = new Set((enrollData || []).map(e => e.course || e.course_id || e.subject_id));
-        loadedCourses = loadedCourses.filter(c => myCourseIds.has(c.id) || myCourseIds.has(c.subject_id));
+        const myCourseIds = new Set((enrollData || []).map(e => String(e.course || e.course_id || e.subject_id || '')));
+        loadedCourses = loadedCourses.filter(c => myCourseIds.has(String(c.id)) || myCourseIds.has(String(c.subject_id)));
         // Students: don't filter further by semester — enrolled courses ARE their courses
       } else if (isFaculty) {
         const facProfile = await API.get('faculty/my_profile');

@@ -2,6 +2,8 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.core.mail import send_mail
+from django.conf import settings
 from .models import Fee
 from .serializers import FeeSerializer
 
@@ -30,6 +32,39 @@ class FeeViewSet(viewsets.ModelViewSet):
         fee.transaction_id = request.data.get('transaction_id', '')
         fee.save()
         return Response(FeeSerializer(fee).data)
+
+    @action(detail=False, methods=['post'], url_path='send-reminders')
+    def send_reminders(self, request):
+        """Sends email reminders for pending/overdue fees."""
+        pending_fees = Fee.objects.select_related('student__user').filter(status__in=['pending', 'overdue'])
+        sent_count = 0
+        details = []
+
+        for fee in pending_fees:
+            user = fee.student.user
+            email = user.email
+            if email:
+                subject = f"⚠️ Fee Payment Reminder: {fee.get_fee_type_display()} Due"
+                message = f"Dear {user.get_full_name()},\n\nYour fee of ₹{fee.amount} ({fee.get_fee_type_display()}) is pending with due date {fee.due_date}.\n\nPlease clear your dues at the earliest.\n\nCollege Management"
+                try:
+                    send_mail(
+                        subject,
+                        message,
+                        settings.DEFAULT_FROM_EMAIL if hasattr(settings, 'DEFAULT_FROM_EMAIL') else 'noreply@college360.edu',
+                        [email],
+                        fail_silently=True
+                    )
+                    sent_count += 1
+                    details.append({'student': user.get_full_name(), 'email': email, 'status': 'sent'})
+                except Exception as e:
+                    details.append({'student': user.get_full_name(), 'email': email, 'status': f'failed: {str(e)}'})
+
+        return Response({
+            'success': True,
+            'total_pending': pending_fees.count(),
+            'reminders_sent': sent_count,
+            'details': details
+        })
 
     @action(detail=False, methods=['get'])
     def summary(self, request):

@@ -31,5 +31,11 @@ class Fee(models.Model):
     semester = models.PositiveSmallIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['student', 'status'], name='idx_fee_student_status'),
+            models.Index(fields=['due_date'], name='idx_fee_due_date'),
+        ]
+
     def __str__(self):
         return f"{self.student} - {self.fee_type} - {self.status}"

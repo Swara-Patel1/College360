@@ -25,5 +25,12 @@ class Student(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['student_id'], name='idx_student_id_no'),
+            models.Index(fields=['department', 'semester'], name='idx_student_dept_sem'),
+            models.Index(fields=['status'], name='idx_student_status'),
+        ]
+
     def __str__(self):
         return f"{self.user.get_full_name()} ({self.student_id})"

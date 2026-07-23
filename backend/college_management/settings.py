@@ -96,12 +96,13 @@ AUTH_USER_MODEL = 'accounts.User'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
+    'PAGE_SIZE': 100,
 }
 
 # JWT
@@ -118,6 +119,9 @@ CORS_ALLOW_CREDENTIALS = True
 
 from corsheaders.defaults import default_headers
 CORS_ALLOW_HEADERS = list(default_headers) + [
+    'apikey',
+    'prefer',
+    'range',
     'x-user-id',
     'x-user-email',
     'x-user-firstname',
@@ -131,9 +135,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Groq AI Configuration
 GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
 
-# Supabase Configuration
-SUPABASE_URL = os.getenv('SUPABASE_URL', '')
-SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', '')
+# Note: Supabase has been removed. Data API is served by backend-node (port 4000).
+# Django (port 8000) is now the primary data API using DRF + SQLite.
 
 # Logging Configuration
 LOGGING = {

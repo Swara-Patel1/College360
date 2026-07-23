@@ -1,0 +1,52 @@
+1. Data Manipulation & Engineering
+unit-1 pandas.ipynb & unit-1 pandas (1).pdf
+Introduction to Basics: Library fundamentals developed by Wes McKinney (2008), usage in Data Science, Machine Learning, and handling datasets like CSV, Excel, JSON, and APIs.
+Core Data Structures: 1D labeled arrays (Series) and 2D labeled tabular structures (DataFrames).
+DataFrame Indexing: Custom index mapping using .set_index() and resetting via .reset_index().
+File I/O & Exploration: Reading datasets (pd.read_csv()) and inspecting data structural metadata using .head(), .tail(), .info(), .shape, .columns, .dtypes, and .sample().
+Data Cleaning: Technical strategies for handling missing data values using .isna(), .dropna() (with row/column axis control and subset scopes), and structural cell replacement using .fillna() (e.g., replacement with mean() values).
+Cell Modification & Manipulation: Value lookups and targeted editing using .loc[] label-based indexing, .iloc[] integer-position indexing, structural conditional updates, explicit row/column deletion via .drop(), and duplicate cleaning via .drop_duplicates().
+Unit3_notes.pdf
+Categorical Conversion: One-hot encoding categorical variables using pd.get_dummies().
+Conditional Matrix Logic: Applying multi-condition IF-ELSE element routing utilizing np.where().
+Vectorized Arithmetic Operations: Element-wise mathematical processing and column aggregations across structured DataFrames.
+2. Data Visualization & Graph Networks
+unit-2_notes_new syllabus - Jupyter Notebook.pdf
+Matrix Visualizations (Seaborn): Implementing matrix color maps using sns.heatmap() (configuring scales, grid lines, and annotation text parameters), boxplots (sns.boxplot()), and continuous coordinate evaluation charts (sns.scatterplot()).
+Non-Linear Graph Structures (NetworkX): Creating mathematical networks, modeling real-world telephone or social grids, rendering undirected networks (nx.Graph()), building directional topologies (nx.DiGraph()), and mapping connections via adjacency matrices.
+Interactive Analytics (Plotly Express): Developing robust interactive charts using plotly.express.
+Bar Charts: Stacked, grouped, horizontal, and custom color-mapped vertical categories.
+Scatter Plots: Continuous 2D plots, dimensional Bubble Charts, multi-axes 3D coordinates, and multi-variable Scatter Matrices.
+Line Charts & Frequency Plots: Trend monitoring over time intervals and data density distribution modeling using px.histogram().
+Proportional Distributions: Slice percentage mapping through px.pie() with interactive trace overrides.
+3. Machine Learning & Deep Learning Computer Vision
+SHP_CLASS ROOM PRACTICE PROGRAM.ipynb
+Simple Linear Regression: Fitting statistical trends to a single independent feature coordinate map using sklearn.linear_model.LinearRegression.
+Data Splitting: Partitioning matrix frames using train_test_split.
+Model Evaluation: Calculating foundational baseline metrics including Mean Absolute Error (MAE), Mean Squared Error (MSE), and R-squared ($R^2$) score performance.
+01_mnist.ipynb
+Computer Vision Framework Basics: Paradigm shift from traditional conditional programming loops to Deep Learning pattern recognition algorithms using TensorFlow 2 and the Keras API.
+Dataset Segmentation: Splitting structures into explicit arrays (x_train, y_train, x_valid, y_valid) to isolate target evaluation.
+Hardware Accelerator Specializations: Comparative structural differences between standard parallel-processing Graphical Processing Units (GPUs) and customized tensor-operation Tensor Processing Units (TPUs).
+Image Grayscale Arrays: Parsing image dimension vectors (28x28 pixels) represented as unsigned 8-bit integers (values between 0 and 255).
+02_asl.ipynb
+Custom Data Engineering: Techniques to read and ingest specialized image grid formats from local folders/URLs into structured Pandas DataFrames when datasets are not natively available via Keras API wrappers.
+Sign Language Dataset Constraints: Structuring an American Sign Language (ASL) alphabet collection while adjusting for spatial movement limitations (omitting moving letter variants like 'j' and 'z').
+4. Web Scraping, APIs, & Backend Development
+complete_UNIT-7_SHP.pdf
+HTML Parsing & Extraction: Fetching remote web page targets via the requests library and parsing tree tags using BeautifulSoup.
+Online/Offline Scraping Pipelines: Structuring text dumps, scraping script assets, filtering listings by class attributes (find_all), and assembling custom relational DataFrames from live news hubs, political index checking portals, or raw offline saved HTML files (e.g., Rotten Tomatoes movie logs and automobile dealers listings).
+Geolocation & Weather REST Integrations: Interfacing with OpenWeather APIs, passing query parameter payloads, parsing returned JSON nested dictionary arrays, and dynamically converting raw geo-coordinates into metric weather forecasts.
+request&json.pdf
+HTTP Protocol Methods: Comprehensive mechanics of working with JSON web endpoints using GET, POST, PUT, PATCH, and DELETE requests.
+JSON Serialization Pipelines: Passing query parameter arrays, setting custom User-Agent request headers, downloading raw binary file assets (such as images), and using json.dumps(), json.loads(), and json.dump() to translate between text streams, files, and Python dictionary blocks.
+DRF Project.docx
+Django REST Framework (DRF): Building scalable APIs using ModelViewSet and automated endpoints mapping via DefaultRouter architectures.
+API Management Constraints: Integrating explicit backend features including PageNumberPagination, SearchFilter strings, database field OrderingFilter, and custom DjangoFilterBackend backends.
+API Testing & Authentication Protocols: Configuring secure JSON Web Token (JWT) request headers, assigning permissions access levels, generating superuser database entities, and executing end-to-end endpoint tests via Postman.
+CRUD.rar (Compressed Archive Contents)
+Django Full-Stack Web Application Architecture: A complete moviereviewsproject directory consisting of core configuration scripts (settings.py, urls.py, wsgi.py, asgi.py) alongside multiple isolated apps (movie, news, and accounts).
+Database Schema & Relationships: Creating relational entities inside an SQLite environment via Django ORM (models.py), mapping explicit foreign keys connecting global users (User) directly to individual items (Review linked to Movie), and running automated database upgrades (makemigrations/migrate).
+Backend View Controllers & Authentication: Managing complete CRUD request workflows, user signup registration validation checks, account secure logins/logouts, and enforcing view protection boundaries via @login_required decorators.
+Front-End Dynamic Template Rendering: Building presentation structures with standard HTML pages executing dynamic template logic tags ({% extends %}, {% block %}, {% for %}, {% csrf_token %}) to format user review tables and handle keyword filters.
+Would you like me to generate a comprehensive study guide or a set of practice questions based on any of these specific programming units?

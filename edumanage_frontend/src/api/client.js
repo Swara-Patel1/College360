@@ -1,8 +1,7 @@
-// Data API — now served by the local MongoDB-backed backend (backend-node/),
-// which speaks the same PostgREST dialect Supabase did. To switch back to
-// Supabase, restore the old URL + anon key below.
-export const SUPABASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-export const SUPABASE_ANON = 'local-mongo'; // kept for header compatibility; ignored by backend
+// Data API — now served by the Django DRF backend (backend/),
+// which exposes all data via REST endpoints on port 8000.
+export const SUPABASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export const SUPABASE_ANON = 'local-django'; // kept for header compatibility
 
 export const Auth = {
   getToken: () => localStorage.getItem('access_token'),
@@ -56,33 +55,29 @@ export const API = {
         const emailInput = body.email || body.username;
         const password = body.password;
 
-        // Query the email exactly as typed — no hardcoded mapping
-        const encEmail = encodeURIComponent(emailInput);
-        const encPassword = encodeURIComponent(password);
-        
-        const rows = await SupaFetch.request(`users?select=*&email=eq.${encEmail}&password_hash=eq.${encPassword}`);
+        // Call Django DRF login endpoint
+        const res = await fetch(`${SUPABASE_URL}/api/auth/login/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailInput, password }),
+        });
+        const loginData = await res.json();
+        if (!res.ok) throw loginData;
 
-        if (!rows || rows.length === 0) {
-          throw { error: 'invalid_credentials', message: 'Invalid username/email or password.' };
-        }
-
-        const dbUser = rows[0];
-        const emailPrefix = dbUser.email.split('@')[0];
-        const firstName = emailPrefix.split('.')[0] || 'User';
-        const lastName = emailPrefix.split('.')[1] || '';
-        const role = (dbUser.roles || dbUser.role || '').toLowerCase();
+        const dbUser = loginData.user;
+        const role = (dbUser.role || '').toLowerCase();
 
         const loginResponse = {
-          access: 'mock_access_token_' + Math.floor(Math.random() * 1000000),
-          refresh: 'mock_refresh_token_' + Math.floor(Math.random() * 1000000),
+          access: loginData.access,
+          refresh: loginData.refresh,
           user: {
-            id: dbUser.id,
+            id: String(dbUser.id),
             email: dbUser.email,
-            username: emailPrefix,
-            first_name: firstName.charAt(0).toUpperCase() + firstName.slice(1),
-            last_name: lastName ? lastName.charAt(0).toUpperCase() + lastName.slice(1) : '',
+            username: dbUser.username || dbUser.email.split('@')[0],
+            first_name: dbUser.first_name,
+            last_name: dbUser.last_name,
             role,
-            phone: '',
+            phone: dbUser.phone || '',
           }
         };
 
@@ -93,21 +88,19 @@ export const API = {
 
         // Pre-fetch role-specific profile in background
         if (role === 'student') {
-          SupaFetch.request(`students?select=*,user:users(*),department:departments(*),current_semester:semesters(*)&user_id=eq.${dbUser.id}`)
-            .then(sRows => {
-              if (sRows && sRows.length) {
-                const s = sRows[0];
-                localStorage.setItem('student_profile', JSON.stringify({
-                  ...s,
-                  id: s.student_id,
-                  student_id: s.enrollment_no,
-                  department_name: s.department?.name || '—',
-                  semester: s.current_semester?.number || '—',
-                  year_of_study: s.current_semester?.number ? Math.ceil(s.current_semester.number / 2) : '—',
-                  user: s.user
-                }));
-              }
-            }).catch(() => {});
+          fetch(`${SUPABASE_URL}/api/students/my_profile/`, {
+            headers: { 'Authorization': `Bearer ${loginResponse.access}`, 'Content-Type': 'application/json' }
+          }).then(r => r.json()).then(s => {
+            if (s && s.student_id) {
+              localStorage.setItem('student_profile', JSON.stringify({
+                ...s,
+                id: s.student_id,
+                department_name: s.department_name || '—',
+                semester: s.semester || '—',
+                year_of_study: s.year_of_study || '—',
+              }));
+            }
+          }).catch(() => {});
         }
 
         return loginResponse;
@@ -132,8 +125,8 @@ export const API = {
         const feePayments = await safeReq('fee_payments?select=student_id,amount_paid,status');
         const users      = await safeReq('users?select=id,is_active');
 
-        const paidFees    = feePayments.filter(f => f.status === 'paid').reduce((a, c) => a + parseFloat(c.amount_paid || 0), 0);
-        const pendingFees = feePayments.filter(f => f.status !== 'paid').reduce((a, c) => a + parseFloat(c.amount_paid || 0), 0);
+        const paidFees    = feePayments.filter(f => f.status === 'paid').reduce((a, c) => a + parseFloat(c.amount_paid || c.amount || 0), 0);
+        const pendingFees = feePayments.filter(f => f.status !== 'paid').reduce((a, c) => a + parseFloat(c.amount || c.amount_paid || 0), 0);
         const paidIds     = new Set(feePayments.filter(f => f.status === 'paid').map(f => f.student_id));
         const feesDue     = students.filter(s => !paidIds.has(s.student_id)).length;
         const activeU     = users.filter(u => u.is_active !== false).length;
@@ -179,15 +172,16 @@ export const API = {
         }
         const rows = await SupaFetch.request(`students?select=*,user:users(*),department:departments(*),current_semester:semesters(*)&user_id=eq.${loggedInUser.id}`);
         if (!rows || rows.length === 0) return null;
+        const s = rows[0];
         const result = {
-          ...rows[0],
-          id: rows[0].student_id,
-          student_id: rows[0].enrollment_no,
-          department_name: rows[0].department?.name || '—',
-          semester: rows[0].current_semester?.number || '—',
-          year_of_study: rows[0].current_semester?.number ? Math.ceil(rows[0].current_semester.number / 2) : '—',
-          user: rows[0].user,
-          status: rows[0].user?.is_active ? 'active' : 'inactive'
+          ...s,
+          id: s.student_id || s.id,
+          student_id: s.enrollment_no || s.student_id,
+          department_name: s.department?.name || s.department_name || '—',
+          semester: s.current_semester?.number || s.semester || '—',
+          year_of_study: s.year_of_study || (s.current_semester?.number ? Math.ceil(s.current_semester.number / 2) : '—'),
+          user: s.user || { first_name: s.first_name, last_name: s.last_name, email: s.email },
+          status: s.status || (s.user?.is_active !== false ? 'active' : 'inactive')
         };
         localStorage.setItem('student_profile', JSON.stringify(result));
         return result;
@@ -211,19 +205,18 @@ export const API = {
           const rows = await SupaFetch.request('students?select=*,user:users(*),department:departments(*),current_semester:semesters(*)&order=enrollment_no.asc');
           return rows.map(s => ({
             ...s,
-            id: s.student_id,
-            student_id: s.enrollment_no,
-            department_name: s.department?.name || '—',
-            semester: s.current_semester?.number || '—',
-            year_of_study: s.current_semester?.number ? Math.ceil(s.current_semester.number / 2) : '—',
+            id: s.student_id || s.id,
+            student_id: s.enrollment_no || s.student_id,
+            department_name: s.department?.name || s.department_name || '—',
+            semester: s.current_semester?.number || s.semester || '—',
+            year_of_study: s.year_of_study || (s.current_semester?.number ? Math.ceil(s.current_semester.number / 2) : '—'),
             user: {
               ...(s.user || {}),
-              first_name: s.first_name || '',
-              last_name: s.last_name || ''
+              first_name: s.first_name || s.user?.first_name || '',
+              last_name: s.last_name || s.user?.last_name || ''
             },
-            roll_number: s.current_rollno,
+            roll_number: s.current_rollno || s.roll_number || '',
             email: s.user?.email || s.email || '',
-            // Use DB status field if present; otherwise derive from is_active
             status: s.status || (s.user?.is_active === false ? 'inactive' : 'active')
           }));
         }
@@ -582,12 +575,17 @@ export const API = {
           const studentRow = await SupaFetch.request(`students?user_id=eq.${loggedInUser.id}`);
           if (!studentRow || studentRow.length === 0) return [];
           const rows = await SupaFetch.request(`enrollments?select=*,course:subjects(*)&student_id=eq.${studentRow[0].student_id}`);
-          return rows.map(e => ({
-            ...e,
-            course: e.course?.subject_id,
-            course_code: e.course?.code,
-            course_name: e.course?.name
-          }));
+          return rows.map(e => {
+            const cId = String(e.course?.subject_id || e.course?.id || e.course_id || e.subject_id || e.course || '');
+            return {
+              ...e,
+              course: cId,
+              course_id: cId,
+              subject_id: cId,
+              course_code: e.course?.code || e.course_code || '—',
+              course_name: e.course?.name || e.course_name || '—'
+            };
+          });
         }
       }
 
