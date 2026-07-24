@@ -31,6 +31,7 @@ export default function Login() {
         faculty: '/dashboard/faculty',
         hod: '/dashboard/faculty',
         student: '/dashboard/student',
+        parent: '/dashboard/parent',
       };
       navigate(destinations[role] || '/dashboard/admin', { replace: true });
     }

@@ -7,7 +7,15 @@ import sys
 import json
 import django
 from pathlib import Path
-from datetime import date
+from datetime import date, timedelta
+
+# Windows consoles default to cp1252, which can't encode the emoji used in the
+# progress output below. Force UTF-8 so `python seed_data.py` runs everywhere.
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+except (AttributeError, ValueError):
+    pass
 
 BASE_DIR = Path(__file__).resolve().parent
 EXPORT_DIR = BASE_DIR / 'db-export'
@@ -18,6 +26,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'college_management.settings')
 django.setup()
 
 from django.db import transaction
+from django.utils import timezone
 from accounts.models import User
 from faculty.models import Faculty, Department
 from students.models import Student
@@ -28,6 +37,8 @@ from fees.models import Fee
 from timetable.models import Schedule
 from notices.models import Notice
 from complaints.models import Complaint
+from campus.models import StudyMaterial, Doubt, Alumnus, FacultyFeedback, Parent, Backlog, Exam
+from placement.models import PlacementCompany
 
 
 def load(filename):
@@ -55,6 +66,14 @@ print("=" * 60)
 with transaction.atomic():
     # ── Clear existing data ───────────────────────────────────────
     print("\n⏳ Clearing existing data...")
+    StudyMaterial.objects.all().delete()
+    Doubt.objects.all().delete()
+    Alumnus.objects.all().delete()
+    FacultyFeedback.objects.all().delete()
+    Parent.objects.all().delete()
+    Backlog.objects.all().delete()
+    Exam.objects.all().delete()
+    PlacementCompany.objects.all().delete()
     AttendanceRecord.objects.all().delete()
     Grade.objects.all().delete()
     Fee.objects.all().delete()
@@ -461,6 +480,237 @@ with transaction.atomic():
         comp_count += 1
     print(f"  ✅ {comp_count} complaints/grievances")
 
+    # ── 13. STUDY MATERIALS (Content) ─────────────────────────────
+    from datetime import datetime
+
+    def safe_dt(s):
+        if not s:
+            return None
+        try:
+            return datetime.fromisoformat(str(s).replace('Z', '+00:00'))
+        except Exception:
+            return None
+
+    print("\n📖 Importing study materials (content)...")
+    content_rows = load('content.json')
+    content_count = 0
+    for c in content_rows:
+        course = course_map.get(c.get('subject_id'))
+        if not course:
+            continue
+        fac = faculty_map.get(c.get('faculty_id')) or course.faculty
+        StudyMaterial.objects.create(
+            course=course,
+            faculty=fac,
+            content_type=(c.get('content_type') or 'notes').lower(),
+            title=c.get('title', 'Study Material'),
+            description=c.get('description', ''),
+            file_url=c.get('file_url') or '',
+            video_url=c.get('video_url') or '',
+            topic_tag=c.get('topic_tag') or '',
+            is_active=c.get('is_active', True),
+            uploaded_at=safe_dt(c.get('uploaded_at')) or timezone.now(),
+        )
+        content_count += 1
+    print(f"  ✅ {content_count} study materials")
+
+    # ── 14. DOUBTS ────────────────────────────────────────────────
+    print("\n❓ Importing doubts...")
+    doubt_rows = load('doubts.json')
+    doubt_count = 0
+    for d in doubt_rows:
+        stu = student_map.get(d.get('student_id'))
+        if not stu:
+            continue
+        course = course_map.get(d.get('subject_id'))
+        assigned = faculty_map.get(d.get('assigned_faculty_id'))
+        submitted = safe_dt(d.get('submitted_at')) or timezone.now()
+        Doubt.objects.create(
+            student=stu,
+            course=course,
+            question=d.get('question', ''),
+            attachment_url=d.get('attachment_url') or '',
+            status=(d.get('status') or 'open').lower(),
+            assigned_faculty=assigned,
+            resolution=d.get('resolution') or '',
+            sla_deadline=submitted + timedelta(hours=72),
+            submitted_at=submitted,
+            resolved_at=safe_dt(d.get('resolved_at')),
+        )
+        doubt_count += 1
+    print(f"  ✅ {doubt_count} doubts")
+
+    # ── 15. ALUMNI (synthesized from senior students) ─────────────
+    print("\n🎓 Building alumni directory...")
+    COMPANIES = [
+        ('Google', 'Software Engineer', 'Bangalore'),
+        ('Microsoft', 'SDE II', 'Hyderabad'),
+        ('Amazon', 'Cloud Engineer', 'Pune'),
+        ('TCS', 'Systems Engineer', 'Ahmedabad'),
+        ('Infosys', 'Technology Analyst', 'Mysore'),
+        ('Deloitte', 'Consultant', 'Mumbai'),
+        ('Reliance Jio', 'Network Engineer', 'Navi Mumbai'),
+        ('Zoho', 'Product Engineer', 'Chennai'),
+        ('Adani Group', 'Project Engineer', 'Ahmedabad'),
+        ('Wipro', 'Project Engineer', 'Bangalore'),
+    ]
+    DEGREES = ['B.Tech', 'B.E.', 'M.Tech']
+    alumni_count = 0
+    senior_students = [s for s in student_map.values() if s.semester >= 7][:12]
+    if len(senior_students) < 8:
+        senior_students = list(student_map.values())[:12]
+    for i, stu in enumerate(senior_students):
+        company, role, loc = COMPANIES[i % len(COMPANIES)]
+        grad_year = 2026 - (i % 4)  # spread across recent years
+        Alumnus.objects.create(
+            student=stu,
+            department=stu.department,
+            first_name=stu.user.first_name or 'Alumnus',
+            last_name=stu.user.last_name or '',
+            email=stu.user.email,
+            graduation_year=grad_year,
+            degree=DEGREES[i % len(DEGREES)],
+            current_company=company,
+            designation=role,
+            location=loc,
+            linkedin_url=f'https://linkedin.com/in/{(stu.user.first_name or "alum").lower()}-{stu.pk}',
+            available_for_mentorship=(i % 3 == 0),
+        )
+        alumni_count += 1
+    print(f"  ✅ {alumni_count} alumni")
+
+    # ── 16. FACULTY FEEDBACK (sample survey responses) ────────────
+    import random
+    print("\n⭐ Seeding faculty feedback...")
+    fb_count = 0
+    all_students = list(student_map.values())
+    COMMENTS = [
+        'Very clear explanations and always approachable.',
+        'Good subject knowledge, could pace lectures a bit slower.',
+        'Punctual and well-prepared for every class.',
+        'Engaging teaching style with helpful examples.',
+        '', '', 'Encourages doubts and answers them patiently.',
+    ]
+    for course in course_map.values():
+        fac = course.faculty
+        if not fac:
+            continue
+        # 2–4 responses per course from random students
+        for stu in random.sample(all_students, min(len(all_students), random.randint(2, 4))):
+            FacultyFeedback.objects.create(
+                student=stu, faculty=fac, course=course,
+                teaching=random.randint(3, 5), knowledge=random.randint(3, 5),
+                communication=random.randint(2, 5), punctuality=random.randint(3, 5),
+                comment=random.choice(COMMENTS),
+                is_anonymous=random.random() < 0.7,
+            )
+            fb_count += 1
+    print(f"  ✅ {fb_count} feedback responses")
+
+    # ── 17. PLACEMENT COMPANIES ───────────────────────────────────
+    print("\n🏢 Importing placement companies...")
+    company_rows = load('placement_companies.json')
+    ENRICH = {
+        'TCS': ('IT', 4.5, 'System Engineer, Ninja/Digital', 2),
+        'Infosys': ('IT', 4.5, 'Systems Engineer', 0),
+        'Wipro': ('IT', 4.0, 'Project Engineer', 1),
+        'Accenture': ('Consulting', 6.5, 'Associate Software Engineer', 0),
+        'Capgemini': ('IT', 4.2, 'Analyst', 0),
+        'Cognizant': ('IT', 5.0, 'Programmer Analyst', 0),
+        'HCL Technologies': ('IT', 4.5, 'Graduate Engineer Trainee', 1),
+        'Tech Mahindra': ('IT', 4.0, 'Associate Engineer', 0),
+        'IBM India': ('IT', 6.0, 'Associate Developer', 0),
+        'Amazon': ('IT', 28.0, 'SDE-1', 0),
+        'Microsoft': ('IT', 32.0, 'Software Engineer', 0),
+        'Google': ('IT', 35.0, 'Software Engineer', 0),
+        'Deloitte': ('Consulting', 7.5, 'Analyst', 0),
+        'Goldman Sachs': ('Finance', 18.0, 'Analyst', 0),
+        'JP Morgan': ('Finance', 16.0, 'Technology Analyst', 0),
+    }
+    comp_count = 0
+    for c in company_rows:
+        name = c.get('name', 'Company')
+        sector, package, roles, bond = ENRICH.get(
+            name, ('IT', round(4 + float(c.get('min_cpi') or 6) * 1.3, 1), 'Graduate Trainee', 0))
+        PlacementCompany.objects.create(
+            name=name, sector=sector, package_lpa=package,
+            min_cpi=float(c.get('min_cpi') or 6.0),
+            max_backlogs=int(c.get('max_backlogs') or 0),
+            min_attendance=float(c.get('min_attendance') or 75.0),
+            roles=roles, bond_years=bond,
+            other_criteria=c.get('other_criteria') or '',
+            is_active=c.get('is_active', True),
+        )
+        comp_count += 1
+    print(f"  ✅ {comp_count} placement companies")
+
+    # ── 18. PARENT ACCOUNTS (read-only portal) ────────────────────
+    print("\n👪 Creating parent accounts...")
+    parent_count = 0
+    parent_students = list(student_map.values())[:10]
+    for i, stu in enumerate(parent_students):
+        guardian = stu.guardian_name or f'{stu.user.first_name} Parent'
+        parts = guardian.split()
+        first = parts[0] if parts else 'Parent'
+        last = stu.user.last_name or (parts[-1] if len(parts) > 1 else '')
+        email = f'parent{i+1}@lju.edu.in'
+        puser = User(username=f'parent{i+1}', email=email, first_name=first,
+                     last_name=last, role='parent', is_active=True, phone=stu.guardian_phone or '')
+        puser.set_password('parent123')
+        puser.save()
+        Parent.objects.create(user=puser, student=stu,
+                              relation='father' if i % 2 == 0 else 'mother',
+                              phone=stu.guardian_phone or '')
+        parent_count += 1
+    print(f"  ✅ {parent_count} parent accounts (login: parent1@lju.edu.in / parent123)")
+
+    # ── 19. BACKLOGS / KT (re-exam tracking) ──────────────────────
+    print("\n📉 Seeding backlogs / KT records...")
+    backlog_count = 0
+    # Real failures first: every current 'F' grade is an active backlog.
+    for g in Grade.objects.filter(grade='F').select_related('student', 'course'):
+        Backlog.objects.get_or_create(
+            student=g.student, course=g.course,
+            defaults={'semester': g.course.semester, 'status': 'active'})
+        backlog_count += 1
+
+    # Add historical KT records with mixed statuses for a realistic module.
+    backlog_students = list(student_map.values())[10:24]
+    for i, stu in enumerate(backlog_students):
+        courses = list(Course.objects.filter(enrollments__student=stu).distinct()[:3])
+        for j, course in enumerate(random.sample(courses, min(len(courses), random.randint(1, 2)))):
+            roll = (i + j) % 3
+            status = ['active', 'registered', 'cleared'][roll]
+            reexam = date(2026, 8, 10 + (i % 15)) if status in ('registered', 'cleared') else None
+            cleared = date(2026, 8, 20 + (i % 8)) if status == 'cleared' else None
+            _, created = Backlog.objects.get_or_create(
+                student=stu, course=course,
+                defaults={'semester': course.semester, 'status': status,
+                          'attempts': 2 if status == 'cleared' else 1,
+                          'reexam_date': reexam, 'cleared_date': cleared})
+            if created:
+                backlog_count += 1
+    print(f"  ✅ {backlog_count} backlog records")
+
+    # ── 20. EXAM SCHEDULE (end-semester timetable) ────────────────
+    from datetime import time as _time
+    print("\n🗓️  Scheduling examinations...")
+    exam_count = 0
+    SLOTS = [(_time(10, 0), _time(13, 0)), (_time(14, 0), _time(17, 0))]
+    ROOMS = ['Exam Hall A', 'Exam Hall B', 'Block C-101', 'Block C-102', 'Auditorium']
+    exam_courses = list(Course.objects.all()[:16])
+    for i, course in enumerate(exam_courses):
+        exam_date = date(2026, 8, 3) + timedelta(days=(i // 2) * 2)  # 2 exams/day, gap day
+        start, end = SLOTS[i % 2]
+        Exam.objects.create(
+            course=course, exam_type='endsem', date=exam_date,
+            start_time=start, end_time=end,
+            room=ROOMS[i % len(ROOMS)], building='Main Campus',
+            max_marks=100, seats_per_room=30,
+        )
+        exam_count += 1
+    print(f"  ✅ {exam_count} exams scheduled")
+
 print("\n" + "=" * 60)
 print("✅ Database seeded successfully!")
 print("\n📋 Login Credentials:")
@@ -469,6 +719,7 @@ print("🔑 Admin:   admin@lju.edu.in   / admin123")
 print("🔑 HOD:     hod@lju.edu.in     / hod123")
 print("🔑 Faculty: fac@lju.edu.in     / fac123")
 print("🔑 Student: rushi@lju.edu.in   / rushi123")
+print("🔑 Parent:  parent1@lju.edu.in  / parent123")
 print("=" * 40)
 print(f"\n📊 Summary:")
 print(f"  Departments: {Department.objects.count()}")
@@ -483,3 +734,11 @@ print(f"  Fees:        {Fee.objects.count()}")
 print(f"  Timetable:   {Schedule.objects.count()}")
 print(f"  Notices:     {Notice.objects.count()}")
 print(f"  Complaints:  {Complaint.objects.count()}")
+print(f"  Content:     {StudyMaterial.objects.count()}")
+print(f"  Doubts:      {Doubt.objects.count()}")
+print(f"  Alumni:      {Alumnus.objects.count()}")
+print(f"  Feedback:    {FacultyFeedback.objects.count()}")
+print(f"  Companies:   {PlacementCompany.objects.count()}")
+print(f"  Parents:     {Parent.objects.count()}")
+print(f"  Backlogs:    {Backlog.objects.count()}")
+print(f"  Exams:       {Exam.objects.count()}")

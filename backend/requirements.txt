@@ -1,0 +1,8 @@
+# EduPulse Pro — Django backend dependencies
+Django==6.0.6
+djangorestframework==3.17.1
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.9.0
+
+# ML placement predictor (numpy-only logistic regression — no scikit-learn needed)
+numpy==2.4.1

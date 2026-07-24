@@ -18,6 +18,10 @@ export default function Grades() {
   const [submitting, setSubmitting] = useState(false);
   const [isEntryMode, setIsEntryMode] = useState(false);
 
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+
   const loadInitialData = async () => {
     try {
       setLoading(true);
@@ -129,6 +133,41 @@ export default function Grades() {
     }
   };
 
+  const handleCsvImport = async (file) => {
+    if (!file) return;
+    if (!selectedCourse) {
+      Toast.warning('Select a course before importing.');
+      return;
+    }
+    if (!/\.(csv|txt)$/i.test(file.name)) {
+      Toast.warning('Please upload a .csv file (roll number / enrollment / name, marks).');
+      return;
+    }
+    try {
+      setImporting(true);
+      setImportResult(null);
+      const csvText = await file.text();
+      // Parsing + student matching happen in Django; the client just uploads the text.
+      const result = await API.post('grades/bulk-import', {
+        course_id: selectedCourse,
+        total_marks: parseFloat(totalMarks) || 100,
+        csv_text: csvText,
+      });
+      setImportResult(result);
+      if (result.imported > 0) {
+        Toast.success(`Imported ${result.imported} grade(s)${result.skipped ? `, skipped ${result.skipped}` : ''}.`);
+        loadInitialData();
+      } else {
+        Toast.warning('No rows matched enrolled students. Check the identifiers in your CSV.');
+      }
+    } catch (e) {
+      console.error('CSV import failed:', e);
+      Toast.error('Failed to import CSV.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const filteredGrades = gradesLog.filter(g => {
     return filterCourse ? g.subject_id === filterCourse : true;
   });
@@ -185,6 +224,49 @@ export default function Grades() {
                 />
               </div>
             </div>
+
+            {/* Bulk CSV import */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); handleCsvImport(e.dataTransfer.files?.[0]); }}
+              style={{
+                border: `2px dashed ${dragOver ? 'var(--primary)' : 'var(--border)'}`,
+                borderRadius: '12px', padding: '20px', textAlign: 'center', marginBottom: '20px',
+                background: dragOver ? 'rgba(108,99,255,0.08)' : 'var(--bg-secondary)', transition: 'all 0.2s ease',
+              }}
+            >
+              <div style={{ fontSize: '1.6rem', marginBottom: '6px' }}>📥</div>
+              <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                {importing ? 'Importing…' : 'Bulk import marks from CSV'}
+              </div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 12px' }}>
+                Drag &amp; drop or browse a <code>.csv</code> — columns: <strong>roll no / enrollment / name</strong>, <strong>marks</strong>.
+                Grades are matched &amp; computed on the server.
+              </p>
+              <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
+                Browse file
+                <input
+                  type="file" accept=".csv,.txt" hidden disabled={importing}
+                  onChange={(e) => { handleCsvImport(e.target.files?.[0]); e.target.value = ''; }}
+                />
+              </label>
+            </div>
+
+            {importResult && (
+              <div className="card" style={{ marginBottom: '20px', padding: '14px 18px', background: 'var(--bg-secondary)' }}>
+                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '0.85rem', marginBottom: importResult.rows?.length ? '10px' : 0 }}>
+                  <span>✅ Imported: <strong>{importResult.imported}</strong></span>
+                  <span>⏭️ Skipped: <strong>{importResult.skipped}</strong></span>
+                  <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setImportResult(null)}>Dismiss</button>
+                </div>
+                {importResult.rows?.some(r => r.status === 'skipped') && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Skipped rows: {importResult.rows.filter(r => r.status === 'skipped').map(r => `${r.identifier} (${r.reason})`).join(', ')}
+                  </div>
+                )}
+              </div>
+            )}
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: '40px' }}><div className="loading-spinner"></div></div>

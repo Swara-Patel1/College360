@@ -21,8 +21,12 @@ Filter syntax (from PostgREST):
   select=*          → all fields (embed joins are simplified)
   limit=N
 """
+import csv
+import io
 import json
 import re
+from datetime import date, timedelta
+from django.utils import timezone
 from django.http import JsonResponse
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -40,6 +44,8 @@ from fees.models import Fee
 from timetable.models import Schedule
 from notices.models import Notice
 from complaints.models import Complaint
+from campus.models import StudyMaterial, Doubt, Alumnus, FacultyFeedback, Backlog, Exam
+from django.db.models import Avg, Count
 
 # Serialization helpers ──────────────────────────────────────────────────────
 
@@ -173,9 +179,10 @@ def serialize_enrollment(e):
 
 
 def serialize_mark(g):
+    # Grade, GPA and percentage are all computed server-side (see grades.models.Grade)
+    # so the React client never re-derives them.
     internal = float(g.marks_obtained) * 0.4
     external = float(g.marks_obtained) * 0.6
-    pct = g.percentage
     return {
         'mark_id': str(g.pk),
         'id': str(g.pk),
@@ -183,10 +190,13 @@ def serialize_mark(g):
         'subject_id': str(g.course.pk),
         'internal_marks': round(internal, 2),
         'external_marks': round(external, 2),
-        'total_marks': float(g.marks_obtained),
+        'marks_obtained': float(g.marks_obtained),
+        'total_marks': float(g.total_marks),
         'grade': g.grade,
-        'percentage': pct,
+        'gpa': g.grade_point,
+        'percentage': g.percentage,
         'exam_type': g.exam_type,
+        'exam_date': _dt(g.exam_date),
         'entered_at': _dt(g.created_at),
         'course': serialize_subject(g.course),
         'student': serialize_student(g.student),
@@ -422,15 +432,21 @@ def handle_users(request, params, body):
     if request.method == 'PATCH':
         qs = User.objects.all()
         qs = apply_postgrest_filters(qs, params, FM)
-        updates = {}
-        if 'is_active' in body:
-            updates['is_active'] = body['is_active']
-        if 'roles' in body:
-            updates['role'] = body['roles']
-        if 'email' in body:
-            updates['email'] = body['email']
-        if updates:
-            qs.update(**updates)
+        new_password = body.get('password') or body.get('new_password') or body.get('password_hash')
+        for u in qs:
+            if 'is_active' in body:
+                u.is_active = body['is_active']
+            if 'roles' in body or 'role' in body:
+                u.role = body.get('roles') or body.get('role')
+            if 'email' in body:
+                u.email = body['email']
+            if 'first_name' in body:
+                u.first_name = body['first_name']
+            if 'last_name' in body:
+                u.last_name = body['last_name']
+            if new_password:
+                u.set_password(new_password)  # proper reset, re-hashed
+            u.save()
         return [serialize_user(u) for u in qs]
 
     if request.method == 'DELETE':
@@ -484,41 +500,59 @@ def handle_faculty(request, params, body):
         return [serialize_faculty(f) for f in qs[:limit]]
 
     if request.method == 'POST':
-        user = User.objects.get(pk=body.get('user_id'))
+        # High-level create: build the User + Faculty in one call.
+        if body.get('user_id'):
+            user = User.objects.filter(pk=body['user_id']).first()
+        else:
+            user = _create_account(body, role='faculty', default_pw='faculty123',
+                                   is_active=body.get('status') != 'inactive')
+        if not user:
+            return {'error': 'Could not create user account.'}
         dept = Department.objects.filter(pk=body.get('department_id')).first()
         f = Faculty.objects.create(
             user=user,
             faculty_id=body.get('employee_id') or f'F{Faculty.objects.count()+1:03d}',
             department=dept,
-            first_name=body.get('first_name') or user.first_name,
-            last_name=body.get('last_name') or user.last_name,
+            designation='hod' if body.get('role') == 'hod' else 'assistant_professor',
         )
         return [serialize_faculty(f)]
 
     if request.method == 'PATCH':
         qs = Faculty.objects.select_related('user', 'department').all()
-        qs = apply_postgrest_filters(qs, params, FM)
-        update_fields = {}
-        if 'first_name' in body:
-            update_fields['user__first_name'] = body['first_name']
-        if 'department_id' in body:
-            update_fields['department_id'] = body['department_id']
+        fid_filter = params.get('faculty_id', '') or params.get('id', '')
+        if fid_filter.startswith('eq.'):
+            qs = qs.filter(pk=fid_filter[3:])
+        else:
+            qs = apply_postgrest_filters(qs, params, FM)
         for fac in qs:
             if 'first_name' in body:
                 fac.user.first_name = body['first_name']
-                fac.user.save()
             if 'last_name' in body:
                 fac.user.last_name = body['last_name']
-                fac.user.save()
+            if 'email' in body:
+                fac.user.email = body['email']
+            if 'status' in body:
+                fac.user.is_active = body['status'] != 'inactive'
+            fac.user.save()
+            if 'employee_id' in body:
+                fac.faculty_id = body['employee_id']
             if 'department_id' in body:
                 fac.department_id = body['department_id']
-                fac.save()
-        return [serialize_faculty(f) for f in qs]
+            fac.save()
+        return [serialize_faculty(fac) for fac in qs]
 
     if request.method == 'DELETE':
-        qs = Faculty.objects.all()
-        qs = apply_postgrest_filters(qs, params, FM)
-        qs.delete()
+        qs = Faculty.objects.select_related('user').all()
+        fid_filter = params.get('faculty_id', '') or params.get('id', '')
+        if fid_filter.startswith('eq.'):
+            qs = qs.filter(pk=fid_filter[3:])
+        else:
+            qs = apply_postgrest_filters(qs, params, FM)
+        for fac in qs:
+            if fac.user:
+                fac.user.delete()  # cascades to Faculty
+            else:
+                fac.delete()
         return []
 
 
@@ -545,23 +579,29 @@ def handle_hod(request, params, body):
         } for f in qs]
 
     if request.method == 'POST':
-        user_id = body.get('user_id')
+        # Promote a faculty member to HOD. Accepts faculty_id (preferred) or user_id.
         dept_id = body.get('department_id')
-        fac = Faculty.objects.filter(user__pk=user_id).first()
-        if fac:
-            fac.designation = 'hod'
-            if dept_id:
-                fac.department_id = dept_id
-            fac.save()
-            return [{'hod_id': str(fac.pk), 'user_id': str(fac.user.pk),
-                     'department_id': str(fac.department.pk) if fac.department else None}]
-        return []
+        fac = None
+        if body.get('faculty_id'):
+            fac = Faculty.objects.filter(pk=body['faculty_id']).first()
+        elif body.get('user_id'):
+            fac = Faculty.objects.filter(user__pk=body['user_id']).first()
+        if not fac:
+            return {'error': 'Faculty not found.'}
+        # A department has one HOD: demote any current HOD of the target department.
+        if dept_id:
+            Faculty.objects.filter(department__pk=dept_id, designation='hod').exclude(pk=fac.pk) \
+                .update(designation='assistant_professor')
+            fac.department_id = dept_id
+        fac.designation = 'hod'
+        fac.save()
+        return [{'hod_id': str(fac.pk), 'id': str(fac.pk), 'user_id': str(fac.user.pk),
+                 'department_id': str(fac.department.pk) if fac.department else None}]
 
     if request.method == 'DELETE':
-        hod_id_filter = params.get('hod_id', '')
+        hod_id_filter = params.get('hod_id', '') or params.get('id', '')
         if hod_id_filter.startswith('eq.'):
-            pk = hod_id_filter[3:]
-            Faculty.objects.filter(pk=pk).update(designation='assistant_professor')
+            Faculty.objects.filter(pk=hod_id_filter[3:]).update(designation='assistant_professor')
         return []
 
 
@@ -589,24 +629,34 @@ def handle_students(request, params, body):
         return [serialize_student(s) for s in qs[:limit]]
 
     if request.method == 'POST':
-        user = User.objects.get(pk=body.get('user_id'))
+        # High-level create: build the User, the Student, and auto-enrol in one call
+        # (this orchestration used to live in the React client).
+        status = body.get('status') or 'active'
+        if body.get('user_id'):
+            user = User.objects.filter(pk=body['user_id']).first()
+        else:
+            user = _create_account(body, role='student', default_pw='student123',
+                                   is_active=status not in ('inactive', 'graduated'))
+        if not user:
+            return {'error': 'Could not create user account.'}
         dept = Department.objects.filter(pk=body.get('department_id')).first()
+        sem = _parse_semester(body, 1)
         s = Student.objects.create(
             user=user,
-            student_id=body.get('enrollment_no') or f'ENR{Student.objects.count()+1:06d}',
+            student_id=body.get('enrollment_no') or body.get('student_id') or f'ENR{Student.objects.count()+1:06d}',
             department=dept,
-            roll_number=str(body.get('current_rollno') or ''),
+            roll_number=str(body.get('current_rollno') or body.get('roll_number') or ''),
             gender=body.get('gender') or 'M',
-            year_of_study=int(body.get('year_of_study') or 1),
-            semester=int(body.get('semester') or 1),
-            status=body.get('status') or 'active',
+            year_of_study=max(1, (sem + 1) // 2),
+            semester=sem,
+            status=status,
         )
+        _auto_enroll(s)
         return [serialize_student(s)]
 
     if request.method == 'PATCH':
         qs = Student.objects.select_related('user', 'department').all()
-        # Handle custom filter on pk
-        sid_filter = params.get('student_id', '')
+        sid_filter = params.get('student_id', '') or params.get('id', '')
         if sid_filter.startswith('eq.'):
             qs = qs.filter(pk=sid_filter[3:])
         else:
@@ -614,19 +664,43 @@ def handle_students(request, params, body):
         for s in qs:
             if 'enrollment_no' in body:
                 s.student_id = body['enrollment_no']
-            if 'status' in body:
-                s.status = body['status']
-            if 'current_rollno' in body:
-                s.roll_number = str(body['current_rollno'])
+            if 'current_rollno' in body or 'roll_number' in body:
+                s.roll_number = str(body.get('current_rollno') or body.get('roll_number') or '')
             if 'department_id' in body:
                 s.department_id = body['department_id']
+            sem_changed = 'semester' in body or 'current_semester_id' in body
+            if sem_changed:
+                s.semester = _parse_semester(body, s.semester)
+                s.year_of_study = max(1, (s.semester + 1) // 2)
+            # User-level fields
+            if 'first_name' in body:
+                s.user.first_name = body['first_name']
+            if 'last_name' in body:
+                s.user.last_name = body['last_name']
+            if 'email' in body:
+                s.user.email = body['email']
+            if 'status' in body:
+                s.status = body['status']
+                s.user.is_active = body['status'] not in ('inactive', 'graduated')
+            s.user.save()
             s.save()
+            if sem_changed or 'department_id' in body:
+                _auto_enroll(s)
         return [serialize_student(s) for s in qs]
 
     if request.method == 'DELETE':
-        qs = Student.objects.all()
-        qs = apply_postgrest_filters(qs, params, FM)
-        qs.delete()
+        qs = Student.objects.select_related('user').all()
+        sid_filter = params.get('student_id', '') or params.get('id', '')
+        if sid_filter.startswith('eq.'):
+            qs = qs.filter(pk=sid_filter[3:])
+        else:
+            qs = apply_postgrest_filters(qs, params, FM)
+        # Deleting the user cascades to the student profile.
+        for s in qs:
+            if s.user:
+                s.user.delete()
+            else:
+                s.delete()
         return []
 
 
@@ -734,11 +808,17 @@ def handle_marks(request, params, body):
         course = Course.objects.filter(pk=body.get('subject_id')).first()
         if not stu or not course:
             return []
-        total = float(body.get('total_marks') or 0)
-        g, _ = Grade.objects.get_or_create(
+        # Accept marks_obtained (+ optional total_marks); grade/GPA are derived on save().
+        obtained = float(body.get('marks_obtained', body.get('total_marks') or 0))
+        max_marks = float(body.get('total_marks') or 100) if 'marks_obtained' in body else 100
+        g, created = Grade.objects.get_or_create(
             student=stu, course=course, exam_type=body.get('exam_type') or 'Semester End Exam',
-            defaults={'marks_obtained': total, 'total_marks': 100}
+            defaults={'marks_obtained': obtained, 'total_marks': max_marks}
         )
+        if not created:
+            g.marks_obtained = obtained
+            g.total_marks = max_marks
+            g.save()
         return [serialize_mark(g)]
 
     if request.method == 'PATCH':
@@ -749,9 +829,11 @@ def handle_marks(request, params, body):
         else:
             qs = apply_postgrest_filters(qs, params, FM)
         for g in qs:
+            if 'marks_obtained' in body:
+                g.marks_obtained = float(body['marks_obtained'])
             if 'total_marks' in body:
-                g.marks_obtained = float(body['total_marks'])
-            g.save()
+                g.total_marks = float(body['total_marks'])
+            g.save()  # recomputes grade
         return [serialize_mark(g) for g in qs]
 
     if request.method == 'DELETE':
@@ -763,6 +845,78 @@ def handle_marks(request, params, body):
             qs = apply_postgrest_filters(qs, params, FM)
         qs.delete()
         return []
+
+
+def _is_number(s):
+    try:
+        float(s)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+@handler('grades/bulk-import')
+def handle_grades_bulk_import(request, params, body):
+    """Parse a CSV of marks server-side and upsert Grade rows.
+
+    Accepts { course_id/subject_id, total_marks, exam_type, csv_text }.
+    Each CSV row is `identifier, [..], marks` where identifier matches a student's
+    roll number, enrollment number, or full name. Grades/GPA are derived on save().
+    """
+    if request.method != 'POST':
+        return {'error': 'POST required'}
+
+    course = Course.objects.filter(pk=body.get('course_id') or body.get('subject_id')).first()
+    if not course:
+        return {'error': 'Course not found', 'imported': 0, 'skipped': 0, 'rows': []}
+
+    total_marks = float(body.get('total_marks') or 100)
+    exam_type = body.get('exam_type') or 'Semester End Exam'
+    csv_text = body.get('csv_text') or body.get('csv') or ''
+
+    # Build identifier → student lookups from the course's active enrollments.
+    enrolled = (Student.objects
+                .filter(enrollments__course=course, enrollments__is_active=True)
+                .select_related('user').distinct())
+    by_roll, by_enroll, by_name = {}, {}, {}
+    for s in enrolled:
+        if s.roll_number:
+            by_roll[s.roll_number.strip().lower()] = s
+        by_enroll[s.student_id.strip().lower()] = s
+        by_name[f'{s.user.first_name} {s.user.last_name}'.strip().lower()] = s
+
+    imported, skipped, rows = 0, 0, []
+    for i, raw in enumerate(csv.reader(io.StringIO(csv_text))):
+        cells = [c.strip() for c in raw]
+        if not cells or all(not c for c in cells):
+            continue
+        # Skip an obvious header row (first row with no numeric cells after col 0).
+        if i == 0 and not any(_is_number(c) for c in cells[1:]):
+            continue
+
+        ident = cells[0].lower()
+        marks_val = next((float(c) for c in reversed(cells[1:]) if _is_number(c)), None)
+        stu = by_roll.get(ident) or by_enroll.get(ident) or by_name.get(ident)
+
+        if not stu or marks_val is None:
+            skipped += 1
+            rows.append({'row': i + 1, 'identifier': cells[0], 'status': 'skipped',
+                         'reason': 'no matching student' if not stu else 'no marks value'})
+            continue
+
+        g, created = Grade.objects.get_or_create(
+            student=stu, course=course, exam_type=exam_type,
+            defaults={'marks_obtained': marks_val, 'total_marks': total_marks})
+        if not created:
+            g.marks_obtained = marks_val
+            g.total_marks = total_marks
+            g.save()
+        imported += 1
+        rows.append({'row': i + 1, 'identifier': cells[0],
+                     'student_name': f'{stu.user.first_name} {stu.user.last_name}'.strip(),
+                     'marks': marks_val, 'grade': g.grade, 'status': 'imported'})
+
+    return {'imported': imported, 'skipped': skipped, 'total': imported + skipped, 'rows': rows}
 
 
 @handler('attendance_records')
@@ -792,6 +946,71 @@ def handle_attendance(request, params, body):
         return results
 
     return []
+
+
+@handler('attendance/bulk-mark')
+def handle_attendance_bulk(request, params, body):
+    """Mark attendance for many students at once (faculty resolution + status
+    mapping done server-side)."""
+    if request.method != 'POST':
+        return []
+    marker = User.objects.filter(pk=body.get('marked_by')).first() if body.get('marked_by') else None
+    STATUS = {'present': 'present', 'absent': 'absent', 'late': 'late', 'excused': 'excused',
+              'P': 'present', 'A': 'absent', 'L': 'late', 'E': 'excused'}
+    out = []
+    for r in (body.get('records') or []):
+        raw_s = r.get('student')
+        stu = Student.objects.filter(pk=raw_s).first() if str(raw_s).isdigit() else None
+        stu = stu or Student.objects.filter(student_id=raw_s).first()
+        raw_c = r.get('course')
+        course = Course.objects.filter(pk=raw_c).first() if str(raw_c).isdigit() else None
+        course = course or Course.objects.filter(code=raw_c).first()
+        if not stu or not course or not r.get('date'):
+            continue
+        a, _ = AttendanceRecord.objects.update_or_create(
+            student=stu, course=course, date=r['date'],
+            defaults={'status': STATUS.get(str(r.get('status')), 'present'), 'marked_by': marker})
+        out.append(serialize_attendance(a))
+    return out
+
+
+@handler('admin/fees')
+def handle_admin_fees(request, params, body):
+    """Flat, denormalized fee list for the admin fee console."""
+    out = []
+    for f in Fee.objects.select_related('student__user', 'student__department').all()[:1000]:
+        stu = f.student
+        out.append({
+            'id': str(f.pk),
+            'payment_id': str(f.pk),
+            'student_name': f'{stu.user.first_name} {stu.user.last_name}'.strip() or '—',
+            'enrollment_no': stu.student_id,
+            'department_name': stu.department.name if stu.department else '—',
+            'component_name': f.get_fee_type_display(),
+            'fee_type': f.fee_type,
+            'amount': float(f.amount),
+            'amount_paid': float(f.amount) if f.status == 'paid' else 0.0,
+            'due_date': _dt(f.due_date),
+            'status': f.status,
+            'transaction_ref': f.transaction_id or '',
+        })
+    return out
+
+
+@handler('fees/mark-paid')
+def handle_fee_mark_paid(request, params, body):
+    """Mark a single fee record paid, stamping the payment date + a transaction ref."""
+    if request.method != 'POST':
+        return []
+    pid = body.get('payment_id') or (params.get('payment_id', '').replace('eq.', ''))
+    fee = Fee.objects.filter(pk=pid).first()
+    if not fee:
+        return {'error': 'fee not found'}
+    fee.status = 'paid'
+    fee.payment_date = timezone.now().date()
+    fee.transaction_id = body.get('transaction_ref') or f'TXN{int(timezone.now().timestamp())}'
+    fee.save()
+    return [serialize_fee(fee)]
 
 
 @handler('fee_payments')
@@ -1060,157 +1279,165 @@ def handle_hod_check(request, params, body):
     return {'isHod': True, 'hod': None}
 
 
-MOCK_CONTENT_STORE = [
-    {
-        'id': 'cnt-1',
-        'content_id': 'cnt-1',
-        'title': 'Data Structures Lecture Notes & Array Operations',
-        'description': 'Comprehensive notes on Linear Data Structures, Stacks, Queues, and Array Operations with code snippets.',
-        'content_type': 'notes',
-        'subject_id': '27',
-        'subject_name': 'Computer Organization',
-        'subject_code': 'ME114',
-        'faculty_name': 'Kush Panchal',
-        'file_url': 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-        'video_url': '',
-        'topic_tag': 'Data Structures & Algorithms',
-        'is_active': True,
-        'uploaded_at': '2026-07-20T10:00:00Z',
-        'created_at': '2026-07-20T10:00:00Z',
-    },
-    {
-        'id': 'cnt-2',
-        'content_id': 'cnt-2',
-        'title': 'Fluid Mechanics & Thermal Systems Video Tutorial',
-        'description': 'Video tutorial on Fluid Dynamics, Bernoulli Equation, and Laminar Flow Applications.',
-        'content_type': 'video',
-        'subject_id': '28',
-        'subject_name': 'Fluid Mechanics',
-        'subject_code': 'ME115',
-        'faculty_name': 'Kinjal Shah',
-        'file_url': '',
-        'video_url': 'https://www.youtube.com/watch?v=dl00fOOYLOM',
-        'topic_tag': 'Fluid Mechanics & Flow',
-        'is_active': True,
-        'uploaded_at': '2026-07-21T14:30:00Z',
-        'created_at': '2026-07-21T14:30:00Z',
-    },
-    {
-        'id': 'cnt-3',
-        'content_id': 'cnt-3',
-        'title': 'Thermodynamics Heat Transfer Assignment 3',
-        'description': 'Assignment 3: Calculate conduction and convection heat loss in cylindrical pipes.',
-        'content_type': 'assignment',
-        'subject_id': '29',
-        'subject_name': 'Thermodynamics',
-        'subject_code': 'ME116',
-        'faculty_name': 'Devang Patel',
-        'file_url': 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-        'video_url': '',
-        'topic_tag': 'Thermodynamics & Heat',
-        'is_active': True,
-        'uploaded_at': '2026-07-22T09:15:00Z',
-        'created_at': '2026-07-22T09:15:00Z',
-    },
-    {
-        'id': 'cnt-4',
-        'content_id': 'cnt-4',
-        'title': 'Engineering Metallurgy & Material Science Reference Guide',
-        'description': 'Reference manual covering Crystal Structures, Phase Diagrams, and Heat Treatment processes.',
-        'content_type': 'reference',
-        'subject_id': '27',
-        'subject_name': 'Computer Organization',
-        'subject_code': 'ME114',
-        'faculty_name': 'Kush Panchal',
-        'file_url': 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-        'video_url': '',
-        'topic_tag': 'Material Science',
-        'is_active': True,
-        'uploaded_at': '2026-07-23T11:00:00Z',
-        'created_at': '2026-07-23T11:00:00Z',
-    },
-]
+def _faculty_name(fac):
+    if not fac:
+        return '—'
+    return f'{fac.user.first_name} {fac.user.last_name}'.strip() or fac.faculty_id
 
-MOCK_DOUBTS_STORE = [
-    {
-        'id': 'dbt-1',
-        'doubt_id': 'dbt-1',
-        'question': 'How does time complexity differ between QuickSort worst-case O(n^2) and MergeSort O(n log n)?',
-        'student_id': '39',
-        'student_name': 'Meera Patel',
-        'subject_id': '27',
-        'subject_name': 'Computer Organization',
-        'assigned_faculty_name': 'Kush Panchal',
-        'status': 'resolved',
-        'resolution': 'QuickSort selects a pivot; if the pivot is smallest/largest item every split, recursion depth is n leading to O(n^2). MergeSort always divides the array exactly in half.',
-        'submitted_at': '2026-07-22T10:00:00Z',
-        'resolved_at': '2026-07-22T15:30:00Z',
-        'sla_deadline': '2026-07-23T10:00:00Z',
-    },
-    {
-        'id': 'dbt-2',
-        'doubt_id': 'dbt-2',
-        'question': 'What is the difference between laminar and turbulent flow boundary layers in Fluid Mechanics?',
-        'student_id': '39',
-        'student_name': 'Meera Patel',
-        'subject_id': '28',
-        'subject_name': 'Fluid Mechanics',
-        'assigned_faculty_name': 'Kinjal Shah',
-        'status': 'open',
-        'resolution': '',
-        'submitted_at': '2026-07-23T09:00:00Z',
-        'resolved_at': None,
-        'sla_deadline': '2026-07-24T18:00:00Z',
-    },
-    {
-        'id': 'dbt-3',
-        'doubt_id': 'dbt-3',
-        'question': 'Can you clarify how Carnot Cycle efficiency relates to the Second Law of Thermodynamics?',
-        'student_id': '39',
-        'student_name': 'Meera Patel',
-        'subject_id': '29',
-        'subject_name': 'Thermodynamics',
-        'assigned_faculty_name': 'Devang Patel',
-        'status': 'under_review',
-        'resolution': '',
-        'submitted_at': '2026-07-23T16:00:00Z',
-        'resolved_at': None,
-        'sla_deadline': '2026-07-25T12:00:00Z',
-    },
-]
+
+# ── Orchestration helpers (business logic moved out of the React client) ──────
+
+def _unique_username(base):
+    base = (base or 'user')[:140]
+    username, i = base, 1
+    while User.objects.filter(username=username).exists():
+        username = f'{base}{i}'
+        i += 1
+    return username[:150]
+
+
+def _create_account(body, role, default_pw, is_active=True):
+    """Create a User from a high-level create payload (email/name/password)."""
+    email = body.get('email') or f"{body.get('username') or role}{User.objects.count()+1}@lju.edu.in"
+    username = _unique_username(body.get('username') or email.split('@')[0])
+    user = User(
+        username=username, email=email,
+        first_name=body.get('first_name') or username.capitalize(),
+        last_name=body.get('last_name') or '',
+        role=role, is_active=is_active,
+        phone=body.get('phone') or '',
+    )
+    user.set_password(body.get('password') or body.get('password_hash') or default_pw)
+    user.save()
+    return user
+
+
+def _parse_semester(body, default=1):
+    """Accept either a semester number or a 'sem-05' / legacy-UUID id."""
+    if body.get('semester') not in (None, ''):
+        try:
+            return int(body['semester'])
+        except (TypeError, ValueError):
+            pass
+    sid = str(body.get('current_semester_id') or '')
+    digits = re.findall(r'(\d+)', sid)
+    if digits:
+        return int(digits[-1])
+    return default
+
+
+def _auto_enroll(student):
+    """Enrol a student in every active course for their department + semester."""
+    if not student.department:
+        return 0
+    courses = Course.objects.filter(department=student.department, semester=student.semester, is_active=True)
+    n = 0
+    for c in courses:
+        _, created = Enrollment.objects.get_or_create(student=student, course=c)
+        n += 1 if created else 0
+    return n
+
+
+def serialize_content(m):
+    return {
+        'id': str(m.pk),
+        'content_id': str(m.pk),
+        'title': m.title,
+        'description': m.description,
+        'content_type': m.content_type,
+        'subject_id': str(m.course.pk) if m.course else None,
+        'subject_name': m.course.name if m.course else '—',
+        'subject_code': m.course.code if m.course else '—',
+        'faculty_id': str(m.faculty.pk) if m.faculty else None,
+        'faculty_name': _faculty_name(m.faculty),
+        'file_url': m.file_url,
+        'video_url': m.video_url,
+        'topic_tag': m.topic_tag,
+        'is_active': m.is_active,
+        'uploaded_at': _dt(m.uploaded_at),
+        'created_at': _dt(m.uploaded_at),
+    }
+
+
+def serialize_doubt(d):
+    stu_name = f'{d.student.user.first_name} {d.student.user.last_name}'.strip() if d.student else 'Student'
+    return {
+        'id': str(d.pk),
+        'doubt_id': str(d.pk),
+        'question': d.question,
+        'student_id': str(d.student.pk) if d.student else None,
+        'student_name': stu_name,
+        'subject_id': str(d.course.pk) if d.course else None,
+        'subject_name': d.course.name if d.course else '—',
+        'subject_code': d.course.code if d.course else '—',
+        'assigned_faculty_id': str(d.assigned_faculty.pk) if d.assigned_faculty else None,
+        'assigned_faculty_name': _faculty_name(d.assigned_faculty) if d.assigned_faculty else None,
+        'status': d.status,
+        'resolution': d.resolution or '',
+        'attachment_url': d.attachment_url or '',
+        'submitted_at': _dt(d.submitted_at),
+        'resolved_at': _dt(d.resolved_at),
+        'sla_deadline': _dt(d.sla_deadline),
+    }
+
+
+def serialize_alumnus(a):
+    return {
+        'id': str(a.pk),
+        'alumnus_id': str(a.pk),
+        'first_name': a.first_name,
+        'last_name': a.last_name,
+        'name': f'{a.first_name} {a.last_name}'.strip(),
+        'email': a.email,
+        'department_id': str(a.department.pk) if a.department else None,
+        'department_name': a.department.name if a.department else '—',
+        'graduation_year': a.graduation_year,
+        'degree': a.degree,
+        'current_company': a.current_company,
+        'designation': a.designation,
+        'location': a.location,
+        'linkedin_url': a.linkedin_url,
+        'available_for_mentorship': a.available_for_mentorship,
+        'created_at': _dt(a.created_at),
+    }
 
 
 @handler('content')
 @handler('study_materials')
 def handle_content(request, params, body):
     if request.method == 'GET':
-        subj_filter = params.get('subject_id')
-        items = MOCK_CONTENT_STORE
-        if subj_filter:
-            val = subj_filter.replace('eq.', '').strip()
-            items = [c for c in items if str(c.get('subject_id')) == val]
-        return items
+        qs = StudyMaterial.objects.select_related('course', 'faculty__user').filter(is_active=True)
+        subj_filter = params.get('subject_id', '')
+        if subj_filter.startswith('eq.'):
+            val = subj_filter[3:]
+            qs = qs.filter(Q(course__pk=int(val) if val.isdigit() else -1) | Q(course__code=val))
+        fac_filter = params.get('faculty_id', '')
+        if fac_filter.startswith('eq.'):
+            qs = qs.filter(faculty__pk=fac_filter[3:] if fac_filter[3:].isdigit() else -1)
+        return [serialize_content(m) for m in qs[:200]]
 
     if request.method == 'POST':
-        new_item = {
-            'id': f'cnt-{len(MOCK_CONTENT_STORE)+1}',
-            'content_id': f'cnt-{len(MOCK_CONTENT_STORE)+1}',
-            'title': body.get('title', 'Study Material'),
-            'description': body.get('description', ''),
-            'content_type': body.get('content_type', 'notes'),
-            'subject_id': str(body.get('subject_id', '27')),
-            'subject_name': body.get('subject_name', 'Course Material'),
-            'subject_code': body.get('subject_code', 'GEN100'),
-            'faculty_name': 'Faculty Instructor',
-            'file_url': body.get('file_url', '#'),
-            'video_url': body.get('video_url', ''),
-            'topic_tag': body.get('topic_tag', 'General'),
-            'is_active': True,
-            'uploaded_at': _dt(date.today()),
-            'created_at': _dt(date.today()),
-        }
-        MOCK_CONTENT_STORE.insert(0, new_item)
-        return [new_item]
+        course = Course.objects.filter(pk=body.get('subject_id')).first() if str(body.get('subject_id', '')).isdigit() else None
+        if not course:
+            course = Course.objects.filter(code=body.get('subject_id')).first() or Course.objects.first()
+        fac = Faculty.objects.filter(pk=body.get('faculty_id')).first() or course.faculty
+        m = StudyMaterial.objects.create(
+            course=course,
+            faculty=fac,
+            content_type=(body.get('content_type') or 'notes').lower(),
+            title=body.get('title', 'Study Material'),
+            description=body.get('description', ''),
+            file_url=body.get('file_url') or '',
+            video_url=body.get('video_url') or '',
+            topic_tag=body.get('topic_tag') or 'General',
+        )
+        return [serialize_content(m)]
+
+    if request.method == 'DELETE':
+        cid = params.get('content_id', '')
+        if cid.startswith('eq.'):
+            StudyMaterial.objects.filter(pk=cid[3:]).delete()
+        return []
 
     return []
 
@@ -1218,43 +1445,449 @@ def handle_content(request, params, body):
 @handler('doubts')
 def handle_doubts(request, params, body):
     if request.method == 'GET':
-        stud_filter = params.get('student_id')
-        items = MOCK_DOUBTS_STORE
-        if stud_filter:
-            val = stud_filter.replace('eq.', '').strip()
-            items = [d for d in items if str(d.get('student_id')) == val or str(d.get('student_name', '')).lower() == val.lower()]
-        return items
+        qs = Doubt.objects.select_related('student__user', 'course', 'assigned_faculty__user').all()
+        stud_filter = params.get('student_id', '')
+        if stud_filter.startswith('eq.'):
+            val = stud_filter[3:]
+            # student_id from the frontend is the auth user id, so match via the user FK too
+            qs = qs.filter(Q(student__pk=int(val) if val.isdigit() else -1) |
+                           Q(student__user__pk=int(val) if val.isdigit() else -1) |
+                           Q(student__student_id=val))
+        fac_filter = params.get('assigned_faculty_id', '')
+        if fac_filter.startswith('eq.'):
+            qs = qs.filter(assigned_faculty__pk=fac_filter[3:] if fac_filter[3:].isdigit() else -1)
+        return [serialize_doubt(d) for d in qs[:200]]
 
     if request.method == 'POST':
-        new_doubt = {
-            'id': f'dbt-{len(MOCK_DOUBTS_STORE)+1}',
-            'doubt_id': f'dbt-{len(MOCK_DOUBTS_STORE)+1}',
-            'question': body.get('question') or body.get('questionText') or 'New Question',
-            'student_id': str(body.get('student_id') or body.get('student') or '39'),
-            'student_name': 'Meera Patel',
-            'subject_id': str(body.get('subject_id') or body.get('course') or '27'),
-            'subject_name': body.get('subject_name', 'Subject'),
-            'assigned_faculty_name': 'Subject Professor',
-            'status': 'open',
-            'resolution': '',
-            'submitted_at': _dt(date.today()),
-            'resolved_at': None,
-            'sla_deadline': '2026-07-26T12:00:00Z',
-        }
-        MOCK_DOUBTS_STORE.insert(0, new_doubt)
-        return [new_doubt]
+        raw_sid = body.get('student_id') or body.get('student')
+        stu = Student.objects.filter(pk=raw_sid).first() if str(raw_sid).isdigit() else None
+        if not stu and str(raw_sid).isdigit():
+            stu = Student.objects.filter(user__pk=raw_sid).first()
+        if not stu:
+            stu = Student.objects.first()
+        raw_cid = body.get('subject_id') or body.get('course')
+        course = Course.objects.filter(pk=raw_cid).first() if str(raw_cid).isdigit() else None
+        if not course:
+            course = Course.objects.filter(code=raw_cid).first()
+        submitted = timezone.now()
+        d = Doubt.objects.create(
+            student=stu,
+            course=course,
+            question=body.get('question') or body.get('questionText') or '',
+            status='open',
+            submitted_at=submitted,
+            sla_deadline=submitted + timedelta(hours=72),
+        )
+        return [serialize_doubt(d)]
 
     if request.method == 'PATCH':
         did = params.get('doubt_id', '').replace('eq.', '')
-        for d in MOCK_DOUBTS_STORE:
-            if d['id'] == did or d['doubt_id'] == did:
-                if 'status' in body:
-                    d['status'] = body['status']
-                if 'resolution' in body:
-                    d['resolution'] = body['resolution']
-                if 'resolved_at' in body:
-                    d['resolved_at'] = body['resolved_at']
-                return [d]
+        d = Doubt.objects.filter(pk=did).first()
+        if not d:
+            return []
+        if 'status' in body:
+            d.status = body['status']
+        if 'resolution' in body:
+            d.resolution = body['resolution']
+        if 'resolved_at' in body:
+            d.resolved_at = timezone.now() if body['resolved_at'] else None
+        d.save()
+        return [serialize_doubt(d)]
+
+    return []
+
+
+def serialize_feedback(f):
+    return {
+        'id': str(f.pk),
+        'feedback_id': str(f.pk),
+        'faculty_id': str(f.faculty.pk) if f.faculty else None,
+        'faculty_name': _faculty_name(f.faculty),
+        'course_id': str(f.course.pk) if f.course else None,
+        'course_name': f.course.name if f.course else '—',
+        'teaching': f.teaching,
+        'knowledge': f.knowledge,
+        'communication': f.communication,
+        'punctuality': f.punctuality,
+        'overall': f.overall,
+        'comment': f.comment,
+        'is_anonymous': f.is_anonymous,
+        # Only expose the student when they chose not to be anonymous.
+        'student_name': (None if f.is_anonymous or not f.student
+                         else f'{f.student.user.first_name} {f.student.user.last_name}'.strip()),
+        'created_at': _dt(f.created_at),
+    }
+
+
+@handler('faculty_feedback')
+def handle_faculty_feedback(request, params, body):
+    FM = {'id': 'pk', 'feedback_id': 'pk', 'faculty_id': 'faculty__pk', 'course_id': 'course__pk'}
+    if request.method == 'GET':
+        qs = FacultyFeedback.objects.select_related('faculty__user', 'course', 'student__user').all()
+        qs = apply_postgrest_filters(qs, params, FM)
+        qs = apply_order(qs, params.get('order', 'created_at.desc'), FM)
+        return [serialize_feedback(f) for f in qs[:300]]
+
+    if request.method == 'POST':
+        fac = Faculty.objects.filter(pk=body.get('faculty_id')).first()
+        if not fac:
+            return {'error': 'Faculty not found'}
+        stu = Student.objects.filter(pk=body.get('student_id')).first()
+        if not stu and str(body.get('student_id') or '').isdigit():
+            stu = Student.objects.filter(user__pk=body.get('student_id')).first()
+        course = Course.objects.filter(pk=body.get('course_id')).first()
+
+        def _rating(key):
+            try:
+                return max(1, min(5, int(body.get(key, 3))))
+            except (TypeError, ValueError):
+                return 3
+
+        f = FacultyFeedback.objects.create(
+            student=stu, faculty=fac, course=course,
+            teaching=_rating('teaching'), knowledge=_rating('knowledge'),
+            communication=_rating('communication'), punctuality=_rating('punctuality'),
+            comment=body.get('comment', ''),
+            is_anonymous=bool(body.get('is_anonymous', True)),
+        )
+        return [serialize_feedback(f)]
+
+    return []
+
+
+@handler('faculty_feedback/summary')
+def handle_faculty_feedback_summary(request, params, body):
+    """HOD aggregate: average ratings per faculty. Optional ?department=<pk>."""
+    qs = FacultyFeedback.objects.select_related('faculty__user', 'faculty__department')
+    dept = params.get('department') or params.get('department_id')
+    if dept:
+        dept = dept.replace('eq.', '')
+        qs = qs.filter(faculty__department__pk=dept if dept.isdigit() else -1)
+
+    rows = (qs.values('faculty')
+              .annotate(count=Count('id'),
+                        avg_teaching=Avg('teaching'), avg_knowledge=Avg('knowledge'),
+                        avg_communication=Avg('communication'), avg_punctuality=Avg('punctuality')))
+    out = []
+    for r in rows:
+        fac = Faculty.objects.select_related('user', 'department').filter(pk=r['faculty']).first()
+        if not fac:
+            continue
+        dims = [r['avg_teaching'], r['avg_knowledge'], r['avg_communication'], r['avg_punctuality']]
+        overall = round(sum(dims) / 4, 2)
+        out.append({
+            'faculty_id': str(fac.pk),
+            'faculty_name': _faculty_name(fac),
+            'department_name': fac.department.name if fac.department else '—',
+            'responses': r['count'],
+            'teaching': round(r['avg_teaching'], 2),
+            'knowledge': round(r['avg_knowledge'], 2),
+            'communication': round(r['avg_communication'], 2),
+            'punctuality': round(r['avg_punctuality'], 2),
+            'overall': overall,
+        })
+    out.sort(key=lambda x: x['overall'], reverse=True)
+    return out
+
+
+def serialize_exam(e):
+    fac = e.course.faculty
+    return {
+        'id': str(e.pk),
+        'exam_id': str(e.pk),
+        'course_id': str(e.course.pk),
+        'course_code': e.course.code,
+        'course_name': e.course.name,
+        'department_name': e.course.department.name if e.course.department else '—',
+        'faculty_name': _faculty_name(fac) if fac else '—',
+        'exam_type': e.exam_type,
+        'date': _dt(e.date),
+        'start_time': str(e.start_time)[:5],
+        'end_time': str(e.end_time)[:5],
+        'room': e.room,
+        'building': e.building,
+        'max_marks': e.max_marks,
+        'semester': e.semester,
+        'seats_per_room': e.seats_per_room,
+        'created_at': _dt(e.created_at),
+    }
+
+
+@handler('exams')
+def handle_exams(request, params, body):
+    FM = {'id': 'pk', 'exam_id': 'pk', 'course_id': 'course__pk',
+          'exam_type': 'exam_type', 'date': 'date',
+          'department_id': 'course__department__pk', 'semester': 'course__semester'}
+    if request.method == 'GET':
+        qs = Exam.objects.select_related('course__department', 'course__faculty__user').all()
+        # Student view: only exams for the courses they're enrolled in.
+        sid = params.get('student_id', '')
+        if sid.startswith('eq.'):
+            val = sid[3:]
+            stu = None
+            if val.isdigit():
+                stu = Student.objects.filter(pk=val).first() or Student.objects.filter(user__pk=val).first()
+            stu = stu or Student.objects.filter(student_id=val).first()
+            course_ids = (Enrollment.objects.filter(student=stu, is_active=True)
+                          .values_list('course_id', flat=True)) if stu else []
+            qs = qs.filter(course_id__in=list(course_ids))
+        # Faculty view: exams for the courses they teach.
+        fid = params.get('faculty_id', '')
+        if fid.startswith('eq.'):
+            qs = qs.filter(course__faculty__pk=fid[3:] if fid[3:].isdigit() else -1)
+        qs = apply_postgrest_filters(qs, params, FM)
+        qs = apply_order(qs, params.get('order', 'date.asc'), FM)
+        return [serialize_exam(e) for e in qs[:400]]
+
+    if request.method == 'POST':
+        course = Course.objects.filter(pk=body.get('course_id')).first()
+        if not course:
+            return {'error': 'course not found'}
+        e = Exam.objects.create(
+            course=course,
+            exam_type=body.get('exam_type', 'endsem'),
+            date=body.get('date'),
+            start_time=body.get('start_time', '10:00'),
+            end_time=body.get('end_time', '13:00'),
+            room=body.get('room', ''),
+            building=body.get('building', ''),
+            max_marks=int(body.get('max_marks') or 100),
+            seats_per_room=int(body.get('seats_per_room') or 30),
+        )
+        return [serialize_exam(e)]
+
+    if request.method == 'PATCH':
+        eid = params.get('exam_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        e = Exam.objects.select_related('course').filter(pk=eid).first()
+        if not e:
+            return []
+        if 'course_id' in body:
+            c = Course.objects.filter(pk=body['course_id']).first()
+            if c:
+                e.course = c
+        for f in ['exam_type', 'date', 'start_time', 'end_time', 'room', 'building']:
+            if f in body:
+                setattr(e, f, body[f])
+        if 'max_marks' in body:
+            e.max_marks = int(body['max_marks'])
+        if 'seats_per_room' in body:
+            e.seats_per_room = int(body['seats_per_room'])
+        e.save()
+        return [serialize_exam(e)]
+
+    if request.method == 'DELETE':
+        eid = params.get('exam_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        Exam.objects.filter(pk=eid).delete()
+        return []
+
+    return []
+
+
+@handler('exams/seat-plan')
+def handle_exam_seat_plan(request, params, body):
+    """Auto seat allocation for an exam: enrolled students → rooms/seats."""
+    eid = (params.get('exam_id', '') or params.get('exam', '')).replace('eq.', '')
+    exam = Exam.objects.select_related('course').filter(pk=eid).first()
+    if not exam:
+        return {'error': 'exam not found', 'seats': []}
+    students = (Student.objects.filter(enrollments__course=exam.course, enrollments__is_active=True)
+                .select_related('user').distinct().order_by('roll_number', 'student_id'))
+    per_room = max(1, exam.seats_per_room)
+    base_room = exam.room or 'Hall'
+    seats = []
+    for i, s in enumerate(students):
+        room_no = i // per_room + 1
+        seat_no = i % per_room + 1
+        seats.append({
+            'seat': i + 1,
+            'room': base_room if room_no == 1 else f'{base_room}-{room_no}',
+            'seat_in_room': seat_no,
+            'student_id': str(s.pk),
+            'enrollment_no': s.student_id,
+            'roll_number': s.roll_number or '—',
+            'student_name': f'{s.user.first_name} {s.user.last_name}'.strip(),
+        })
+    return {
+        'exam': serialize_exam(exam),
+        'total_students': len(seats),
+        'rooms': (len(seats) + per_room - 1) // per_room if seats else 0,
+        'seats': seats,
+    }
+
+
+def serialize_backlog(b):
+    return {
+        'id': str(b.pk),
+        'backlog_id': str(b.pk),
+        'student_id': str(b.student.pk),
+        'student_name': f'{b.student.user.first_name} {b.student.user.last_name}'.strip(),
+        'course_id': str(b.course.pk),
+        'course_code': b.course.code,
+        'course_name': b.course.name,
+        'semester': b.semester,
+        'status': b.status,
+        'attempts': b.attempts,
+        'reexam_date': _dt(b.reexam_date),
+        'cleared_date': _dt(b.cleared_date),
+        'created_at': _dt(b.created_at),
+    }
+
+
+@handler('backlogs')
+def handle_backlogs(request, params, body):
+    FM = {'id': 'pk', 'backlog_id': 'pk', 'student_id': 'student__pk',
+          'course_id': 'course__pk', 'status': 'status'}
+    if request.method == 'GET':
+        qs = Backlog.objects.select_related('student__user', 'course').all()
+        # student_id from the client is the auth user id — match via the user FK too.
+        sid = params.get('student_id', '')
+        if sid.startswith('eq.'):
+            val = sid[3:]
+            qs = qs.filter(Q(student__pk=int(val) if val.isdigit() else -1) |
+                           Q(student__user__pk=int(val) if val.isdigit() else -1) |
+                           Q(student__student_id=val))
+        else:
+            qs = apply_postgrest_filters(qs, params, FM)
+        qs = apply_order(qs, params.get('order', 'status.asc'), FM)
+        return [serialize_backlog(b) for b in qs[:300]]
+
+    if request.method == 'POST':
+        stu = Student.objects.filter(pk=body.get('student_id')).first()
+        if not stu and str(body.get('student_id') or '').isdigit():
+            stu = Student.objects.filter(user__pk=body.get('student_id')).first()
+        course = Course.objects.filter(pk=body.get('course_id')).first()
+        if not stu or not course:
+            return {'error': 'student or course not found'}
+        b, _ = Backlog.objects.get_or_create(
+            student=stu, course=course,
+            defaults={'semester': int(body.get('semester') or course.semester), 'status': 'active'})
+        return [serialize_backlog(b)]
+
+    if request.method == 'PATCH':
+        bid = params.get('backlog_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        b = Backlog.objects.select_related('student__user', 'course').filter(pk=bid).first()
+        if not b:
+            return []
+        action = body.get('action')
+        if action == 'register' or 'reexam_date' in body:
+            b.status = 'registered'
+            b.reexam_date = body.get('reexam_date') or b.reexam_date
+        if action == 'clear' or body.get('status') == 'cleared':
+            b.status = 'cleared'
+            b.cleared_date = body.get('cleared_date') or timezone.now().date().isoformat()
+            b.attempts = (b.attempts or 1) + (1 if action == 'clear' else 0)
+            # Clearing lifts the underlying failing grade to a bare pass.
+            new_marks = body.get('marks_obtained')
+            if new_marks is not None:
+                g = Grade.objects.filter(student=b.student, course=b.course).first()
+                if g:
+                    g.marks_obtained = float(new_marks)
+                    g.save()
+        elif body.get('status') in ('active', 'registered'):
+            b.status = body['status']
+        b.save()
+        return [serialize_backlog(b)]
+
+    if request.method == 'DELETE':
+        bid = params.get('backlog_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        Backlog.objects.filter(pk=bid).delete()
+        return []
+
+    return []
+
+
+@handler('parents/child')
+def handle_parent_child(request, params, body):
+    """Return the student linked to the logged-in parent (read-only portal)."""
+    from campus.models import Parent
+    uid = params.get('user_id', '').replace('eq.', '')
+    parent = None
+    if uid:
+        parent = Parent.objects.select_related('student__user', 'student__department').filter(
+            Q(user__pk=uid if uid.isdigit() else -1) | Q(user__username=uid)).first()
+    if not parent:
+        return {}
+    child = parent.student
+    data = serialize_student(child)
+    data['semester'] = child.semester
+    data['parent_relation'] = parent.relation
+    data['parent_name'] = parent.user.get_full_name() or parent.user.username
+    return data
+
+
+@handler('placement_companies')
+def handle_placement_companies(request, params, body):
+    from placement.models import PlacementCompany
+    qs = PlacementCompany.objects.all()
+    active = params.get('is_active', '')
+    if active.startswith('eq.'):
+        qs = qs.filter(is_active=active[3:].lower() in ('true', '1'))
+    return [{
+        'id': str(c.pk),
+        'company_id': str(c.pk),
+        'name': c.name,
+        'sector': c.sector,
+        'package_lpa': float(c.package_lpa),
+        'min_cpi': float(c.min_cpi),
+        'max_backlogs': c.max_backlogs,
+        'min_attendance': float(c.min_attendance),
+        'roles': c.roles,
+        'bond_years': c.bond_years,
+        'other_criteria': c.other_criteria,
+        'is_active': c.is_active,
+    } for c in qs]
+
+
+@handler('placement_scores')
+def handle_placement_scores(request, params, body):
+    """ML-predicted placement readiness — computed live from the student's real record."""
+    from placement.service import compute_placement
+    sid = params.get('student_id', '')
+    student = None
+    if sid.startswith('eq.'):
+        val = sid[3:]
+        if val.isdigit():
+            student = Student.objects.filter(pk=val).first() or Student.objects.filter(user__pk=val).first()
+        if not student:
+            student = Student.objects.filter(student_id=val).first()
+    if not student and hasattr(request, 'user') and request.user.is_authenticated:
+        student = getattr(request.user, 'student_profile', None)
+    if not student:
+        return []
+    return [compute_placement(student)]
+
+
+@handler('alumni')
+def handle_alumni(request, params, body):
+    FM = {'id': 'pk', 'alumnus_id': 'pk', 'graduation_year': 'graduation_year',
+          'department_id': 'department__pk', 'available_for_mentorship': 'available_for_mentorship'}
+    if request.method == 'GET':
+        qs = Alumnus.objects.select_related('department').all()
+        qs = apply_postgrest_filters(qs, params, FM)
+        qs = apply_order(qs, params.get('order', 'graduation_year.desc'), FM)
+        return [serialize_alumnus(a) for a in qs[:300]]
+
+    if request.method == 'POST':
+        dept = Department.objects.filter(pk=body.get('department_id')).first()
+        a = Alumnus.objects.create(
+            first_name=body.get('first_name', 'Alumnus'),
+            last_name=body.get('last_name', ''),
+            email=body.get('email', ''),
+            department=dept,
+            graduation_year=int(body.get('graduation_year') or date.today().year),
+            degree=body.get('degree', ''),
+            current_company=body.get('current_company', ''),
+            designation=body.get('designation', ''),
+            location=body.get('location', ''),
+            linkedin_url=body.get('linkedin_url', ''),
+            available_for_mentorship=bool(body.get('available_for_mentorship', False)),
+        )
+        return [serialize_alumnus(a)]
+
+    if request.method == 'DELETE':
+        aid = params.get('id', '') or params.get('alumnus_id', '')
+        if aid.startswith('eq.'):
+            Alumnus.objects.filter(pk=aid[3:]).delete()
         return []
 
     return []

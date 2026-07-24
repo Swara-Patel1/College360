@@ -156,9 +156,14 @@ export default function Placement() {
             <h3 id="scoreTitle" style={{ textAlign: 'center', fontWeight: 700, fontSize: '1.1rem', marginBottom: '8px' }}>
               {scoreData ? getCategoryMessage(category, score) : 'Not enough academic history yet.'}
             </h3>
+            {scoreData?.placement_probability != null && (
+              <span className="badge badge-info" style={{ marginBottom: '8px' }}>
+                🤖 ML model · {Math.round(scoreData.placement_probability * 100)}% placement probability
+              </span>
+            )}
             <p id="scoreComputedAt" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              {scoreData 
-                ? `Last computed: ${new Date(scoreData.computed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`
+              {scoreData
+                ? `Predicted ${new Date(scoreData.computed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} · ${scoreData.model || 'ML model'}`
                 : 'Complete at least one semester to see your score.'}
             </p>
           </div>

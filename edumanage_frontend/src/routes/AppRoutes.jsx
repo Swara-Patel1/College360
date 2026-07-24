@@ -4,6 +4,7 @@ import { ProtectedRoute } from './ProtectedRoute.jsx';
 import { useAuthStore } from '../store/useAuthStore.js';
 import { initSocket, disconnectSocket } from '../api/socket.js';
 import Login from '../pages/Login.jsx';
+import Landing from '../pages/Landing.jsx';
 import Sidebar from '../components/Sidebar.jsx';
 import Header from '../components/Header.jsx';
 import StudentDashboard from '../pages/student/Dashboard.jsx';
@@ -16,6 +17,16 @@ import StudentDoubts from '../pages/student/Doubts.jsx';
 import StudentComplaints from '../pages/student/Complaints.jsx';
 import StudentPlacement from '../pages/student/Placement.jsx';
 import Notices from '../pages/Notices.jsx';
+import Alumni from '../pages/Alumni.jsx';
+import StudentFeedback from '../pages/student/Feedback.jsx';
+import StudentBacklogs from '../pages/student/Backlogs.jsx';
+import ExamSchedule from '../pages/ExamSchedule.jsx';
+import ExamScheduling from '../pages/admin/ExamScheduling.jsx';
+import HODFeedback from '../pages/hod/Feedback.jsx';
+import ParentDashboard from '../pages/parent/Dashboard.jsx';
+import ParentAttendance from '../pages/parent/Attendance.jsx';
+import ParentGrades from '../pages/parent/Grades.jsx';
+import ParentFees from '../pages/parent/Fees.jsx';
 
 
 import FacultyDashboard from '../pages/faculty/Dashboard.jsx';
@@ -35,6 +46,7 @@ import TimetableManagement from '../pages/hod/TimetableManagement.jsx';
 
 import AdminDashboard from '../pages/admin/AdminDashboard.jsx';
 import ManageFaculty from '../pages/ManageFaculty.jsx';
+import ManageUsers from '../pages/admin/ManageUsers.jsx';
 import ManageDepartments from '../pages/ManageDepartments.jsx';
 import ManageHOD from '../pages/ManageHOD.jsx';
 import FeeManagement from '../pages/FeeManagement.jsx';
@@ -74,13 +86,18 @@ export const AppRoutes = () => {
     if (role === 'admin') return '/dashboard/admin';
     if (role === 'faculty' || role === 'hod') return '/dashboard/faculty';
     if (role === 'student') return '/dashboard/student';
+    if (role === 'parent') return '/dashboard/parent';
     return '/login';
   };
 
   return (
     <Routes>
-      {/* Public Route */}
+      {/* Public Routes */}
       <Route path="/login" element={<Login />} />
+      <Route
+        path="/"
+        element={isLoggedIn ? <Navigate to={getRootRedirect()} replace /> : <Landing />}
+      />
 
       {/* Student Protected Routes */}
       <Route element={<ProtectedRoute allowedRoles={['student']} />}>
@@ -94,6 +111,10 @@ export const AppRoutes = () => {
         <Route path="/student/complaints" element={<MainLayout><StudentComplaints /></MainLayout>} />
         <Route path="/student/notices" element={<MainLayout><Notices /></MainLayout>} />
         <Route path="/student/placement" element={<MainLayout><StudentPlacement /></MainLayout>} />
+        <Route path="/student/alumni" element={<MainLayout><Alumni /></MainLayout>} />
+        <Route path="/student/feedback" element={<MainLayout><StudentFeedback /></MainLayout>} />
+        <Route path="/student/backlogs" element={<MainLayout><StudentBacklogs /></MainLayout>} />
+        <Route path="/student/exams" element={<MainLayout><ExamSchedule /></MainLayout>} />
       </Route>
 
       {/* Faculty & HOD Protected Routes */}
@@ -107,6 +128,7 @@ export const AppRoutes = () => {
         <Route path="/faculty/students" element={<MainLayout><ManageStudents /></MainLayout>} />
         <Route path="/faculty/courses" element={<MainLayout><Courses /></MainLayout>} />
         <Route path="/faculty/notices" element={<MainLayout><Notices /></MainLayout>} />
+        <Route path="/faculty/exams" element={<MainLayout><ExamSchedule /></MainLayout>} />
       </Route>
 
       {/* HOD Specific Protected Routes */}
@@ -118,11 +140,22 @@ export const AppRoutes = () => {
         <Route path="/hod/timetable" element={<MainLayout><TimetableManagement /></MainLayout>} />
         <Route path="/hod/seminars" element={<MainLayout><HODSeminars /></MainLayout>} />
         <Route path="/hod/classes" element={<MainLayout><HODClasses /></MainLayout>} />
+        <Route path="/hod/feedback" element={<MainLayout><HODFeedback /></MainLayout>} />
+      </Route>
+
+      {/* Parent Protected Routes (read-only) */}
+      <Route element={<ProtectedRoute allowedRoles={['parent']} />}>
+        <Route path="/dashboard/parent" element={<MainLayout><ParentDashboard /></MainLayout>} />
+        <Route path="/parent/attendance" element={<MainLayout><ParentAttendance /></MainLayout>} />
+        <Route path="/parent/grades" element={<MainLayout><ParentGrades /></MainLayout>} />
+        <Route path="/parent/fees" element={<MainLayout><ParentFees /></MainLayout>} />
+        <Route path="/parent/notices" element={<MainLayout><Notices /></MainLayout>} />
       </Route>
 
       {/* Admin Protected Routes */}
       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
         <Route path="/dashboard/admin" element={<MainLayout><AdminDashboard /></MainLayout>} />
+        <Route path="/admin/users" element={<MainLayout><ManageUsers /></MainLayout>} />
         <Route path="/admin/students" element={<MainLayout><ManageStudents /></MainLayout>} />
         <Route path="/admin/faculty" element={<MainLayout><ManageFaculty /></MainLayout>} />
         <Route path="/admin/hod" element={<MainLayout><ManageHOD /></MainLayout>} />
@@ -133,10 +166,11 @@ export const AppRoutes = () => {
         <Route path="/admin/timetable" element={<MainLayout><TimetableManagement /></MainLayout>} />
         <Route path="/admin/fees" element={<MainLayout><FeeManagement /></MainLayout>} />
         <Route path="/admin/notices" element={<MainLayout><Notices /></MainLayout>} />
+        <Route path="/admin/alumni" element={<MainLayout><Alumni /></MainLayout>} />
+        <Route path="/admin/exams" element={<MainLayout><ExamScheduling /></MainLayout>} />
       </Route>
 
-      {/* Fallback Redirects */}
-      <Route path="/" element={<Navigate to={getRootRedirect()} replace />} />
+      {/* Fallback Redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

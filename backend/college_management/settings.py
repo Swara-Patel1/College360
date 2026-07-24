@@ -35,6 +35,8 @@ INSTALLED_APPS = [
     'notices',
     'complaints',
     'chatbot',
+    'campus',
+    'placement',
 ]
 
 MIDDLEWARE = [

@@ -25,15 +25,19 @@ export default function Sidebar() {
       { type: 'section', label: 'Academics' },
       { type: 'link', label: 'My Attendance', icon: '✅', to: '/student/attendance' },
       { type: 'link', label: 'My Grades', icon: '📝', to: '/student/grades' },
+      { type: 'link', label: 'Backlogs / KT', icon: '📉', to: '/student/backlogs' },
       { type: 'link', label: 'Timetable', icon: '📅', to: '/student/timetable' },
+      { type: 'link', label: 'Exam Schedule', icon: '🗓️', to: '/student/exams' },
       { type: 'link', label: 'Courses', icon: '📚', to: '/student/courses' },
       { type: 'link', label: 'Study Materials', icon: '📖', to: '/student/content' },
       { type: 'link', label: 'My Doubts Q&A', icon: '❓', to: '/student/doubts' },
+      { type: 'link', label: 'Faculty Feedback', icon: '⭐', to: '/student/feedback' },
       { type: 'section', label: 'Support & Info' },
       { type: 'link', label: 'My Complaints', icon: '📣', to: '/student/complaints' },
       { type: 'link', label: 'Notices', icon: '📢', to: '/student/notices' },
       { type: 'section', label: 'Career' },
-      { type: 'link', label: 'Placement Score', icon: '🎯', to: '/student/placement' }
+      { type: 'link', label: 'Placement Score', icon: '🎯', to: '/student/placement' },
+      { type: 'link', label: 'Alumni Network', icon: '🎓', to: '/student/alumni' }
     ];
   } else if (role === 'faculty' || role === 'hod') {
     brandSubtitle = role === 'hod' ? 'HOD Portal' : 'Faculty Portal';
@@ -45,6 +49,7 @@ export default function Sidebar() {
       { type: 'link', label: 'Mark Attendance', icon: '✅', to: '/faculty/attendance' },
       { type: 'link', label: 'Enter Grades', icon: '📝', to: '/faculty/grades' },
       { type: 'link', label: 'My Timetable', icon: '📅', to: '/faculty/timetable' },
+      { type: 'link', label: 'Exam Schedule', icon: '🗓️', to: '/faculty/exams' },
       { type: 'section', label: 'Leave & Schedule' },
       { type: 'link', label: 'Apply Leave', icon: '🏖️', to: '/faculty/leaves' },
       { type: 'link', label: 'Lecture Interchange', icon: '🔄', to: '/faculty/interchange' }
@@ -59,7 +64,8 @@ export default function Sidebar() {
         { type: 'link', label: 'Pending Fees', icon: '💰', to: '/hod/fees' },
         { type: 'link', label: 'Manage Timetable', icon: '🗓️', to: '/hod/timetable' },
         { type: 'link', label: 'Seminars', icon: '🎙️', to: '/hod/seminars' },
-        { type: 'link', label: 'Class Rankings', icon: '📊', to: '/hod/classes' }
+        { type: 'link', label: 'Class Rankings', icon: '📊', to: '/hod/classes' },
+        { type: 'link', label: 'Faculty Feedback', icon: '⭐', to: '/hod/feedback' }
       );
     }
 
@@ -69,6 +75,19 @@ export default function Sidebar() {
       { type: 'link', label: 'Courses', icon: '📚', to: '/faculty/courses' },
       { type: 'link', label: 'Notices', icon: '📢', to: '/faculty/notices' }
     );
+  } else if (role === 'parent') {
+    brandSubtitle = 'Parent Portal';
+    brandHref = '/dashboard/parent';
+    navItems = [
+      { type: 'section', label: 'Main' },
+      { type: 'link', label: 'Overview', icon: '📊', to: '/dashboard/parent' },
+      { type: 'section', label: 'My Child' },
+      { type: 'link', label: 'Attendance', icon: '✅', to: '/parent/attendance' },
+      { type: 'link', label: 'Grades', icon: '📝', to: '/parent/grades' },
+      { type: 'link', label: 'Fee Status', icon: '💰', to: '/parent/fees' },
+      { type: 'section', label: 'Info' },
+      { type: 'link', label: 'Notices', icon: '📢', to: '/parent/notices' },
+    ];
   } else if (role === 'admin') {
     brandSubtitle = 'Admin Panel';
     brandHref = '/dashboard/admin';
@@ -76,15 +95,18 @@ export default function Sidebar() {
       { type: 'section', label: 'Main' },
       { type: 'link', label: 'Dashboard', icon: '📊', to: '/dashboard/admin' },
       { type: 'section', label: 'Management' },
+      { type: 'link', label: 'Users', icon: '👥', to: '/admin/users' },
       { type: 'link', label: 'Students', icon: '🎓', to: '/admin/students' },
       { type: 'link', label: 'Faculty', icon: '👨‍🏫', to: '/admin/faculty' },
       { type: 'link', label: 'HODs', icon: '🏷️', to: '/admin/hod' },
       { type: 'link', label: 'Courses', icon: '📚', to: '/admin/courses' },
       { type: 'link', label: 'Departments', icon: '🏛️', to: '/admin/departments' },
+      { type: 'link', label: 'Alumni', icon: '🎓', to: '/admin/alumni' },
       { type: 'section', label: 'Academic' },
       { type: 'link', label: 'Attendance', icon: '✅', to: '/admin/attendance' },
       { type: 'link', label: 'Grades', icon: '📝', to: '/admin/grades' },
       { type: 'link', label: 'Timetable', icon: '📅', to: '/admin/timetable' },
+      { type: 'link', label: 'Exam Scheduling', icon: '🗓️', to: '/admin/exams' },
       { type: 'section', label: 'Finance & Comms' },
       { type: 'link', label: 'Fee Management', icon: '💰', to: '/admin/fees' },
       { type: 'link', label: 'Notices', icon: '📢', to: '/admin/notices' }

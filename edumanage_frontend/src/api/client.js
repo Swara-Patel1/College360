@@ -106,43 +106,9 @@ export const API = {
         return loginResponse;
       }
 
-      // 2. ADMIN DASHBOARD STATS
+      // 2. ADMIN DASHBOARD STATS — aggregated server-side (rest_compat.handle_admin_stats).
       if (path === 'auth/dashboard/stats' || path === 'admin/stats') {
-        const safeReq = async (q) => {
-          try {
-            const r = await SupaFetch.request(q);
-            return Array.isArray(r) ? r : [];
-          } catch (e) {
-            console.warn('Stats query failed:', q, e);
-            return [];
-          }
-        };
-
-        const students   = await safeReq('students?select=student_id');
-        const faculty    = await safeReq('faculty?select=faculty_id');
-        const hods       = await safeReq('hod?select=hod_id');
-        const subjects   = await safeReq('subjects?select=subject_id');
-        const feePayments = await safeReq('fee_payments?select=student_id,amount_paid,status');
-        const users      = await safeReq('users?select=id,is_active');
-
-        const paidFees    = feePayments.filter(f => f.status === 'paid').reduce((a, c) => a + parseFloat(c.amount_paid || c.amount || 0), 0);
-        const pendingFees = feePayments.filter(f => f.status !== 'paid').reduce((a, c) => a + parseFloat(c.amount || c.amount_paid || 0), 0);
-        const paidIds     = new Set(feePayments.filter(f => f.status === 'paid').map(f => f.student_id));
-        const feesDue     = students.filter(s => !paidIds.has(s.student_id)).length;
-        const activeU     = users.filter(u => u.is_active !== false).length;
-        const inactiveU   = users.filter(u => u.is_active === false).length;
-
-        return {
-          total_students:        students.length,
-          active_users:          activeU,
-          inactive_users:        inactiveU,
-          total_faculty:         faculty.length,
-          total_hod:             hods.length,
-          total_courses:         subjects.length,
-          total_fees_collected:  paidFees,
-          total_fees_pending:    pendingFees,
-          fees_pending_students: feesDue,
-        };
+        return await SupaFetch.request('admin/stats');
       }
 
       // 3. STUDENT PROFILE
@@ -221,114 +187,21 @@ export const API = {
           }));
         }
         if (method === 'POST') {
-          const username = body.username || (body.email ? body.email.split('@')[0] : `std_${Math.floor(100000 + Math.random() * 900000)}`);
-          const passwordHash = body.password || 'student123';
-          // is_active is false for both inactive and graduated students
-          const is_active = body.status !== 'inactive' && body.status !== 'graduated';
-          
-          // Production users table: email, password_hash, roles, is_active (NO username column)
-          const newUser = await SupaFetch.request('users', 'POST', {
-            email: body.email || `${username}@student.college.edu`,
-            password_hash: passwordHash,
-            roles: 'student',
-            is_active: is_active
-          });
-          const createdUser = Array.isArray(newUser) ? newUser[0] : newUser;
-          
-          const enrollmentNo = body.student_id || body.roll_number || `ENR${Math.floor(100000 + Math.random() * 900000)}`;
-          // Use provided semester UUID directly; only fall back if truly absent (not empty string)
-          const currentSemesterId = (body.current_semester_id && body.current_semester_id.trim())
-            ? body.current_semester_id
-            : (body.semester ? `e0000000-0000-0000-0000-00000000000${body.semester}` : null);
-          
-          const studentPayload = {
-            user_id: createdUser.id,
-            enrollment_no: enrollmentNo,
-            first_name: body.first_name || username,
-            last_name: body.last_name || '',
-            date_of_birth: body.date_of_birth || '2005-01-01',
-            parent_email: body.parent_email || 'parent@college.edu',
-            parent_phone: body.parent_phone || '',
-            department_id: body.department_id || 'd0000000-0000-0000-0000-000000000001',
-            current_rollno: body.roll_number || body.current_rollno || '',
-            status: body.status || 'active',
-          };
-          // Only include current_semester_id if we have a valid UUID
-          if (currentSemesterId) studentPayload.current_semester_id = currentSemesterId;
-          const newStudent = await SupaFetch.request('students', 'POST', studentPayload);
-          const createdStudent = Array.isArray(newStudent) ? newStudent[0] : newStudent;
-          
-          if (createdStudent && createdStudent.student_id) {
-            const subjects = await SupaFetch.request(`subjects?department_id=eq.${createdStudent.department_id}&semester_id=eq.${createdStudent.current_semester_id}`);
-            if (subjects && subjects.length > 0) {
-              const enrollmentPayload = subjects.map(sub => ({
-                student_id: createdStudent.student_id,
-                subject_id: sub.subject_id,
-                semester_id: createdStudent.current_semester_id
-              }));
-              await SupaFetch.request('enrollments', 'POST', enrollmentPayload).catch(() => {});
-            }
-          }
-          return createdStudent;
+          // Django creates the user + student record and auto-enrols in one call.
+          const created = await SupaFetch.request('students', 'POST', body);
+          return Array.isArray(created) ? created[0] : created;
         }
       }
 
-      // 6. STUDENT EDIT / DELETE
+      // 6. STUDENT EDIT / DELETE — orchestrated server-side.
       if (path.startsWith('students/')) {
         const studentUuid = path.split('/')[1];
         if (method === 'PATCH' || method === 'PUT') {
-          const updateBody = { ...body };
-          if (updateBody.semester !== undefined) {
-            updateBody.current_semester_id = `e0000000-0000-0000-0000-00000000000${updateBody.semester}`;
-            delete updateBody.semester;
-          }
-          if (updateBody.year_of_study !== undefined) delete updateBody.year_of_study;
-          
-          let is_active = undefined;
-          if (updateBody.status !== undefined) {
-            is_active = updateBody.status === 'active';
-            delete updateBody.status;
-          }
-          
-          if (updateBody.roll_number !== undefined) {
-            updateBody.current_rollno = updateBody.roll_number;
-            delete updateBody.roll_number;
-          }
-          if (updateBody.email !== undefined || updateBody.phone !== undefined || is_active !== undefined) {
-            const stRows = await SupaFetch.request(`students?select=user_id&student_id=eq.${studentUuid}`);
-            if (stRows && stRows.length) {
-              const uId = stRows[0].user_id;
-              const userUpdate = {};
-              if (updateBody.email !== undefined) userUpdate.email = updateBody.email;
-              if (is_active !== undefined) userUpdate.is_active = is_active;
-              if (Object.keys(userUpdate).length > 0) {
-                await SupaFetch.request(`users?id=eq.${uId}`, 'PATCH', userUpdate);
-              }
-            }
-            delete updateBody.email;
-            delete updateBody.phone;
-          }
-          const row = await SupaFetch.request(`students?student_id=eq.${studentUuid}`, 'PATCH', updateBody);
-          const updatedStudent = Array.isArray(row) ? row[0] : row;
-
-          if (updatedStudent && updatedStudent.student_id) {
-            const subjects = await SupaFetch.request(`subjects?department_id=eq.${updatedStudent.department_id}&semester_id=eq.${updatedStudent.current_semester_id}`);
-            if (subjects && subjects.length > 0) {
-              const enrollmentPayload = subjects.map(sub => ({
-                student_id: updatedStudent.student_id,
-                subject_id: sub.subject_id,
-                semester_id: updatedStudent.current_semester_id
-              }));
-              await SupaFetch.request('enrollments', 'POST', enrollmentPayload).catch(() => {});
-            }
-          }
-          return updatedStudent;
+          const row = await SupaFetch.request(`students?id=eq.${studentUuid}`, 'PATCH', body);
+          return Array.isArray(row) ? row[0] : row;
         }
         if (method === 'DELETE') {
-          const student = await SupaFetch.request(`students?student_id=eq.${studentUuid}`);
-          if (student && student.length > 0) {
-            await SupaFetch.request(`users?id=eq.${student[0].user_id}`, 'DELETE');
-          }
+          await SupaFetch.request(`students?id=eq.${studentUuid}`, 'DELETE');
           return null;
         }
       }
@@ -351,60 +224,22 @@ export const API = {
           }));
         }
         if (method === 'POST') {
-          const username = body.username || (body.email ? body.email.split('@')[0] : `fac_${Math.floor(100000 + Math.random() * 900000)}`);
-          const passwordHash = body.password || 'faculty123';
-          const is_active = body.status !== 'inactive';
-          // Production users table: email, password_hash, roles, is_active (NO username column)
-          const newUser = await SupaFetch.request('users', 'POST', {
-            email: body.email || `${username}@college.edu`,
-            password_hash: passwordHash,
-            roles: body.role === 'hod' ? 'hod' : 'faculty',
-            is_active
-          });
-          const createdUser = Array.isArray(newUser) ? newUser[0] : newUser;
-          const empId = body.employee_id || `F${Math.floor(100 + Math.random() * 900)}`;
-          const newFaculty = await SupaFetch.request('faculty', 'POST', {
-            user_id: createdUser.id,
-            employee_id: empId,
-            first_name: body.first_name || username,
-            last_name: body.last_name || '',
-            department_id: body.department_id || 'd0000000-0000-0000-0000-000000000001',
-          });
-          return Array.isArray(newFaculty) ? newFaculty[0] : newFaculty;
+          // Django creates the user + faculty record in one call.
+          const created = await SupaFetch.request('faculty', 'POST', body);
+          return Array.isArray(created) ? created[0] : created;
         }
       }
 
-      // 7a. FACULTY BY ID (PATCH / DELETE)
+      // 7a. FACULTY BY ID (PATCH / DELETE) — orchestrated server-side.
       const facultyIdMatch = path.match(/^faculty\/([^/]+)$/);
       if (facultyIdMatch) {
         const facultyUuid = facultyIdMatch[1];
         if (method === 'PATCH' || method === 'PUT') {
-          const updateBody = { ...body };
-          const facultyUpdate = {};
-          if (updateBody.first_name !== undefined) facultyUpdate.first_name = updateBody.first_name;
-          if (updateBody.last_name  !== undefined) facultyUpdate.last_name  = updateBody.last_name;
-          if (updateBody.department_id !== undefined) facultyUpdate.department_id = updateBody.department_id;
-          if (updateBody.employee_id !== undefined) facultyUpdate.employee_id = updateBody.employee_id;
-          if (Object.keys(facultyUpdate).length) {
-            await SupaFetch.request(`faculty?faculty_id=eq.${facultyUuid}`, 'PATCH', facultyUpdate);
-          }
-          if (updateBody.status !== undefined || updateBody.email !== undefined) {
-            const fRow = await SupaFetch.request(`faculty?select=user_id&faculty_id=eq.${facultyUuid}`);
-            if (fRow && fRow.length > 0) {
-              const userUpdate = {};
-              if (updateBody.status !== undefined) userUpdate.is_active = updateBody.status !== 'inactive';
-              if (updateBody.email   !== undefined) userUpdate.email = updateBody.email;
-              await SupaFetch.request(`users?id=eq.${fRow[0].user_id}`, 'PATCH', userUpdate);
-            }
-          }
+          await SupaFetch.request(`faculty?id=eq.${facultyUuid}`, 'PATCH', body);
           return { success: true };
         }
         if (method === 'DELETE') {
-          const fRow = await SupaFetch.request(`faculty?select=user_id&faculty_id=eq.${facultyUuid}`);
-          await SupaFetch.request(`faculty?faculty_id=eq.${facultyUuid}`, 'DELETE');
-          if (fRow && fRow.length > 0) {
-            await SupaFetch.request(`users?id=eq.${fRow[0].user_id}`, 'DELETE').catch(() => {});
-          }
+          await SupaFetch.request(`faculty?id=eq.${facultyUuid}`, 'DELETE');
           return null;
         }
       }
@@ -476,54 +311,24 @@ export const API = {
           });
         }
         if (method === 'POST') {
-          // body: { faculty_id, department_id } — promote an existing faculty member to HOD
+          // Promote a faculty member to HOD — Django handles demoting any prior HOD.
           if (!body.faculty_id || !body.department_id) {
             throw { error: 'validation_error', message: 'Faculty and department are required.' };
           }
-          const facRow = await SupaFetch.request(`faculty?select=user_id&faculty_id=eq.${body.faculty_id}`);
-          if (!facRow || !facRow.length) throw { error: 'not_found', message: 'Faculty not found.' };
-          const userId = facRow[0].user_id;
-
-          // Clear any existing HOD on this department (department_id is UNIQUE)
-          const existingByDept = await SupaFetch.request(`hod?select=hod_id,user_id&department_id=eq.${body.department_id}`);
-          for (const ex of (existingByDept || [])) {
-            await SupaFetch.request(`departments?department_id=eq.${body.department_id}`, 'PATCH', { hod_id: null }).catch(() => {});
-            await SupaFetch.request(`hod?hod_id=eq.${ex.hod_id}`, 'DELETE').catch(() => {});
-            await SupaFetch.request(`users?id=eq.${ex.user_id}`, 'PATCH', { roles: 'faculty' }).catch(() => {});
-          }
-          // Clear any existing HOD row for this user (user_id is UNIQUE)
-          const existingByUser = await SupaFetch.request(`hod?select=hod_id,department_id&user_id=eq.${userId}`);
-          for (const ex of (existingByUser || [])) {
-            await SupaFetch.request(`departments?department_id=eq.${ex.department_id}`, 'PATCH', { hod_id: null }).catch(() => {});
-            await SupaFetch.request(`hod?hod_id=eq.${ex.hod_id}`, 'DELETE').catch(() => {});
-          }
-
           const created = await SupaFetch.request('hod', 'POST', {
-            user_id: userId,
+            faculty_id: body.faculty_id,
             department_id: body.department_id,
           });
-          const hodRow = Array.isArray(created) ? created[0] : created;
-          await SupaFetch.request(`users?id=eq.${userId}`, 'PATCH', { roles: 'hod' }).catch(() => {});
-          if (hodRow?.hod_id) {
-            await SupaFetch.request(`departments?department_id=eq.${body.department_id}`, 'PATCH', { hod_id: hodRow.hod_id }).catch(() => {});
-          }
-          return hodRow;
+          return Array.isArray(created) ? created[0] : created;
         }
       }
 
-      // 7d-ii. HOD BY ID (DELETE — demote back to faculty)
+      // 7d-ii. HOD BY ID (DELETE — demote back to faculty), server-side.
       const hodIdMatch = path.match(/^hod\/([^/]+)$/);
       if (hodIdMatch && hodIdMatch[1] !== 'check' && hodIdMatch[1] !== 'leaves' && hodIdMatch[1] !== 'leave') {
         const hodUuid = hodIdMatch[1];
         if (method === 'DELETE') {
-          const hRow = await SupaFetch.request(`hod?select=user_id,department_id&hod_id=eq.${hodUuid}`);
-          if (hRow && hRow.length) {
-            await SupaFetch.request(`departments?department_id=eq.${hRow[0].department_id}`, 'PATCH', { hod_id: null }).catch(() => {});
-          }
           await SupaFetch.request(`hod?hod_id=eq.${hodUuid}`, 'DELETE');
-          if (hRow && hRow.length) {
-            await SupaFetch.request(`users?id=eq.${hRow[0].user_id}`, 'PATCH', { roles: 'faculty' }).catch(() => {});
-          }
           return null;
         }
       }
@@ -603,96 +408,49 @@ export const API = {
           if (studentUuid) query += `&student_id=eq.${studentUuid}`;
           if (courseUuid) query += `&subject_id=eq.${courseUuid}`;
           const rows = await SupaFetch.request(query);
-          return rows.map(r => {
-            const internal = parseFloat(r.internal_marks || 0);
-            const external = parseFloat(r.external_marks || 0);
-            const obtained = parseFloat(r.total_marks || (internal + external) || 0);
-            const maxMarks = obtained > 100 ? 150 : 100;
-            const percentage = Math.round((obtained / maxMarks) * 100);
-            const studentName = r.student ? `${r.student.first_name || ''} ${r.student.last_name || ''}`.trim() : 'Student';
-            
-            // Use DB grade as-is (Indian system: O, AA, AB, BB, BC, CC, CD, DD, F)
-            // Only recompute if the DB grade field is empty
-            let displayGrade = r.grade || '';
-            if (!displayGrade) {
-              if (percentage >= 90) displayGrade = 'O';
-              else if (percentage >= 80) displayGrade = 'AA';
-              else if (percentage >= 70) displayGrade = 'AB';
-              else if (percentage >= 60) displayGrade = 'BB';
-              else if (percentage >= 55) displayGrade = 'BC';
-              else if (percentage >= 50) displayGrade = 'CC';
-              else if (percentage >= 45) displayGrade = 'CD';
-              else if (percentage >= 40) displayGrade = 'DD';
-              else displayGrade = 'F';
-            }
-
-            return {
-              ...r,
-              id: r.mark_id,
-              marks_obtained: obtained,
-              total_marks: maxMarks,
-              percentage: percentage,
-              grade: displayGrade,
-              course_name: r.course?.name || '—',
-              course_code: r.course?.code || '—',
-              student_name: studentName,
-              exam_type: 'Semester End Exam',
-              exam_date: r.entered_at
-            };
-          });
+          // Grade, GPA and percentage are computed by Django (grades.models.Grade);
+          // the client just presents them.
+          return rows.map(r => ({
+            ...r,
+            id: r.mark_id,
+            marks_obtained: parseFloat(r.marks_obtained ?? r.total_marks ?? 0),
+            total_marks: parseFloat(r.total_marks ?? 100),
+            percentage: r.percentage,
+            grade: r.grade,
+            gpa: r.gpa,
+            course_name: r.course?.name || '—',
+            course_code: r.course?.code || '—',
+            student_name: r.student ? `${r.student.first_name || ''} ${r.student.last_name || ''}`.trim() : 'Student',
+            exam_type: r.exam_type || 'Semester End Exam',
+            exam_date: r.exam_date || r.entered_at
+          }));
         }
         if (method === 'POST') {
-          const percentage = Math.round((body.marks_obtained / body.total_marks) * 100);
-          let computedGrade = 'F';
-          let gpa = 0.0;
-          if (percentage >= 90) { computedGrade = 'O'; gpa = 10.0; }
-          else if (percentage >= 85) { computedGrade = 'A+'; gpa = 9.0; }
-          else if (percentage >= 75) { computedGrade = 'A'; gpa = 8.0; }
-          else if (percentage >= 65) { computedGrade = 'B+'; gpa = 7.0; }
-          else if (percentage >= 55) { computedGrade = 'B'; gpa = 6.0; }
-          else if (percentage >= 45) { computedGrade = 'C'; gpa = 5.0; }
-          else if (percentage >= 35) { computedGrade = 'D'; gpa = 4.0; }
-          
-          const activeSem = 'e0000000-0000-0000-0000-000000000005';
-          
+          // Grade + GPA are derived by Django on save — send raw marks only.
           const row = await SupaFetch.request('marks', 'POST', {
             student_id: body.student,
             subject_id: body.course,
-            semester_id: activeSem,
-            internal_marks: body.marks_obtained * 0.4,
-            external_marks: body.marks_obtained * 0.6,
-            total_marks: body.marks_obtained,
-            grade: computedGrade,
-            gpa: gpa,
+            marks_obtained: body.marks_obtained,
+            total_marks: body.total_marks || 100,
             entered_by: loggedInUser.id
           });
           return row;
         }
       }
 
+      // BULK CSV IMPORT — parsed & matched server-side (rest_compat.handle_grades_bulk_import)
+      if (path === 'grades/bulk-import' && method === 'POST') {
+        return await SupaFetch.request('grades/bulk-import', 'POST', body);
+      }
+
       // marks EDIT / DELETE
       if (path.startsWith('grades/')) {
         const gradeId = path.split('/')[1];
         if (method === 'PATCH' || method === 'PUT') {
-          const percentage = Math.round((body.marks_obtained / body.total_marks) * 100);
-          let computedGrade = 'F';
-          let gpa = 0.0;
-          if (percentage >= 90) { computedGrade = 'O'; gpa = 10.0; }
-          else if (percentage >= 85) { computedGrade = 'A+'; gpa = 9.0; }
-          else if (percentage >= 75) { computedGrade = 'A'; gpa = 8.0; }
-          else if (percentage >= 65) { computedGrade = 'B+'; gpa = 7.0; }
-          else if (percentage >= 55) { computedGrade = 'B'; gpa = 6.0; }
-          else if (percentage >= 45) { computedGrade = 'C'; gpa = 5.0; }
-          else if (percentage >= 35) { computedGrade = 'D'; gpa = 4.0; }
-
+          // Django recomputes grade + GPA from the raw marks.
           const row = await SupaFetch.request(`marks?mark_id=eq.${gradeId}`, 'PATCH', {
-            student_id: body.student,
-            subject_id: body.course,
-            internal_marks: body.marks_obtained * 0.4,
-            external_marks: body.marks_obtained * 0.6,
-            total_marks: body.marks_obtained,
-            grade: computedGrade,
-            gpa: gpa
+            marks_obtained: body.marks_obtained,
+            total_marks: body.total_marks || 100
           });
           return row;
         }
@@ -753,28 +511,13 @@ export const API = {
         }
       }
 
-      // 12. ATTENDANCE STATS
+      // 12. ATTENDANCE STATS — computed server-side (rest_compat.handle_attendance_stats).
       if (path === 'attendance/stats') {
-        const studentUuid = params.get('student');
-        const subjectUuid = params.get('course');
-        const date = params.get('date');
-        let query = 'attendance_records?select=*';
-        if (studentUuid) query += `&student_id=eq.${studentUuid}`;
-        if (subjectUuid) query += `&subject_id=eq.${subjectUuid}`;
-        if (date) query += `&date=eq.${date}`;
-        const records = await SupaFetch.request(query);
-        
-        const present = records.filter(r => r.status === 'present' || r.status === 'P' || r.status === 'p').length;
-        const absent  = records.filter(r => r.status === 'absent' || r.status === 'A' || r.status === 'a').length;
-        const late    = records.filter(r => r.status === 'late' || r.status === 'L' || r.status === 'l').length;
-        const excused = records.filter(r => r.status === 'excused' || r.status === 'E' || r.status === 'e').length;
-        const total   = records.length;
-        const totalEligible = total || 1;
-        
-        const attended = present + late;
-        const percentage = ((attended / totalEligible) * 100).toFixed(1);
-
-        return { total, present, absent, late, excused, percentage };
+        const qp = new URLSearchParams();
+        if (params.get('student')) qp.set('student', params.get('student'));
+        if (params.get('course')) qp.set('course', params.get('course'));
+        const suffix = qp.toString() ? `?${qp.toString()}` : '';
+        return await SupaFetch.request(`attendance/stats${suffix}`);
       }
       
       if (path === 'attendance') {
@@ -825,49 +568,24 @@ export const API = {
       }
 
       if (path === 'attendance/bulk-mark' && method === 'POST') {
-        let facultyId = null;
-        if (loggedInUser?.id) {
-          const facultyRow = await SupaFetch.request(`faculty?select=faculty_id&user_id=eq.${loggedInUser.id}`);
-          if (facultyRow && facultyRow.length > 0) facultyId = facultyRow[0].faculty_id;
-        }
-
-        const uiToDbStatus = { 'present': 'present', 'absent': 'absent', 'late': 'late' };
-        const payload = body.records.map(r => ({
-          student_id: r.student,
-          subject_id: r.course,
-          date: r.date,
-          status: uiToDbStatus[r.status] || r.status || 'present',
-          marked_by: facultyId,
-          ip_address: '127.0.0.1'
-        }));
-        return await SupaFetch.request('attendance_records', 'POST', payload);
+        // Faculty resolution + status mapping happen server-side.
+        return await SupaFetch.request('attendance/bulk-mark', 'POST', {
+          marked_by: loggedInUser?.id,
+          records: body.records,
+        });
       }
 
-      // 13. FEES — ADMIN (all payments across students)
+      // 13. FEES — ADMIN (aggregated server-side)
       if (path === 'admin/fees') {
-        const payments = await SupaFetch.request('fee_payments?select=*,student:students(*,department:departments(*)),fee_structures(*)');
-        return (payments || []).map(p => ({
-          ...p,
-          id: p.payment_id,
-          student_name: p.student ? `${p.student.first_name || ''} ${p.student.last_name || ''}`.trim() || '—' : '—',
-          enrollment_no: p.student?.enrollment_no || '—',
-          department_name: p.student?.department?.name || '—',
-          component_name: p.fee_structures?.component_name || 'Tuition Fee',
-          amount: parseFloat(p.fee_structures?.amount ?? p.amount_paid ?? 0),
-          amount_paid: parseFloat(p.amount_paid || 0),
-          due_date: p.fee_structures?.due_date || '',
-          status: p.status || 'pending',
-          transaction_ref: p.transaction_ref || '',
-        }));
+        return await SupaFetch.request('admin/fees');
       }
 
-      // 13a. FEES — mark a payment paid (admin action)
+      // 13a. FEES — mark a payment paid (server stamps date + txn ref)
       if (path.startsWith('fees/') && path.endsWith('/mark-paid') && method === 'POST') {
         const paymentId = path.split('/')[1];
-        const row = await SupaFetch.request(`fee_payments?payment_id=eq.${paymentId}`, 'PATCH', {
-          status: 'paid',
-          payment_date: new Date().toISOString().split('T')[0],
-          transaction_ref: body?.transaction_ref || ('TXN' + Date.now()),
+        const row = await SupaFetch.request('fees/mark-paid', 'POST', {
+          payment_id: paymentId,
+          transaction_ref: body?.transaction_ref,
         });
         return Array.isArray(row) ? row[0] : row;
       }
@@ -1068,14 +786,37 @@ export const API = {
 
       // 19. STUDY MATERIALS / CONTENT
       if (path === 'content' || path === 'study_materials') {
-        const rows = await SupaFetch.request('content?select=*,subject:subjects(*),faculty:faculty(*,user:users(*))&is_active=eq.true&order=uploaded_at.desc');
+        // CREATE (faculty upload) — Django persists it in campus.StudyMaterial.
+        if (method === 'POST') {
+          const created = await SupaFetch.request('content', 'POST', {
+            subject_id:   body.subject_id || body.course,
+            faculty_id:   body.faculty_id,
+            content_type: body.content_type || 'notes',
+            title:        body.title,
+            description:  body.description || '',
+            file_url:     body.file_url || '',
+            video_url:    body.video_url || '',
+            topic_tag:    body.topic_tag || 'General',
+          });
+          const row = Array.isArray(created) ? created[0] : created;
+          return row ? { ...row, id: row.content_id } : row;
+        }
+        // DELETE — forward the ?content_id=eq.X filter straight through.
+        if (method === 'DELETE') {
+          const suffix = queryStr ? `?${queryStr}` : '';
+          await SupaFetch.request(`content${suffix}`, 'DELETE');
+          return null;
+        }
+        // GET (list) — honor optional subject_id / faculty_id filters from the query string.
+        const suffix = queryStr ? `?${queryStr}` : '?is_active=eq.true&order=uploaded_at.desc';
+        const rows = await SupaFetch.request(`content${suffix}`);
         return (rows || []).map(c => ({
           ...c,
           id: c.content_id,
-          content_type: c.content_type?.toLowerCase() || 'note',
-          subject_code: c.subject?.code || '—',
-          subject_name: c.subject?.name || '—',
-          faculty_name: c.faculty ? `${c.faculty.first_name || ''} ${c.faculty.last_name || ''}`.trim() : '—'
+          content_type: (c.content_type || 'notes').toLowerCase(),
+          subject_code: c.subject_code || '—',
+          subject_name: c.subject_name || '—',
+          faculty_name: c.faculty_name || '—'
         }));
       }
 
@@ -1312,6 +1053,48 @@ export const SupaAPI = {
     all:       ()       => API.get('doubts?order=submitted_at.desc'),
     add:       (data)   => API.post('doubts', data),
     resolve:   (id, res)=> API.patch(`doubts?doubt_id=eq.${id}`, { status: 'resolved', resolution: res, resolved_at: new Date().toISOString() }),
+  },
+
+  parent: {
+    child: (userId) => API.get(`parents/child?user_id=eq.${userId}`),
+  },
+
+  users: {
+    all:           ()          => API.get('users?order=id.asc&limit=500'),
+    setActive:     (id, active) => API.patch(`users?id=eq.${id}`, { is_active: active }),
+    setRole:       (id, role)  => API.patch(`users?id=eq.${id}`, { roles: role }),
+    resetPassword: (id, pw)    => API.patch(`users?id=eq.${id}`, { new_password: pw }),
+    remove:        (id)        => API.delete(`users?id=eq.${id}`),
+  },
+
+  exams: {
+    all:       ()        => API.get('exams?order=date.asc'),
+    byStudent: (studId)  => API.get(`exams?student_id=eq.${studId}&order=date.asc`),
+    byFaculty: (facId)   => API.get(`exams?faculty_id=eq.${facId}&order=date.asc`),
+    create:    (data)    => API.post('exams', data),
+    update:    (id, d)   => API.patch(`exams?exam_id=eq.${id}`, d),
+    remove:    (id)      => API.delete(`exams?exam_id=eq.${id}`),
+    seatPlan:  (id)      => API.get(`exams/seat-plan?exam_id=${id}`),
+  },
+
+  backlogs: {
+    byStudent: (studId) => API.get(`backlogs?student_id=eq.${studId}&order=status.asc`),
+    all:       ()       => API.get('backlogs'),
+    register:  (id, date) => API.patch(`backlogs?backlog_id=eq.${id}`, { action: 'register', reexam_date: date }),
+    clear:     (id, marks) => API.patch(`backlogs?backlog_id=eq.${id}`, { action: 'clear', marks_obtained: marks }),
+  },
+
+  feedback: {
+    summary:   (deptId) => API.get(`faculty_feedback/summary${deptId ? `?department=${deptId}` : ''}`),
+    byFaculty: (facId)  => API.get(`faculty_feedback?faculty_id=eq.${facId}&order=created_at.desc`),
+    submit:    (data)   => API.post('faculty_feedback', data),
+  },
+
+  alumni: {
+    all:    ()      => API.get('alumni?order=graduation_year.desc'),
+    byYear: (year)  => API.get(`alumni?graduation_year=eq.${year}&order=first_name.asc`),
+    add:    (data)  => API.post('alumni', data),
+    delete: (id)    => API.delete(`alumni?id=eq.${id}`),
   },
 
   companies: {

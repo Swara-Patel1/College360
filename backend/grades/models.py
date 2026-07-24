@@ -24,22 +24,34 @@ class Grade(models.Model):
     class Meta:
         unique_together = ('student', 'course', 'exam_type')
 
+    # Single source of truth for grade/GPA thresholds (kept out of the React client).
+    GRADE_POINTS = {'O': 10.0, 'A+': 9.0, 'A': 8.0, 'B+': 7.0, 'B': 6.0, 'C': 5.0, 'D': 4.0, 'F': 0.0}
+
     @property
     def percentage(self):
-        if self.total_marks > 0:
-            return round((self.marks_obtained / self.total_marks) * 100, 2)
+        # Cast to float so a freshly-assigned float doesn't clash with a DB Decimal.
+        total = float(self.total_marks or 0)
+        if total > 0:
+            return round((float(self.marks_obtained) / total) * 100, 2)
         return 0
 
+    @staticmethod
+    def letter_for(pct):
+        if pct >= 90: return 'O'
+        elif pct >= 85: return 'A+'
+        elif pct >= 75: return 'A'
+        elif pct >= 65: return 'B+'
+        elif pct >= 55: return 'B'
+        elif pct >= 45: return 'C'
+        elif pct >= 35: return 'D'
+        return 'F'
+
+    @property
+    def grade_point(self):
+        return self.GRADE_POINTS.get(self.grade or self.letter_for(self.percentage), 0.0)
+
     def save(self, *args, **kwargs):
-        pct = self.percentage
-        if pct >= 90: self.grade = 'O'
-        elif pct >= 85: self.grade = 'A+'
-        elif pct >= 75: self.grade = 'A'
-        elif pct >= 65: self.grade = 'B+'
-        elif pct >= 55: self.grade = 'B'
-        elif pct >= 45: self.grade = 'C'
-        elif pct >= 35: self.grade = 'D'
-        else: self.grade = 'F'
+        self.grade = self.letter_for(self.percentage)
         super().save(*args, **kwargs)
 
     def __str__(self):
