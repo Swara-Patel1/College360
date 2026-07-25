@@ -49,7 +49,7 @@ export default function Landing() {
       <header className={`lp-nav ${scrolled ? 'scrolled' : ''}`}>
         <div className="lp-nav-inner">
           <a className="lp-brand" href="#top">
-            <span className="lp-brand-icon">🎓</span>
+            <span className="lp-brand-icon"><i className="bi bi-mortarboard"></i></span>
             <span className="lp-brand-text">EduPulse<span className="lp-brand-dim"> Pro</span></span>
           </a>
           <nav className="lp-nav-links">
@@ -63,7 +63,7 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="lp-hero" id="top">
-        <span className="lp-pill">✨ The all-in-one campus operating system</span>
+        <span className="lp-pill"><i className="bi bi-stars"></i> The all-in-one campus operating system</span>
         <h1 className="lp-h1">
           Run your entire college<br />
           from <span className="lp-grad">one intelligent portal</span>
@@ -146,7 +146,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="lp-footer">
         <div className="lp-brand">
-          <span className="lp-brand-icon">🎓</span>
+          <span className="lp-brand-icon"><i className="bi bi-mortarboard"></i></span>
           <span className="lp-brand-text">EduPulse<span className="lp-brand-dim"> Pro</span></span>
         </div>
         <p>© {new Date().getFullYear()} EduPulse Pro — College Management System. Built with Django + React.</p>

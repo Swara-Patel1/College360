@@ -106,7 +106,7 @@ export default function Alumni() {
       {/* Header card */}
       <div className="stat-card primary" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <div className="stat-icon">🎓</div>
+          <div className="stat-icon"><i className="bi bi-mortarboard"></i></div>
           <div className="stat-value">Alumni Network</div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
             Connect with graduates, explore career paths, and find mentors across companies.
@@ -114,17 +114,17 @@ export default function Alumni() {
         </div>
         {isAdmin && (
           <button className="btn btn-primary" onClick={() => setIsAddOpen(true)} style={{ flexShrink: 0 }}>
-            ➕ Add Alumnus
+            <i className="bi bi-plus-lg"></i> Add Alumnus
           </button>
         )}
       </div>
 
       {/* Stats */}
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card primary"><div className="stat-icon">👥</div><div className="stat-value">{stats.total}</div><div className="stat-label">Total Alumni</div></div>
-        <div className="stat-card success"><div className="stat-icon">🤝</div><div className="stat-value">{stats.mentors}</div><div className="stat-label">Open to Mentorship</div></div>
-        <div className="stat-card info"><div className="stat-icon">🏢</div><div className="stat-value">{stats.companies}</div><div className="stat-label">Companies</div></div>
-        <div className="stat-card warning"><div className="stat-icon">🗓️</div><div className="stat-value">{stats.latestBatch}</div><div className="stat-label">Latest Batch</div></div>
+        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-people"></i></div><div className="stat-value">{stats.total}</div><div className="stat-label">Total Alumni</div></div>
+        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-people"></i></div><div className="stat-value">{stats.mentors}</div><div className="stat-label">Open to Mentorship</div></div>
+        <div className="stat-card info"><div className="stat-icon"><i className="bi bi-building"></i></div><div className="stat-value">{stats.companies}</div><div className="stat-label">Companies</div></div>
+        <div className="stat-card warning"><div className="stat-icon"><i className="bi bi-calendar-week"></i></div><div className="stat-value">{stats.latestBatch}</div><div className="stat-label">Latest Batch</div></div>
       </div>
 
       {/* Filters */}
@@ -164,18 +164,18 @@ export default function Alumni() {
               </div>
 
               <div style={{ display: 'grid', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                <div>💼 <strong>{a.designation || '—'}</strong>{a.current_company ? ` @ ${a.current_company}` : ''}</div>
-                <div>🏛️ {a.department_name}</div>
-                {a.location && <div>📍 {a.location}</div>}
+                <div><i className="bi bi-briefcase"></i> <strong>{a.designation || '—'}</strong>{a.current_company ? ` @ ${a.current_company}` : ''}</div>
+                <div><i className="bi bi-building"></i> {a.department_name}</div>
+                {a.location && <div><i className="bi bi-geo-alt"></i> {a.location}</div>}
               </div>
 
               <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-                {a.available_for_mentorship && <span className="badge badge-success">🤝 Mentor</span>}
+                {a.available_for_mentorship && <span className="badge badge-success"><i className="bi bi-people"></i> Mentor</span>}
                 {a.linkedin_url && (
-                  <a href={a.linkedin_url} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">🔗 LinkedIn</a>
+                  <a href={a.linkedin_url} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm"><i className="bi bi-link-45deg"></i> LinkedIn</a>
                 )}
                 {isAdmin && (
-                  <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto', color: 'var(--accent, #FF6B6B)' }} onClick={() => handleDelete(a)}>🗑️</button>
+                  <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto', color: 'var(--accent, #FF6B6B)' }} onClick={() => handleDelete(a)}><i className="bi bi-trash"></i></button>
                 )}
               </div>
             </div>
@@ -183,7 +183,7 @@ export default function Alumni() {
         </div>
       ) : (
         <div className="empty-state" style={{ padding: '48px', textAlign: 'center' }}>
-          <div className="empty-state-icon">🔍</div>
+          <div className="empty-state-icon"><i className="bi bi-search"></i></div>
           <h3>No alumni match your filters</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Try a different search term or batch year.</p>
         </div>

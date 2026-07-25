@@ -50,19 +50,19 @@ export default function ExamSchedule() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>🗓️ Exam Schedule</h1>
+          <h1><i className="bi bi-calendar-week"></i> Exam Schedule</h1>
           <p>{isFaculty ? 'Examinations for the courses you teach.' : 'Your upcoming examinations.'}</p>
         </div>
       </div>
 
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card primary"><div className="stat-icon">📋</div><div className="stat-value">{exams.length}</div><div className="stat-label">Total Exams</div></div>
-        <div className="stat-card warning"><div className="stat-icon">⏳</div><div className="stat-value">{upcoming.length}</div><div className="stat-label">Upcoming</div></div>
-        <div className="stat-card info"><div className="stat-icon">📅</div><div className="stat-value" style={{ fontSize: '1.1rem' }}>{nextExam ? Utils.formatDate(nextExam.date) : '—'}</div><div className="stat-label">Next Exam</div></div>
+        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-clipboard"></i></div><div className="stat-value">{exams.length}</div><div className="stat-label">Total Exams</div></div>
+        <div className="stat-card warning"><div className="stat-icon"><i className="bi bi-hourglass-split"></i></div><div className="stat-value">{upcoming.length}</div><div className="stat-label">Upcoming</div></div>
+        <div className="stat-card info"><div className="stat-icon"><i className="bi bi-calendar3"></i></div><div className="stat-value" style={{ fontSize: '1.1rem' }}>{nextExam ? Utils.formatDate(nextExam.date) : '—'}</div><div className="stat-label">Next Exam</div></div>
       </div>
 
       <div className="card col-12">
-        <div className="card-header"><div className="card-title">📖 Timetable</div></div>
+        <div className="card-header"><div className="card-title"><i className="bi bi-journal-bookmark"></i> Timetable</div></div>
         <div className="card-body" style={{ padding: 0 }}>
           {exams.length ? (
             <div style={{ overflowX: 'auto' }}>
@@ -81,7 +81,7 @@ export default function ExamSchedule() {
                         <td>{TYPE_LABEL[e.exam_type] || e.exam_type}</td>
                         <td>{e.room || 'TBA'}{e.building ? `, ${e.building}` : ''}</td>
                         <td>{e.max_marks}</td>
-                        {isFaculty && <td><button className="btn btn-ghost btn-sm" onClick={() => openSeatPlan(e)}>🪑 View</button></td>}
+                        {isFaculty && <td><button className="btn btn-ghost btn-sm" onClick={() => openSeatPlan(e)}><i className="bi bi-grid-3x3-gap"></i> View</button></td>}
                       </tr>
                     );
                   })}
@@ -90,7 +90,7 @@ export default function ExamSchedule() {
             </div>
           ) : (
             <div className="empty-state" style={{ padding: '48px', textAlign: 'center' }}>
-              <div className="empty-state-icon">🗓️</div>
+              <div className="empty-state-icon"><i className="bi bi-calendar-week"></i></div>
               <h3>No exams scheduled</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Your exam timetable will appear here once published.</p>
             </div>

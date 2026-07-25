@@ -196,7 +196,7 @@ export default function Wellness() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>💚 Wellness & Mentorship Tracker</h1>
+          <h1><i className="bi bi-heart-fill"></i> Wellness & Mentorship Tracker</h1>
           <p>Confidential daily check-ins to monitor stress levels and get mentorship advice.</p>
         </div>
       </div>
@@ -205,9 +205,9 @@ export default function Wellness() {
         {/* Status display card */}
         <div className="card col-6">
           <div className="card-header">
-            <div className="card-title">🌱 Current Status</div>
+            <div className="card-title"><i className="bi bi-flower1"></i> Current Status</div>
             <span id="streakInfo" style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              📅 {historyData.length} check-in{historyData.length !== 1 ? 's' : ''} completed
+              <i className="bi bi-calendar3"></i> {historyData.length} check-in{historyData.length !== 1 ? 's' : ''} completed
             </span>
           </div>
           <div className="card-body" style={{ display: 'flex', gap: '20px', alignItems: 'center', minHeight: '180px' }}>
@@ -246,7 +246,7 @@ export default function Wellness() {
         {/* Form check-in card */}
         <div className="card col-6">
           <div className="card-header">
-            <div className="card-title">💚 Daily Wellness Check-in</div>
+            <div className="card-title"><i className="bi bi-heart-fill"></i> Daily Wellness Check-in</div>
             <span id="assessLabel" style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               {alreadySubmittedToday ? '(submitted today)' : '(pending today)'}
             </span>
@@ -387,7 +387,7 @@ export default function Wellness() {
         {historyData.length > 0 && (
           <div className="card col-7">
             <div className="card-header">
-              <div className="card-title">📈 Wellness Score Trend</div>
+              <div className="card-title"><i className="bi bi-graph-up-arrow"></i> Wellness Score Trend</div>
             </div>
             <div className="card-body">
               <div className="chart-container" style={{ height: '260px', position: 'relative' }}>
@@ -401,7 +401,7 @@ export default function Wellness() {
         {historyData.length > 0 && (
           <div className="card col-5">
             <div className="card-header">
-              <div className="card-title">📅 Check-in History Log</div>
+              <div className="card-title"><i className="bi bi-calendar3"></i> Check-in History Log</div>
             </div>
             <div className="card-body" id="historyLog" style={{ display: 'grid', gap: '10px', maxHeight: '280px', overflowY: 'auto', padding: '16px' }}>
               {historyData.map((r, i) => {

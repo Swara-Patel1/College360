@@ -106,7 +106,7 @@ export default function Content() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>📖 Study Materials</h1>
+          <h1><i className="bi bi-journal-bookmark"></i> Study Materials</h1>
           <p>Browse course materials, lectures, notes, and links.</p>
         </div>
       </div>
@@ -114,27 +114,27 @@ export default function Content() {
       {/* Stats Summary cards */}
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
         <div className="stat-card primary">
-          <div className="stat-icon">📚</div>
+          <div className="stat-icon"><i className="bi bi-book"></i></div>
           <div className="stat-value" id="st-all">{totalCount}</div>
           <div className="stat-label">Total Resources</div>
         </div>
         <div className="stat-card success">
-          <div className="stat-icon">📄</div>
+          <div className="stat-icon"><i className="bi bi-file-earmark-text"></i></div>
           <div className="stat-value" id="st-notes">{notesCount}</div>
           <div className="stat-label">Notes</div>
         </div>
         <div className="stat-card info">
-          <div className="stat-icon">▶️</div>
+          <div className="stat-icon"><i className="bi bi-play-fill"></i></div>
           <div className="stat-value" id="st-videos">{videosCount}</div>
           <div className="stat-label">Video Tutorials</div>
         </div>
         <div className="stat-card warning">
-          <div className="stat-icon">🔗</div>
+          <div className="stat-icon"><i className="bi bi-link-45deg"></i></div>
           <div className="stat-value" id="st-ref">{refCount}</div>
           <div className="stat-label">References</div>
         </div>
         <div className="stat-card" style={{ background: 'rgba(108,99,255,0.08)', border: '1px solid rgba(108,99,255,0.2)' }}>
-          <div className="stat-icon">📝</div>
+          <div className="stat-icon"><i className="bi bi-pencil-square"></i></div>
           <div className="stat-value" id="st-assign">{assignCount}</div>
           <div className="stat-label">Assignments</div>
         </div>
@@ -143,9 +143,9 @@ export default function Content() {
       {/* Filter and Browse Card */}
       <div className="card col-12" style={{ marginBottom: '24px' }}>
         <div className="card-header" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
-          <div className="card-title">🔍 Search Materials</div>
+          <div className="card-title"><i className="bi bi-search"></i> Search Materials</div>
           <div className="search-input-wrap" style={{ width: '300px', marginLeft: 'auto' }}>
-            <span>🔍</span>
+            <span><i className="bi bi-search"></i></span>
             <input 
               type="text" 
               placeholder="Search by title, tag, description..."
@@ -168,25 +168,25 @@ export default function Content() {
               className={`btn ${selectedType === 'notes' ? 'btn-primary' : 'btn-ghost'} btn-sm`}
               onClick={() => setSelectedType('notes')}
             >
-              📄 Notes
+              <i className="bi bi-file-earmark-text"></i> Notes
             </button>
             <button
               className={`btn ${selectedType === 'video' ? 'btn-primary' : 'btn-ghost'} btn-sm`}
               onClick={() => setSelectedType('video')}
             >
-              ▶️ Videos
+              <i className="bi bi-play-fill"></i> Videos
             </button>
             <button
               className={`btn ${selectedType === 'reference' ? 'btn-primary' : 'btn-ghost'} btn-sm`}
               onClick={() => setSelectedType('reference')}
             >
-              🔗 Reference
+              <i className="bi bi-link-45deg"></i> Reference
             </button>
             <button
               className={`btn ${selectedType === 'assignment' ? 'btn-primary' : 'btn-ghost'} btn-sm`}
               onClick={() => setSelectedType('assignment')}
             >
-              📝 Assignment
+              <i className="bi bi-pencil-square"></i> Assignment
             </button>
           </div>
 
@@ -241,8 +241,8 @@ export default function Content() {
                   </div>
                 )}
                 <div className="content-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  <span>📚 {c.subject_code || c.subject_name || '—'}</span>
-                  <span>👨‍🏫 {c.faculty_name || '—'}</span>
+                  <span><i className="bi bi-book"></i> {c.subject_code || c.subject_name || '—'}</span>
+                  <span><i className="bi bi-person-video3"></i> {c.faculty_name || '—'}</span>
                   <span className="btn btn-primary btn-sm">{cfg.action} →</span>
                 </div>
               </div>
@@ -251,7 +251,7 @@ export default function Content() {
         ) : (
           <div className="card col-12 text-center" style={{ padding: '60px', gridColumn: '1 / -1' }}>
             <div className="empty-state">
-              <div className="empty-state-icon">🔍</div>
+              <div className="empty-state-icon"><i className="bi bi-search"></i></div>
               <p>No materials found matching your filters.</p>
             </div>
           </div>

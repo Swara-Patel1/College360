@@ -20,7 +20,7 @@ function Stars({ value, onChange }) {
           role="button"
           onClick={() => onChange(n)}
           style={{ cursor: 'pointer', fontSize: '1.4rem', lineHeight: 1, filter: n <= value ? 'none' : 'grayscale(1) opacity(0.35)' }}
-        >⭐</span>
+        ><i className="bi bi-star-fill"></i></span>
       ))}
     </div>
   );
@@ -112,7 +112,7 @@ export default function Feedback() {
   return (
     <>
       <div className="stat-card primary" style={{ marginBottom: '20px' }}>
-        <div className="stat-icon">⭐</div>
+        <div className="stat-icon"><i className="bi bi-star-fill"></i></div>
         <div className="stat-value">Faculty Feedback</div>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
           Rate your instructors. Feedback can be submitted anonymously and helps your department improve teaching.
@@ -125,9 +125,9 @@ export default function Feedback() {
             <div key={item.courseId} className="card" style={{ padding: '20px' }}>
               <div style={{ fontWeight: 700, marginBottom: '4px' }}>{item.courseName}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '10px' }}>{item.courseCode}</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>👨‍🏫 {item.facultyName}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}><i className="bi bi-person-video3"></i> {item.facultyName}</div>
               {done[item.courseId] ? (
-                <span className="badge badge-success">✓ Feedback submitted</span>
+                <span className="badge badge-success"><i className="bi bi-check"></i> Feedback submitted</span>
               ) : (
                 <button className="btn btn-primary btn-sm" onClick={() => openForm(item)}>Give Feedback</button>
               )}
@@ -136,7 +136,7 @@ export default function Feedback() {
         </div>
       ) : (
         <div className="empty-state" style={{ padding: '48px', textAlign: 'center' }}>
-          <div className="empty-state-icon">📭</div>
+          <div className="empty-state-icon"><i className="bi bi-inbox"></i></div>
           <h3>No courses to review yet</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Once you're enrolled in courses, you can rate their faculty here.</p>
         </div>

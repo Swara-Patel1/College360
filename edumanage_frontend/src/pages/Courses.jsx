@@ -260,7 +260,7 @@ export default function Courses() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>📚 Course Catalog</h1>
+          <h1><i className="bi bi-book"></i> Course Catalog</h1>
           <p id="pageDesc">
             {isStudent 
               ? `You are enrolled in ${courses.length} course${courses.length !== 1 ? 's' : ''} for your current semester (Semester ${activeSemesterNumber}).`
@@ -271,7 +271,7 @@ export default function Courses() {
         </div>
         {isAdmin && (
           <div className="page-header-right" id="addCourseWrap">
-            <button className="btn btn-primary" onClick={handleOpenAdd}>➕ Add Course</button>
+            <button className="btn btn-primary" onClick={handleOpenAdd}><i className="bi bi-plus-lg"></i> Add Course</button>
           </div>
         )}
       </div>
@@ -279,19 +279,19 @@ export default function Courses() {
       {/* Stats Summary Cards */}
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
         <div className="stat-card primary">
-          <div className="stat-icon">📚</div>
+          <div className="stat-icon"><i className="bi bi-book"></i></div>
           <div className="stat-value" id="totalCourses">{courses.length}</div>
           <div className="stat-label">Total Courses</div>
         </div>
         <div className="stat-card success">
-          <div className="stat-icon">✅</div>
+          <div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div>
           <div className="stat-value" id="activeCourses">
             {courses.filter(c => c.is_active !== false).length}
           </div>
           <div className="stat-label">Active Courses</div>
         </div>
         <div className="stat-card info">
-          <div className="stat-icon">🏅</div>
+          <div className="stat-icon"><i className="bi bi-award"></i></div>
           <div className="stat-value" id="totalCredits">{totalCredits || '—'}</div>
           <div className="stat-label">Total Credits</div>
         </div>
@@ -321,7 +321,7 @@ export default function Courses() {
           <div className="tab-panel active">
             <div className="filters-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', padding: '16px' }}>
               <div className="search-input-wrap">
-                <span>🔍</span>
+                <span><i className="bi bi-search"></i></span>
                 <input 
                   type="text" 
                   id="searchInput" 
@@ -369,7 +369,7 @@ export default function Courses() {
                 <option value="false">Inactive</option>
               </select>
 
-              <button className="btn btn-ghost btn-sm" onClick={clearFilters}>🧹 Clear Filters</button>
+              <button className="btn btn-ghost btn-sm" onClick={clearFilters}><i className="bi bi-eraser"></i> Clear Filters</button>
             </div>
 
             <div className="table-wrapper" style={{ padding: 0 }}>
@@ -418,8 +418,8 @@ export default function Courses() {
                           {isAdmin && (
                             <td>
                               <div className="table-actions" style={{ justifyContent: 'center' }}>
-                                <button className="action-btn edit" title="Edit" onClick={() => handleOpenEdit(c)}>✏️</button>
-                                <button className="action-btn delete" title="Delete" onClick={() => handleOpenDelete(c)}>🗑️</button>
+                                <button className="action-btn edit" title="Edit" onClick={() => handleOpenEdit(c)}><i className="bi bi-pencil"></i></button>
+                                <button className="action-btn delete" title="Delete" onClick={() => handleOpenDelete(c)}><i className="bi bi-trash"></i></button>
                               </div>
                             </td>
                           )}
@@ -430,7 +430,7 @@ export default function Courses() {
                     <tr>
                       <td colSpan={isAdmin ? 8 : 7}>
                         <div className="empty-state" style={{ padding: '40px' }}>
-                          <div className="empty-state-icon">📚</div>
+                          <div className="empty-state-icon"><i className="bi bi-book"></i></div>
                           <h3>No Courses Found</h3>
                           <p>
                             {isAdmin 
@@ -487,7 +487,7 @@ export default function Courses() {
           <div className="tab-panel active" id="tab-enrollments">
             <div className="filters-bar" style={{ display: 'flex', gap: '12px', padding: '16px' }}>
               <div className="search-input-wrap">
-                <span>🔍</span>
+                <span><i className="bi bi-search"></i></span>
                 <input 
                   type="text" 
                   id="enrollSearchInput" 
@@ -496,7 +496,7 @@ export default function Courses() {
                   onChange={(e) => setEnrollSearchQuery(e.target.value)}
                 />
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={loadEnrollments}>🔄 Refresh</button>
+              <button className="btn btn-ghost btn-sm" onClick={loadEnrollments}><i className="bi bi-arrow-repeat"></i> Refresh</button>
             </div>
             
             <div id="enrollmentsBody" style={{ padding: '0 20px 20px' }}>
@@ -536,7 +536,7 @@ export default function Courses() {
                 </div>
               ) : (
                 <div className="empty-state" style={{ padding: '40px' }}>
-                  <div className="empty-state-icon">📋</div>
+                  <div className="empty-state-icon"><i className="bi bi-clipboard"></i></div>
                   <h3>No Enrollments Found</h3>
                   <p>No enrollment records match your search.</p>
                 </div>
@@ -550,7 +550,7 @@ export default function Courses() {
       <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="➕ Add New Course">
         <form onSubmit={handleAddSubmit}>
           <div className="section-divider" style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-            📚 Course Information
+            <i className="bi bi-book"></i> Course Information
           </div>
           <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             <div className="form-group">
@@ -655,7 +655,7 @@ export default function Courses() {
           </div>
           <div className="modal-footer" style={{ padding: 0, display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
             <button type="button" className="btn btn-ghost" onClick={() => setIsAddOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">➕ Add Course</button>
+            <button type="submit" className="btn btn-primary"><i className="bi bi-plus-lg"></i> Add Course</button>
           </div>
         </form>
       </Modal>
@@ -664,7 +664,7 @@ export default function Courses() {
       <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="✏️ Edit Course">
         <form onSubmit={handleEditSubmit}>
           <div className="section-divider" style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-            📚 Course Information
+            <i className="bi bi-book"></i> Course Information
           </div>
           <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             <div className="form-group">
@@ -764,7 +764,7 @@ export default function Courses() {
           </div>
           <div className="modal-footer" style={{ padding: 0, display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
             <button type="button" className="btn btn-ghost" onClick={() => setIsEditOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">✏️ Update Course</button>
+            <button type="submit" className="btn btn-primary"><i className="bi bi-pencil"></i> Update Course</button>
           </div>
         </form>
       </Modal>
@@ -774,11 +774,11 @@ export default function Courses() {
         <div style={{ marginBottom: '20px' }}>
           Are you sure you want to delete course <strong>{deletingCourse?.name}</strong> (<strong>{deletingCourse?.code || deletingCourse?.course_code}</strong>)?
           <br />
-          <span style={{ color: 'var(--accent)', fontSize: '0.8rem' }}>⚠️ This action is permanent.</span>
+          <span style={{ color: 'var(--accent)', fontSize: '0.8rem' }}><i className="bi bi-exclamation-triangle"></i> This action is permanent.</span>
         </div>
         <div className="modal-footer" style={{ padding: 0, display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
           <button type="button" className="btn btn-ghost" onClick={() => setIsDeleteOpen(false)}>Cancel</button>
-          <button type="button" className="btn btn-accent" onClick={handleDeleteConfirm}>🗑️ Delete</button>
+          <button type="button" className="btn btn-accent" onClick={handleDeleteConfirm}><i className="bi bi-trash"></i> Delete</button>
         </div>
       </Modal>
     </>

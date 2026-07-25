@@ -145,12 +145,12 @@ export default function Notices() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>📢 Bulletin Notice Board</h1>
+          <h1><i className="bi bi-megaphone"></i> Bulletin Notice Board</h1>
           <p>Official notices and academic announcements.</p>
         </div>
         {!isStudent && (
           <div className="page-header-right">
-            <button className="btn btn-primary" onClick={handleOpenAdd}>📢 Post Notice</button>
+            <button className="btn btn-primary" onClick={handleOpenAdd}><i className="bi bi-megaphone"></i> Post Notice</button>
           </div>
         )}
       </div>
@@ -217,8 +217,8 @@ export default function Notices() {
                     </div>
                     {!isStudent && (
                       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                        <button className="btn btn-ghost btn-sm btn-icon" onClick={() => handleOpenEdit(n)} title="Edit">✏️</button>
-                        <button className="btn btn-danger btn-sm btn-icon" onClick={() => handleDelete(n.id)} title="Delete">🗑️</button>
+                        <button className="btn btn-ghost btn-sm btn-icon" onClick={() => handleOpenEdit(n)} title="Edit"><i className="bi bi-pencil"></i></button>
+                        <button className="btn btn-danger btn-sm btn-icon" onClick={() => handleDelete(n.id)} title="Delete"><i className="bi bi-trash"></i></button>
                       </div>
                     )}
                   </div>
@@ -242,7 +242,7 @@ export default function Notices() {
         ) : (
           <div className="card col-12 text-center" style={{ padding: '60px', gridColumn: '1 / -1' }}>
             <div className="empty-state">
-              <div className="empty-state-icon">📢</div>
+              <div className="empty-state-icon"><i className="bi bi-megaphone"></i></div>
               <h3>No Notices Found</h3>
               <p style={{ margin: '8px 0 16px 0', color: 'var(--text-muted)' }}>No notices match the selected filter.</p>
             </div>

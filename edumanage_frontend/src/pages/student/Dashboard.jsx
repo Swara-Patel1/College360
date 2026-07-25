@@ -159,22 +159,22 @@ export default function StudentDashboard() {
       {/* Stats Cards */}
       <div className="stats-grid">
         <div className="stat-card primary">
-          <div className="stat-icon">📚</div>
+          <div className="stat-icon"><i className="bi bi-book"></i></div>
           <div className="stat-value" id="enrolledCourses">{enrolledCount}</div>
           <div className="stat-label">Enrolled Courses</div>
         </div>
         <div className="stat-card success">
-          <div className="stat-icon">✅</div>
+          <div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div>
           <div className="stat-value" id="myAttendance">{attStats.percentage}%</div>
           <div className="stat-label">Attendance Rate</div>
         </div>
         <div className="stat-card info">
-          <div className="stat-icon">📊</div>
+          <div className="stat-icon"><i className="bi bi-bar-chart"></i></div>
           <div className="stat-value" id="myGrade">{bestGrade}</div>
           <div className="stat-label">Overall Grade</div>
         </div>
         <div className="stat-card warning">
-          <div className="stat-icon">💰</div>
+          <div className="stat-icon"><i className="bi bi-cash-coin"></i></div>
           <div className="stat-value" id="pendingFees">{Utils.formatCurrency(totalPendingFees)}</div>
           <div className="stat-label">Fees Due</div>
         </div>
@@ -184,7 +184,7 @@ export default function StudentDashboard() {
         {/* My Grades */}
         <div className="card col-6">
           <div className="card-header">
-            <div className="card-title">📝 My Grades</div>
+            <div className="card-title"><i className="bi bi-pencil-square"></i> My Grades</div>
             <Link to="/student/grades" className="btn btn-ghost btn-sm">View All</Link>
           </div>
           <div className="card-body" id="myGradesSection" style={{ padding: 0 }}>
@@ -213,7 +213,7 @@ export default function StudentDashboard() {
               </div>
             ) : (
               <div className="empty-state" style={{ padding: '24px' }}>
-                <div className="empty-state-icon">📝</div>
+                <div className="empty-state-icon"><i className="bi bi-pencil-square"></i></div>
                 <p>No grades posted yet.</p>
               </div>
             )}
@@ -223,7 +223,7 @@ export default function StudentDashboard() {
         {/* Attendance Chart */}
         <div className="card col-6">
           <div className="card-header">
-            <div className="card-title">✅ Attendance by Course</div>
+            <div className="card-title"><i className="bi bi-check-circle-fill"></i> Attendance by Course</div>
           </div>
           <div className="card-body">
             <div className="chart-container" style={{ height: '220px', position: 'relative' }}>
@@ -235,7 +235,7 @@ export default function StudentDashboard() {
         {/* My Fees */}
         <div className="card col-5">
           <div className="card-header">
-            <div className="card-title">💰 Fee Status</div>
+            <div className="card-title"><i className="bi bi-cash-coin"></i> Fee Status</div>
             <Link to="/student/fees" className="btn btn-ghost btn-sm">Details</Link>
           </div>
           <div className="card-body" id="myFeesSection">
@@ -264,7 +264,7 @@ export default function StudentDashboard() {
               ))
             ) : (
               <div className="empty-state">
-                <div className="empty-state-icon">💰</div>
+                <div className="empty-state-icon"><i className="bi bi-cash-coin"></i></div>
                 <p>No fee records.</p>
               </div>
             )}
@@ -274,14 +274,14 @@ export default function StudentDashboard() {
         {/* Notices */}
         <div className="card col-7">
           <div className="card-header">
-            <div className="card-title">📢 Latest Notices</div>
+            <div className="card-title"><i className="bi bi-megaphone"></i> Latest Notices</div>
             <Link to="/student/notices" className="btn btn-ghost btn-sm">All</Link>
           </div>
           <div className="card-body" id="studentNotices">
             {notices.length ? (
               notices.map((n, i) => (
                 <div className="list-item" key={i}>
-                  <div className="list-icon" style={{ background: 'rgba(108,99,255,0.1)' }}>📢</div>
+                  <div className="list-icon" style={{ background: 'rgba(108,99,255,0.1)' }}><i className="bi bi-megaphone"></i></div>
                   <div className="list-text">
                     <div className="list-title">{n.title}</div>
                     <div className="list-subtitle">{n.content.substring(0, 80)}...</div>
@@ -300,7 +300,7 @@ export default function StudentDashboard() {
         {/* Today's Timetable */}
         <div className="card col-12">
           <div className="card-header">
-            <div className="card-title">📅 Today's Classes</div>
+            <div className="card-title"><i className="bi bi-calendar3"></i> Today's Classes</div>
             <Link to="/student/timetable" className="btn btn-ghost btn-sm">Full Schedule</Link>
           </div>
           <div className="card-body" id="todayClasses">
@@ -321,16 +321,16 @@ export default function StudentDashboard() {
                     </div>
                     <div style={{ fontWeight: 700, marginBottom: '8px' }}>{s.course_name}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      🕐 {s.start_time?.substring(0, 5)} – {s.end_time?.substring(0, 5)}
+                      <i className="bi bi-clock"></i> {s.start_time?.substring(0, 5)} – {s.end_time?.substring(0, 5)}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>📍 {s.room || 'TBD'}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>👨‍🏫 {s.faculty_name || 'TBD'}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}><i className="bi bi-geo-alt"></i> {s.room || 'TBD'}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}><i className="bi bi-person-video3"></i> {s.faculty_name || 'TBD'}</div>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="empty-state">
-                <div className="empty-state-icon">🎉</div>
+                <div className="empty-state-icon"><i className="bi bi-balloon"></i></div>
                 <h3>No Classes Today!</h3>
                 <p>Enjoy your free day.</p>
               </div>

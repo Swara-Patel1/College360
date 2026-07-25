@@ -111,7 +111,7 @@ export default function HODComplaints() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>📣 Student Grievances</h1>
+          <h1><i className="bi bi-megaphone"></i> Student Grievances</h1>
           <p>Review and address complaints submitted by students in your department.</p>
         </div>
       </div>
@@ -119,28 +119,28 @@ export default function HODComplaints() {
       {/* Mini Stats */}
       <div className="stats-mini">
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}>📣</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}><i className="bi bi-megaphone"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: 'var(--primary)' }}>{totalCount}</div>
             <div className="stats-mini-lbl">Total Problems</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}>⏳</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}><i className="bi bi-hourglass-split"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#FF6B6B' }}>{pendingCount}</div>
             <div className="stats-mini-lbl">Pending</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(0,212,170,0.2)' }}>✅</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(0,212,170,0.2)' }}><i className="bi bi-check-circle-fill"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#00D4AA' }}>{resolvedCount}</div>
             <div className="stats-mini-lbl">Resolved</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(84,160,255,0.2)' }}>🏢</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(84,160,255,0.2)' }}><i className="bi bi-building"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#54A0FF' }}>{Object.keys(categoryCounts).length}</div>
             <div className="stats-mini-lbl">Active Categories</div>
@@ -152,7 +152,7 @@ export default function HODComplaints() {
       {criticalCategories.length > 0 && (
         <div className="alert alert-danger" style={{ marginBottom: '24px', padding: '16px', borderRadius: '10px', borderLeft: '5px solid #FF6B6B', background: 'rgba(255,107,107,0.08)' }}>
           <h4 style={{ margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#FF6B6B' }}>
-            🚨 CRITICAL ATTENTION REQUIRED
+            <i className="bi bi-exclamation-octagon-fill"></i> CRITICAL ATTENTION REQUIRED
           </h4>
           <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
             The following categories have <strong>10 or more open complaints</strong>. Under SLA policies, these must be resolved <strong>within 3 days</strong>:
@@ -218,10 +218,10 @@ export default function HODComplaints() {
                             style={{ color: 'var(--primary)' }}
                             onClick={() => { setSelectedComplaint(c); setIsResolveOpen(true); }}
                           >
-                            ✏️ Resolve
+                            <i className="bi bi-pencil"></i> Resolve
                           </button>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>✔️ Resolved</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}><i className="bi bi-check-lg"></i> Resolved</span>
                         )}
                       </td>
                     </tr>
@@ -231,7 +231,7 @@ export default function HODComplaints() {
             </table>
           ) : (
             <div className="empty-state" style={{ padding: '40px' }}>
-              <div className="empty-state-icon">📣</div>
+              <div className="empty-state-icon"><i className="bi bi-megaphone"></i></div>
               <p>No complaints reported in your department.</p>
             </div>
           )}

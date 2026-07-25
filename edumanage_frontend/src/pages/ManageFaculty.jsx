@@ -171,13 +171,13 @@ export default function ManageFaculty() {
       {/* ── Page Header ── */}
       <div className="page-header">
         <div className="page-header-left">
-          <h1>🧑‍🏫 Manage Faculty</h1>
+          <h1><i className="bi bi-person-video3"></i> Manage Faculty</h1>
           <p>Manage faculty profiles, departments, and employment status.</p>
         </div>
         {isAdmin && (
           <div className="page-header-right">
             <button className="btn btn-primary" onClick={() => { resetForm(); setIsAddOpen(true); }}>
-              ➕ Add Faculty
+              <i className="bi bi-plus-lg"></i> Add Faculty
             </button>
           </div>
         )}
@@ -186,28 +186,28 @@ export default function ManageFaculty() {
       {/* ── Mini Stats ── */}
       <div className="stats-mini">
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(14,165,233,0.2)' }}>🧑‍🏫</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(14,165,233,0.2)' }}><i className="bi bi-person-video3"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#0ea5e9' }}>{totalCount}</div>
             <div className="stats-mini-lbl">Total Faculty</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(0,212,170,0.2)' }}>✅</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(0,212,170,0.2)' }}><i className="bi bi-check-circle-fill"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#00D4AA' }}>{activeCount}</div>
             <div className="stats-mini-lbl">Active</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(139,92,246,0.2)' }}>🏛️</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(139,92,246,0.2)' }}><i className="bi bi-building"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#8b5cf6' }}>{hodCount}</div>
             <div className="stats-mini-lbl">HODs</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}>⏸️</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}><i className="bi bi-pause"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#FF6B6B' }}>{inactiveCount}</div>
             <div className="stats-mini-lbl">Inactive</div>
@@ -265,11 +265,11 @@ export default function ManageFaculty() {
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => handleViewClick(f)}>🔍 View</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleViewClick(f)}><i className="bi bi-search"></i> View</button>
                         {isAdmin && (
                           <>
-                            <button className="btn btn-ghost btn-sm" onClick={() => handleEditClick(f)}>📝 Edit</button>
-                            <button className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => handleDeleteClick(f)}>🗑️ Delete</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => handleEditClick(f)}><i className="bi bi-pencil-square"></i> Edit</button>
+                            <button className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => handleDeleteClick(f)}><i className="bi bi-trash"></i> Delete</button>
                           </>
                         )}
                       </div>
@@ -280,7 +280,7 @@ export default function ManageFaculty() {
             </table>
           ) : (
             <div className="empty-state">
-              <div className="empty-state-icon">🧑‍🏫</div>
+              <div className="empty-state-icon"><i className="bi bi-person-video3"></i></div>
               <p>No faculty records match the filters.</p>
             </div>
           )}
@@ -340,7 +340,7 @@ export default function ManageFaculty() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setIsAddOpen(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary">➕ Save Faculty</button>
+              <button type="submit" className="btn btn-primary"><i className="bi bi-plus-lg"></i> Save Faculty</button>
             </div>
           </form>
         </Modal>
@@ -386,7 +386,7 @@ export default function ManageFaculty() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setIsEditOpen(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary">💾 Save Changes</button>
+              <button type="submit" className="btn btn-primary"><i className="bi bi-save"></i> Save Changes</button>
             </div>
           </form>
         </Modal>
@@ -400,7 +400,7 @@ export default function ManageFaculty() {
             <p>Are you sure you want to delete this faculty profile? This will permanently remove their records from the portal.</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
               <button className="btn btn-ghost" onClick={() => setIsDeleteOpen(false)}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleDeleteConfirm}>🗑️ Delete Faculty</button>
+              <button className="btn btn-danger" onClick={handleDeleteConfirm}><i className="bi bi-trash"></i> Delete Faculty</button>
             </div>
           </div>
         </Modal>

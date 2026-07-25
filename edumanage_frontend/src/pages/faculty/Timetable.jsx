@@ -67,9 +67,9 @@ export default function Timetable() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>📅 Weekly Timetable</h1>
+          <h1><i className="bi bi-calendar3"></i> Weekly Timetable</h1>
           <p>View your scheduled lectures, class timings, and assigned lecture halls.</p>
-          <div className="today-badge" id="todayBadge">⭐ Today is {todayName}</div>
+          <div className="today-badge" id="todayBadge"><i className="bi bi-star-fill"></i> Today is {todayName}</div>
         </div>
       </div>
 
@@ -130,7 +130,7 @@ export default function Timetable() {
                             >
                               <div className="wg-code" style={{ color }}>{match.course_code || ''}</div>
                               <div className="wg-cname">{match.course_name || ''}</div>
-                              {match.room && <div className="wg-room">📍 Room {match.room}</div>}
+                              {match.room && <div className="wg-room"><i className="bi bi-geo-alt"></i> Room {match.room}</div>}
                             </div>
                           </div>
                         );

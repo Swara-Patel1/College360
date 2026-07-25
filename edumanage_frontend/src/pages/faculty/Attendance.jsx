@@ -178,22 +178,22 @@ export default function Attendance() {
       {/* Stats Section */}
       <div className="stats-grid">
         <div className="stat-card success">
-          <div className="stat-icon">✅</div>
+          <div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div>
           <div className="stat-value">{stats.present}</div>
           <div className="stat-label">Present Records</div>
         </div>
         <div className="stat-card danger">
-          <div className="stat-icon">❌</div>
+          <div className="stat-icon"><i className="bi bi-x-circle"></i></div>
           <div className="stat-value">{stats.absent}</div>
           <div className="stat-label">Absent Records</div>
         </div>
         <div className="stat-card warning">
-          <div className="stat-icon">⏰</div>
+          <div className="stat-icon"><i className="bi bi-alarm"></i></div>
           <div className="stat-value">{stats.late}</div>
           <div className="stat-label">Late Records</div>
         </div>
         <div className="stat-card primary">
-          <div className="stat-icon">📊</div>
+          <div className="stat-icon"><i className="bi bi-bar-chart"></i></div>
           <div className="stat-value">{stats.percentage}%</div>
           <div className="stat-label">Avg Attendance Rate</div>
         </div>
@@ -203,7 +203,7 @@ export default function Attendance() {
         /* MARK ATTENDANCE MODE */
         <div className="card col-12">
           <div className="card-header">
-            <div className="card-title">✅ Mark Attendance</div>
+            <div className="card-title"><i className="bi bi-check-circle-fill"></i> Mark Attendance</div>
           </div>
           <div className="card-body">
             <div className="form-row" style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
@@ -283,7 +283,7 @@ export default function Attendance() {
               </>
             ) : (
               <div className="empty-state">
-                <div className="empty-state-icon">📚</div>
+                <div className="empty-state-icon"><i className="bi bi-book"></i></div>
                 <p>Select a course to load the student roster</p>
               </div>
             )}
@@ -293,7 +293,7 @@ export default function Attendance() {
         /* VIEW RECORDS MODE */
         <div className="card col-12">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="card-title">📋 Attendance Log</div>
+            <div className="card-title"><i className="bi bi-clipboard"></i> Attendance Log</div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <select className="form-input" style={{ width: '160px', padding: '6px 10px', fontSize: '0.8rem' }} value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
                 <option value="">All Courses</option>
@@ -346,7 +346,7 @@ export default function Attendance() {
               </table>
             ) : (
               <div className="empty-state">
-                <div className="empty-state-icon">📋</div>
+                <div className="empty-state-icon"><i className="bi bi-clipboard"></i></div>
                 <p>No matching attendance records found.</p>
               </div>
             )}

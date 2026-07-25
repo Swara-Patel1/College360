@@ -161,7 +161,7 @@ export default function HODPerformance() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>⚠️ Academic Performance Alerts</h1>
+          <h1><i className="bi bi-exclamation-triangle"></i> Academic Performance Alerts</h1>
           <p>Monitor students with low marks, coordinate with parents, and schedule remedial extra classes.</p>
         </div>
       </div>
@@ -198,8 +198,8 @@ export default function HODPerformance() {
                       <span className="badge badge-danger">{alert.grade}</span>
                     </td>
                     <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                      <div>📧 {alert.student?.parent_email || '—'}</div>
-                      <div>📞 {alert.student?.parent_phone || '—'}</div>
+                      <div><i className="bi bi-envelope"></i> {alert.student?.parent_email || '—'}</div>
+                      <div><i className="bi bi-telephone"></i> {alert.student?.parent_phone || '—'}</div>
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
@@ -207,20 +207,20 @@ export default function HODPerformance() {
                           className="btn btn-ghost btn-sm" 
                           onClick={() => handleOpenEmail(alert)}
                         >
-                          ✉️ Contact Parent
+                          <i className="bi bi-envelope"></i> Contact Parent
                         </button>
                         <a 
                           href={`tel:${alert.student?.parent_phone || ''}`} 
                           className="btn btn-ghost btn-sm"
                           style={{ color: '#00D4AA' }}
                         >
-                          📞 Call Parent
+                          <i className="bi bi-telephone"></i> Call Parent
                         </a>
                         <button 
                           className="btn btn-primary btn-sm" 
                           onClick={() => handleOpenLecture(alert)}
                         >
-                          🗓️ Extra Lecture
+                          <i className="bi bi-calendar-week"></i> Extra Lecture
                         </button>
                       </div>
                     </td>
@@ -230,7 +230,7 @@ export default function HODPerformance() {
             </table>
           ) : (
             <div className="empty-state" style={{ padding: '40px' }}>
-              <div className="empty-state-icon">✔️</div>
+              <div className="empty-state-icon"><i className="bi bi-check-lg"></i></div>
               <p>Excellent! No students currently fall under academic alerts.</p>
             </div>
           )}

@@ -137,6 +137,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Groq AI Configuration
 GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
 
+# Payment gateway (Razorpay). Leave blank to run the gateway in test mode —
+# see fees/gateway.py. Set both to go live.
+RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '')
+RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '')
+
 # Note: Supabase has been removed. Data API is served by backend-node (port 4000).
 # Django (port 8000) is now the primary data API using DRF + SQLite.
 

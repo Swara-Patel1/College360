@@ -96,7 +96,7 @@ export default function HODLeaves() {
 
       <div className="page-header">
         <div className="page-header-left">
-          <h1>📋 Leave Approval Panel</h1>
+          <h1><i className="bi bi-clipboard"></i> Leave Approval Panel</h1>
           <p>Review and approve faculty leave requests for your department.</p>
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function HODLeaves() {
           borderRadius:'12px',padding:'14px 18px',marginBottom:'20px',
           display:'flex',alignItems:'center',gap:'12px',color:'#54A0FF',fontSize:'0.87rem'
         }}>
-          <span style={{fontSize:'1.2rem'}}>💡</span>
+          <span style={{fontSize:'1.2rem'}}><i className="bi bi-lightbulb"></i></span>
           <span><strong>Auto-Notification:</strong> When you approve a leave, students will automatically receive a notice about the lecture change, and a substitute faculty will be assigned from your department.</span>
         </div>
       )}
@@ -160,7 +160,7 @@ export default function HODLeaves() {
             </div>
           ) : filteredLeaves.length === 0 ? (
             <div className="empty-state" style={{padding:'60px 20px'}}>
-              <div className="empty-state-icon">📋</div>
+              <div className="empty-state-icon"><i className="bi bi-clipboard"></i></div>
               <h3>No {activeTab==='all' ? '' : activeTab} leave requests</h3>
               <p>{activeTab==='pending' ? 'All leave requests have been reviewed.' : `No ${activeTab} leaves to display.`}</p>
             </div>
@@ -228,14 +228,14 @@ export default function HODLeaves() {
                         background:'rgba(108,99,255,0.06)',borderRadius:'10px',padding:'12px 14px',
                         marginBottom:'14px',color:'var(--text-secondary)',fontSize:'0.87rem',lineHeight:1.6
                       }}>
-                        <span style={{fontWeight:700,color:'var(--text-primary)'}}>📝 Reason: </span>
+                        <span style={{fontWeight:700,color:'var(--text-primary)'}}><i className="bi bi-pencil-square"></i> Reason: </span>
                         {leave.reason}
                       </div>
                     )}
 
                     {leave.hod_remarks && (
                       <div style={{color:st.color,fontSize:'0.83rem',marginBottom:'12px',fontStyle:'italic'}}>
-                        💬 Your Remarks: {leave.hod_remarks}
+                        <i className="bi bi-chat-dots"></i> Your Remarks: {leave.hod_remarks}
                       </div>
                     )}
 
@@ -247,14 +247,14 @@ export default function HODLeaves() {
                           onClick={() => { setActionModal({ leave, action:'approve' }); setRemarks(''); }}
                           style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}
                         >
-                          ✅ Approve Leave
+                          <i className="bi bi-check-circle-fill"></i> Approve Leave
                         </button>
                         <button
                           className="btn btn-danger"
                           onClick={() => { setActionModal({ leave, action:'reject' }); setRemarks(''); }}
                           style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}
                         >
-                          ❌ Reject Leave
+                          <i className="bi bi-x-circle"></i> Reject Leave
                         </button>
                       </div>
                     )}
@@ -319,7 +319,7 @@ export default function HODLeaves() {
                 borderRadius:'10px',padding:'12px 14px',marginBottom:'16px',
                 color:'#00D4AA',fontSize:'0.83rem',display:'flex',alignItems:'center',gap:'8px'
               }}>
-                <span>🔔</span>
+                <span><i className="bi bi-bell"></i></span>
                 <span>A notice will be automatically sent to students about the lecture change, and a substitute faculty will be assigned.</span>
               </div>
             )}

@@ -25,11 +25,11 @@ export default function ParentFees() {
 
   return (
     <>
-      <div className="page-header"><div className="page-header-left"><h1>💰 Fee Status</h1><p>Read-only view of your child’s fee records.</p></div></div>
+      <div className="page-header"><div className="page-header-left"><h1><i className="bi bi-cash-coin"></i> Fee Status</h1><p>Read-only view of your child’s fee records.</p></div></div>
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card success"><div className="stat-icon">✅</div><div className="stat-value">{Utils.formatCurrency(paid)}</div><div className="stat-label">Paid</div></div>
-        <div className={`stat-card ${pending ? 'warning' : 'success'}`}><div className="stat-icon">⏳</div><div className="stat-value">{Utils.formatCurrency(pending)}</div><div className="stat-label">Pending</div></div>
-        <div className="stat-card info"><div className="stat-icon">🧾</div><div className="stat-value">{fees.length}</div><div className="stat-label">Records</div></div>
+        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div className="stat-value">{Utils.formatCurrency(paid)}</div><div className="stat-label">Paid</div></div>
+        <div className={`stat-card ${pending ? 'warning' : 'success'}`}><div className="stat-icon"><i className="bi bi-hourglass-split"></i></div><div className="stat-value">{Utils.formatCurrency(pending)}</div><div className="stat-label">Pending</div></div>
+        <div className="stat-card info"><div className="stat-icon"><i className="bi bi-receipt"></i></div><div className="stat-value">{fees.length}</div><div className="stat-label">Records</div></div>
       </div>
       <div className="card col-12">
         <div className="card-body" style={{ padding: 0 }}>
@@ -49,7 +49,7 @@ export default function ParentFees() {
                 </tbody>
               </table>
             </div>
-          ) : <div className="empty-state" style={{ padding: '40px', textAlign: 'center' }}><div className="empty-state-icon">💰</div><p>No fee records found.</p></div>}
+          ) : <div className="empty-state" style={{ padding: '40px', textAlign: 'center' }}><div className="empty-state-icon"><i className="bi bi-cash-coin"></i></div><p>No fee records found.</p></div>}
         </div>
       </div>
     </>

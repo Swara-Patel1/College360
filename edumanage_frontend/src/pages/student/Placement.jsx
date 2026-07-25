@@ -124,7 +124,7 @@ export default function Placement() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>🎯 Placement Eligibility Predictor</h1>
+          <h1><i className="bi bi-bullseye"></i> Placement Eligibility Predictor</h1>
           <p>Real-time analytics and company matching dashboard.</p>
         </div>
       </div>
@@ -158,7 +158,7 @@ export default function Placement() {
             </h3>
             {scoreData?.placement_probability != null && (
               <span className="badge badge-info" style={{ marginBottom: '8px' }}>
-                🤖 ML model · {Math.round(scoreData.placement_probability * 100)}% placement probability
+                <i className="bi bi-robot"></i> ML model · {Math.round(scoreData.placement_probability * 100)}% placement probability
               </span>
             )}
             <p id="scoreComputedAt" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -172,7 +172,7 @@ export default function Placement() {
         {/* Factors Breakdown Card */}
         <div className="card col-6">
           <div className="card-header">
-            <div className="card-title">📊 Placement Factors Breakdown</div>
+            <div className="card-title"><i className="bi bi-bar-chart"></i> Placement Factors Breakdown</div>
           </div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {scoreData ? (
@@ -261,7 +261,7 @@ export default function Placement() {
         {scoreData?.improvement_tips?.length > 0 && (
           <div className="card col-12" id="tipsSection">
             <div className="card-header">
-              <div className="card-title">💡 Practical Placement Tips</div>
+              <div className="card-title"><i className="bi bi-lightbulb"></i> Practical Placement Tips</div>
             </div>
             <div className="card-body" id="tipsList" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
               {scoreData.improvement_tips.map((t, idx) => (
@@ -279,7 +279,7 @@ export default function Placement() {
         {/* Company Matches Card */}
         <div className="card col-12">
           <div className="card-header" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
-            <div className="card-title">🏢 Placement Company Eligibility Matches</div>
+            <div className="card-title"><i className="bi bi-building"></i> Placement Company Eligibility Matches</div>
             <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
               <button 
                 className={`btn ${selectedFilter === 'all' ? 'btn-secondary' : 'btn-ghost'} btn-sm`}
@@ -291,13 +291,13 @@ export default function Placement() {
                 className={`btn ${selectedFilter === 'eligible' ? 'btn-secondary' : 'btn-ghost'} btn-sm`}
                 onClick={() => setSelectedFilter('eligible')}
               >
-                ✅ Eligible
+                <i className="bi bi-check-circle-fill"></i> Eligible
               </button>
               <button 
                 className={`btn ${selectedFilter === 'locked' ? 'btn-secondary' : 'btn-ghost'} btn-sm`}
                 onClick={() => setSelectedFilter('locked')}
               >
-                🔒 Locked
+                <i className="bi bi-lock-fill"></i> Locked
               </button>
             </div>
           </div>
@@ -343,7 +343,7 @@ export default function Placement() {
               })
             ) : (
               <div className="empty-state" style={{ padding: '40px', gridColumn: '1 / -1', textAlign: 'center' }}>
-                <div className="empty-state-icon">🏢</div>
+                <div className="empty-state-icon"><i className="bi bi-building"></i></div>
                 <p>No companies match selected criteria.</p>
               </div>
             )}

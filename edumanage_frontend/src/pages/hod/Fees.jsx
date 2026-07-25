@@ -91,7 +91,7 @@ export default function HODFees() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>💰 Department Pending Fees</h1>
+          <h1><i className="bi bi-cash-coin"></i> Department Pending Fees</h1>
           <p>Track student pending fees and coordinate collections reminders with parents.</p>
         </div>
       </div>
@@ -99,7 +99,7 @@ export default function HODFees() {
       {/* Mini Stats */}
       <div className="stats-mini">
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}>💰</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}><i className="bi bi-cash-coin"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#FF6B6B' }}>
               {Utils.formatCurrency(totalPendingAmount)}
@@ -108,7 +108,7 @@ export default function HODFees() {
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}>👥</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}><i className="bi bi-people"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: 'var(--primary)' }}>{payments.length}</div>
             <div className="stats-mini-lbl">Pending Defaulters</div>
@@ -165,7 +165,7 @@ export default function HODFees() {
                           style={{ color: 'var(--primary)' }}
                           onClick={() => handleOpenEmail(p)}
                         >
-                          ✉️ Send Reminder
+                          <i className="bi bi-envelope"></i> Send Reminder
                         </button>
                       </td>
                     </tr>
@@ -175,7 +175,7 @@ export default function HODFees() {
             </table>
           ) : (
             <div className="empty-state" style={{ padding: '40px' }}>
-              <div className="empty-state-icon">✅</div>
+              <div className="empty-state-icon"><i className="bi bi-check-circle-fill"></i></div>
               <p>Great! All students in your department have fully settled their dues.</p>
             </div>
           )}

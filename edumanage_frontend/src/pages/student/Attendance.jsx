@@ -200,7 +200,7 @@ export default function Attendance() {
     <>
       {/* Row 1: Attendance Tracker full width */}
       <div className="stat-card primary" style={{ marginBottom: '20px' }}>
-        <div className="stat-icon">📋</div>
+        <div className="stat-icon"><i className="bi bi-clipboard"></i></div>
         <div className="stat-value">Attendance Tracker</div>
         <p id="attSubtitle" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
           {profile 
@@ -212,7 +212,7 @@ export default function Attendance() {
       {/* Row 2: 4 stat cards */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className={rateCardClass}>
-          <div className="stat-icon">📈</div>
+          <div className="stat-icon"><i className="bi bi-graph-up-arrow"></i></div>
           <div className="stat-value" id="overallRate">{rate}%</div>
           <div className="stat-label">Overall Rate</div>
         </div>
@@ -237,7 +237,7 @@ export default function Attendance() {
         {/* Attendance Chart */}
         <div className="card col-5">
           <div className="card-header">
-            <div className="card-title">📊 Visual Breakdown</div>
+            <div className="card-title"><i className="bi bi-bar-chart"></i> Visual Breakdown</div>
           </div>
           <div className="card-body">
             <div className="chart-container" style={{ height: '220px', position: 'relative' }}>
@@ -249,7 +249,7 @@ export default function Attendance() {
         {/* Policy Advice Card */}
         <div className="card col-7">
           <div className="card-header">
-            <div className="card-title">📜 Attendance Policy</div>
+            <div className="card-title"><i className="bi bi-file-text"></i> Attendance Policy</div>
           </div>
           <div className="card-body" style={{ display: 'flex', gap: '20px', alignItems: 'center', height: '100%' }}>
             <div 
@@ -283,7 +283,7 @@ export default function Attendance() {
         {/* Subject Breakdowns */}
         <div className="card col-12">
           <div className="card-header">
-            <div className="card-title">🏛️ Subject-wise Analysis</div>
+            <div className="card-title"><i className="bi bi-building"></i> Subject-wise Analysis</div>
           </div>
           <div className="card-body">
             <div className="dashboard-grid" id="courseBreakdown" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', padding: 0 }}>
@@ -333,7 +333,7 @@ export default function Attendance() {
         {/* Filters and logs list */}
         <div className="card col-12">
           <div className="card-header" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
-            <div className="card-title">📅 Daily Attendance Log</div>
+            <div className="card-title"><i className="bi bi-calendar3"></i> Daily Attendance Log</div>
             <div className="header-actions" style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
               <select 
                 className="form-control" 
@@ -394,7 +394,7 @@ export default function Attendance() {
                   ) : (
                     <tr>
                       <td colSpan="5" className="text-center" style={{ padding: '40px', color: 'var(--text-muted)' }}>
-                        <div className="no-records-icon">📭</div>
+                        <div className="no-records-icon"><i className="bi bi-inbox"></i></div>
                         <div style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '4px' }}>No records found</div>
                         <div style={{ fontSize: '0.75rem' }}>Your daily logs will appear here when marked.</div>
                       </td>

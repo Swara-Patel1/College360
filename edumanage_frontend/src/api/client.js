@@ -39,6 +39,22 @@ const SupaFetch = {
   }
 };
 
+/**
+ * Resolve the HOD context for a user — either a real HOD or a deputy holding an
+ * active delegation that covers `requiredScope`. Returns null if neither applies.
+ */
+async function resolveHodContext(userId, requiredScope = null) {
+  const hodRow = await SupaFetch.request(`hod?user_id=eq.${userId}`).catch(() => null);
+  if (hodRow?.length) {
+    return { departmentId: hodRow[0].department_id, hodId: hodRow[0].hod_id, viaDelegation: false };
+  }
+  const acc = await SupaFetch.request(`hod/my-access?user_id=eq.${userId}`).catch(() => null);
+  if (acc?.isDelegate && (!requiredScope || (acc.scopes || []).includes(requiredScope))) {
+    return { departmentId: acc.department_id, hodId: acc.delegator_hod_id, viaDelegation: true, scopes: acc.scopes };
+  }
+  return null;
+}
+
 export const API = {
   async request(endpoint, options = {}) {
     const method = options.method || 'GET';
@@ -726,10 +742,18 @@ export const API = {
         }
       }
 
-      // 16. HOD CHECK
+      // 16. HOD CHECK (real HOD, or a deputy acting via delegation)
       if (path === 'hod/check') {
         const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
-        return { isHod: !!hodRow?.length, hod: hodRow?.[0] || null };
+        if (hodRow?.length) return { isHod: true, hod: hodRow[0], viaDelegation: false };
+        const acc = await SupaFetch.request(`hod/my-access?user_id=eq.${loggedInUser.id}`).catch(() => null);
+        if (acc?.isDelegate) {
+          return {
+            isHod: true, viaDelegation: true, scopes: acc.scopes,
+            hod: { hod_id: acc.delegator_hod_id, department_id: acc.department_id, delegator_name: acc.delegator_name },
+          };
+        }
+        return { isHod: false, hod: null };
       }
 
       // 17. FACULTY LEAVE
@@ -760,11 +784,11 @@ export const API = {
         }
       }
 
-      // 18. HOD LEAVE MANAGEMENT
+      // 18. HOD LEAVE MANAGEMENT (HOD, or a deputy with a 'leaves' delegation)
       if (path === 'hod/leaves') {
-        const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
-        if (!hodRow?.length) throw { error: 'unauthorized', message: 'HOD access only.' };
-        const faculty = await SupaFetch.request(`faculty?select=faculty_id&department_id=eq.${hodRow[0].department_id}`);
+        const ctx = await resolveHodContext(loggedInUser.id, 'leaves');
+        if (!ctx) throw { error: 'unauthorized', message: 'HOD access only.' };
+        const faculty = await SupaFetch.request(`faculty?select=faculty_id&department_id=eq.${ctx.departmentId}`);
         if (!faculty?.length) return [];
         return await SupaFetch.request(`leave_requests?select=*,faculty:faculty(*)&faculty_id=in.(${faculty.map(f => f.faculty_id).join(',')})&order=applied_at.desc`);
       }
@@ -773,13 +797,14 @@ export const API = {
         const parts = path.split('/');
         const leaveUuid = parts[2];
         const action = parts[3];
-        const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
-        if (!hodRow?.length) throw { error: 'unauthorized', message: 'HOD only.' };
+        const ctx = await resolveHodContext(loggedInUser.id, 'leaves');
+        if (!ctx) throw { error: 'unauthorized', message: 'HOD only.' };
         const status = action === 'approve' ? 'approved' : 'rejected';
         const row = await SupaFetch.request(`leave_requests?leave_id=eq.${leaveUuid}`, 'PATCH', {
           status,
-          approved_by_hod: hodRow[0].hod_id,
-          decision_at: new Date().toISOString()
+          approved_by_hod: ctx.hodId,
+          decision_at: new Date().toISOString(),
+          hod_remarks: body?.remarks || ''
         });
         return Array.isArray(row) ? row[0] : row;
       }
@@ -1053,6 +1078,9 @@ export const SupaAPI = {
     all:       ()       => API.get('doubts?order=submitted_at.desc'),
     add:       (data)   => API.post('doubts', data),
     resolve:   (id, res)=> API.patch(`doubts?doubt_id=eq.${id}`, { status: 'resolved', resolution: res, resolved_at: new Date().toISOString() }),
+    acceptAI:  (id)     => API.patch(`doubts?doubt_id=eq.${id}`, { action: 'accept_ai' }),
+    escalate:  (id)     => API.patch(`doubts?doubt_id=eq.${id}`, { action: 'escalate' }),
+    retryAI:   (id)     => API.patch(`doubts?doubt_id=eq.${id}`, { action: 'ai_retry' }),
   },
 
   parent: {
@@ -1095,6 +1123,57 @@ export const SupaAPI = {
     byYear: (year)  => API.get(`alumni?graduation_year=eq.${year}&order=first_name.asc`),
     add:    (data)  => API.post('alumni', data),
     delete: (id)    => API.delete(`alumni?id=eq.${id}`),
+  },
+
+  payments: {
+    config:       ()        => API.get('payments/config'),
+    createOrder:  (feeId)   => API.post('payments/create-order', { fee_id: feeId }),
+    mockCheckout: (orderId, outcome = 'success', method = 'card') =>
+      API.post('payments/mock-checkout', { order_id: orderId, outcome, method }),
+    verify:       (data)    => API.post('payments/verify', data),
+    history:      (studId)  => API.get(`payments?student_id=eq.${studId}&order=created_at.desc`),
+  },
+
+  delegation: {
+    byDepartment: (deptId) => API.get(`hod/delegations?department_id=eq.${deptId}&order=start_date.desc`),
+    myAccess:     (userId) => API.get(`hod/my-access?user_id=eq.${userId}`),
+    create:       (data)   => API.post('hod/delegations', data),
+    revoke:       (id)     => API.patch(`hod/delegations?delegation_id=eq.${id}`, { action: 'revoke' }),
+    update:       (id, d)  => API.patch(`hod/delegations?delegation_id=eq.${id}`, d),
+    remove:       (id)     => API.delete(`hod/delegations?delegation_id=eq.${id}`),
+  },
+
+  internships: {
+    byStudent: (sid) => API.get(`internships?student_id=eq.${sid}&order=start_date.desc`),
+    all:       ()    => API.get('internships?order=start_date.desc'),
+    add:       (d)   => API.post('internships', d),
+    update:    (id, d) => API.patch(`internships?internship_id=eq.${id}`, d),
+    verify:    (id, status) => API.patch(`internships?internship_id=eq.${id}`, { verification: status }),
+    remove:    (id)  => API.delete(`internships?internship_id=eq.${id}`),
+  },
+
+  achievements: {
+    byStudent: (sid) => API.get(`achievements?student_id=eq.${sid}&order=date_awarded.desc`),
+    all:       ()    => API.get('achievements?order=date_awarded.desc'),
+    add:       (d)   => API.post('achievements', d),
+    update:    (id, d) => API.patch(`achievements?achievement_id=eq.${id}`, d),
+    verify:    (id, status) => API.patch(`achievements?achievement_id=eq.${id}`, { verification: status }),
+    remove:    (id)  => API.delete(`achievements?achievement_id=eq.${id}`),
+  },
+
+  library: {
+    books:       (q = '') => API.get(`library/books${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    available:   (q = '') => API.get(`library/books?available=eq.true${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+    addBook:     (data)   => API.post('library/books', data),
+    updateBook:  (id, d)  => API.patch(`library/books?book_id=eq.${id}`, d),
+    removeBook:  (id)     => API.delete(`library/books?book_id=eq.${id}`),
+    loans:       ()       => API.get('library/loans?order=issued_at.desc'),
+    loansByStudent: (sid) => API.get(`library/loans?student_id=eq.${sid}&order=issued_at.desc`),
+    issue:       (data)   => API.post('library/loans', data),
+    returnBook:  (id, paid = true) => API.patch(`library/loans?loan_id=eq.${id}`, { action: 'return', fine_paid: paid }),
+    markFinePaid:(id)     => API.patch(`library/loans?loan_id=eq.${id}`, { fine_paid: true }),
+    removeLoan:  (id)     => API.delete(`library/loans?loan_id=eq.${id}`),
+    stats:       ()       => API.get('library/stats'),
   },
 
   companies: {
@@ -1180,7 +1259,9 @@ export const Utils = {
       active: 'success', inactive: 'muted', graduated: 'info',
       paid: 'success', pending: 'warning', overdue: 'danger', waived: 'muted',
       present: 'success', absent: 'danger', late: 'warning', excused: 'info',
-      approved: 'success', rejected: 'danger'
+      approved: 'success', rejected: 'danger',
+      ai_answered: 'primary', under_review: 'info', open: 'warning',
+      resolved: 'success', escalated: 'danger'
     };
     return `badge badge-${map[cleanStatus] || 'muted'}`;
   },

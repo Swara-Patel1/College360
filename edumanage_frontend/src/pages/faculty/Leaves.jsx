@@ -92,7 +92,7 @@ export default function FacultyLeaves() {
 
       <div className="page-header">
         <div className="page-header-left">
-          <h1>🏖️ Leave Management</h1>
+          <h1><i className="bi bi-airplane"></i> Leave Management</h1>
           <p>Apply for leave and track your approval status.</p>
         </div>
         <div className="page-header-right">
@@ -155,7 +155,7 @@ export default function FacultyLeaves() {
             </div>
           ) : filteredLeaves.length === 0 ? (
             <div className="empty-state" style={{padding:'60px 20px'}}>
-              <div className="empty-state-icon">🏖️</div>
+              <div className="empty-state-icon"><i className="bi bi-airplane"></i></div>
               <h3>No {activeTab==='all' ? '' : activeTab} leave requests</h3>
               <p>{activeTab==='all' ? 'Click "Apply for Leave" to get started.' : `No ${activeTab} requests to show.`}</p>
             </div>
@@ -185,12 +185,12 @@ export default function FacultyLeaves() {
                       </div>
                       {leave.reason && (
                         <p style={{color:'var(--text-muted)',fontSize:'0.87rem',margin:'4px 0 0 0',lineHeight:1.5}}>
-                          📝 {leave.reason}
+                          <i className="bi bi-pencil-square"></i> {leave.reason}
                         </p>
                       )}
                       {leave.hod_remarks && (
                         <p style={{color:st.color,fontSize:'0.82rem',marginTop:'6px',fontStyle:'italic'}}>
-                          💬 HOD Remarks: {leave.hod_remarks}
+                          <i className="bi bi-chat-dots"></i> HOD Remarks: {leave.hod_remarks}
                         </p>
                       )}
                       <div style={{color:'var(--text-muted)',fontSize:'0.78rem',marginTop:'8px'}}>
@@ -221,7 +221,7 @@ export default function FacultyLeaves() {
             boxShadow:'0 24px 64px rgba(0,0,0,0.4)',border:'1px solid var(--border)'
           }}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'24px'}}>
-              <h2 style={{margin:0,fontSize:'1.4rem'}}>🏖️ Apply for Leave</h2>
+              <h2 style={{margin:0,fontSize:'1.4rem'}}><i className="bi bi-airplane"></i> Apply for Leave</h2>
               <button onClick={() => setShowForm(false)} style={{
                 background:'var(--surface)',border:'1px solid var(--border)',
                 borderRadius:'50%',width:'36px',height:'36px',cursor:'pointer',
@@ -269,7 +269,7 @@ export default function FacultyLeaves() {
 
               {form.fromDate && form.toDate && new Date(form.fromDate) <= new Date(form.toDate) && (
                 <div style={{background:'rgba(108,99,255,0.08)',borderRadius:'10px',padding:'10px 16px',color:'var(--primary)',fontSize:'0.87rem',fontWeight:600,textAlign:'center'}}>
-                  📅 Duration: {getDays(form.fromDate,form.toDate)} day{getDays(form.fromDate,form.toDate)!==1?'s':''}
+                  <i className="bi bi-calendar3"></i> Duration: {getDays(form.fromDate,form.toDate)} day{getDays(form.fromDate,form.toDate)!==1?'s':''}
                 </div>
               )}
 
@@ -284,7 +284,7 @@ export default function FacultyLeaves() {
 
               {formError && (
                 <div style={{background:'rgba(255,107,107,0.1)',border:'1px solid #FF6B6B',color:'#FF6B6B',padding:'12px 16px',borderRadius:'10px',fontSize:'0.87rem'}}>
-                  ⚠️ {formError}
+                  <i className="bi bi-exclamation-triangle"></i> {formError}
                 </div>
               )}
 

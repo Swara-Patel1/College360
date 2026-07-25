@@ -18,7 +18,7 @@ const StatCard = ({ icon, label, value, sub, color, onClick, loading }) => (
       </div>
       {sub && <div className="stat-card-sub">{sub}</div>}
     </div>
-    {onClick && <div className="stat-card-arrow">→</div>}
+    {onClick && <div className="stat-card-arrow"><i className="bi bi-arrow-right"></i></div>}
   </div>
 );
 
@@ -56,13 +56,13 @@ export default function AdminDashboard() {
 
       {error && (
         <div style={{ background: '#450a0a', border: '1px solid #ef4444', color: '#fca5a5', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.8rem' }}>
-          ⚠ Load error: {error}
+          <i className="bi bi-exclamation-triangle"></i> Load error: {error}
         </div>
       )}
 
       {/* ── People ── */}
       <section className="admin-dash-section">
-        <h2 className="admin-section-heading">👥 People</h2>
+        <h2 className="admin-section-heading"><i className="bi bi-people"></i> People</h2>
         <div className="admin-stat-grid">
           <StatCard icon="🎓" label="Total Students"
             value={fmt(stats?.total_students)}
@@ -85,7 +85,7 @@ export default function AdminDashboard() {
 
       {/* ── Fees ── */}
       <section className="admin-dash-section">
-        <h2 className="admin-section-heading">💰 Fees Overview</h2>
+        <h2 className="admin-section-heading"><i className="bi bi-cash-coin"></i> Fees Overview</h2>
         <div className="admin-stat-grid">
           <StatCard icon="✅" label="Fees Collected"
             value={fmtCurr(stats?.total_fees_collected)}
@@ -102,7 +102,7 @@ export default function AdminDashboard() {
 
       {/* ── Quick Actions ── */}
       <section className="admin-dash-section">
-        <h2 className="admin-section-heading">⚡ Quick Actions</h2>
+        <h2 className="admin-section-heading"><i className="bi bi-lightning-charge"></i> Quick Actions</h2>
         <div className="admin-quick-grid">
           {[
             { icon: '🎓', label: 'Students',    path: '/admin/students',    color: '#6366f1' },

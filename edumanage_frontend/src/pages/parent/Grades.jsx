@@ -24,7 +24,7 @@ export default function ParentGrades() {
 
   return (
     <>
-      <div className="page-header"><div className="page-header-left"><h1>📝 {child ? `${child.user?.first_name || ''}'s ` : ''}Grades</h1><p>Read-only view of semester marks. Class average: {avg}%.</p></div></div>
+      <div className="page-header"><div className="page-header-left"><h1><i className="bi bi-pencil-square"></i> {child ? `${child.user?.first_name || ''}'s ` : ''}Grades</h1><p>Read-only view of semester marks. Class average: {avg}%.</p></div></div>
       <div className="card col-12">
         <div className="card-body" style={{ padding: 0 }}>
           {grades.length ? (
@@ -44,7 +44,7 @@ export default function ParentGrades() {
                 </tbody>
               </table>
             </div>
-          ) : <div className="empty-state" style={{ padding: '40px', textAlign: 'center' }}><div className="empty-state-icon">📝</div><p>No grades recorded yet.</p></div>}
+          ) : <div className="empty-state" style={{ padding: '40px', textAlign: 'center' }}><div className="empty-state-icon"><i className="bi bi-pencil-square"></i></div><p>No grades recorded yet.</p></div>}
         </div>
       </div>
     </>

@@ -40,12 +40,13 @@ from students.models import Student
 from courses.models import Course, Enrollment
 from attendance.models import AttendanceRecord
 from grades.models import Grade
-from fees.models import Fee
+from fees.models import Fee, PaymentTransaction
 from timetable.models import Schedule
 from notices.models import Notice
 from complaints.models import Complaint
-from campus.models import StudyMaterial, Doubt, Alumnus, FacultyFeedback, Backlog, Exam
-from django.db.models import Avg, Count
+from campus.models import (StudyMaterial, Doubt, Alumnus, FacultyFeedback, Backlog, Exam,
+                           Book, BookLoan, Internship, Achievement, Delegation)
+from django.db.models import Avg, Count, Sum
 
 # Serialization helpers ──────────────────────────────────────────────────────
 
@@ -1375,6 +1376,11 @@ def serialize_doubt(d):
         'status': d.status,
         'resolution': d.resolution or '',
         'attachment_url': d.attachment_url or '',
+        'ai_answer': d.ai_answer or '',
+        'ai_confidence': d.ai_confidence,
+        'ai_sources': d.ai_sources or '',
+        'ai_answered_at': _dt(d.ai_answered_at),
+        'ai_helpful': d.ai_helpful,
         'submitted_at': _dt(d.submitted_at),
         'resolved_at': _dt(d.resolved_at),
         'sla_deadline': _dt(d.sla_deadline),
@@ -1478,13 +1484,50 @@ def handle_doubts(request, params, body):
             submitted_at=submitted,
             sla_deadline=submitted + timedelta(hours=72),
         )
+        # AI syllabus assistant: attempt an instant grounded answer before faculty.
+        try:
+            from chatbot.services.doubt_ai import answer_doubt
+            ai = answer_doubt(d)
+            d.ai_answer = ai['answer']
+            d.ai_confidence = ai['confidence']
+            d.ai_sources = ai['sources']
+            d.ai_answered_at = timezone.now()
+            d.status = 'ai_answered'
+            d.save()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()  # AI failure shouldn't block doubt submission
         return [serialize_doubt(d)]
 
     if request.method == 'PATCH':
         did = params.get('doubt_id', '').replace('eq.', '')
-        d = Doubt.objects.filter(pk=did).first()
+        d = Doubt.objects.select_related('course', 'student__user').filter(pk=did).first()
         if not d:
             return []
+        action = body.get('action')
+        if action == 'accept_ai':
+            # Student found the AI answer sufficient — close the doubt.
+            d.status = 'resolved'
+            d.resolution = d.ai_answer
+            d.ai_helpful = True
+            d.resolved_at = timezone.now()
+        elif action == 'escalate':
+            # Route to a faculty member for a human answer.
+            d.status = 'under_review'
+            d.ai_helpful = False
+            if not d.assigned_faculty and d.course and d.course.faculty:
+                d.assigned_faculty = d.course.faculty
+        elif action == 'ai_retry':
+            try:
+                from chatbot.services.doubt_ai import answer_doubt
+                ai = answer_doubt(d)
+                d.ai_answer = ai['answer']
+                d.ai_confidence = ai['confidence']
+                d.ai_sources = ai['sources']
+                d.ai_answered_at = timezone.now()
+                d.status = 'ai_answered'
+            except Exception:
+                pass
         if 'status' in body:
             d.status = body['status']
         if 'resolution' in body:
@@ -1891,6 +1934,616 @@ def handle_alumni(request, params, body):
         return []
 
     return []
+
+
+# ── Library Management ───────────────────────────────────────────────────────
+
+def serialize_book(b):
+    issued = b.total_copies - b.available_copies
+    return {
+        'id': str(b.pk),
+        'book_id': str(b.pk),
+        'isbn': b.isbn,
+        'barcode': b.barcode,
+        'title': b.title,
+        'author': b.author,
+        'publisher': b.publisher,
+        'edition': b.edition,
+        'category': b.category,
+        'department_id': str(b.department.pk) if b.department else None,
+        'department_name': b.department.name if b.department else '—',
+        'shelf': b.shelf,
+        'total_copies': b.total_copies,
+        'available_copies': b.available_copies,
+        'issued_copies': issued,
+        'cover_url': b.cover_url,
+        'created_at': _dt(b.created_at),
+    }
+
+
+def serialize_loan(l, as_of=None):
+    live_fine = l.fine if l.status == 'returned' else l.computed_fine(as_of)
+    return {
+        'id': str(l.pk),
+        'loan_id': str(l.pk),
+        'book_id': str(l.book.pk),
+        'book_title': l.book.title,
+        'book_author': l.book.author,
+        'barcode': l.book.barcode,
+        'student_id': str(l.student.pk),
+        'student_name': f'{l.student.user.first_name} {l.student.user.last_name}'.strip(),
+        'enrollment_no': l.student.student_id,
+        'issued_at': _dt(l.issued_at),
+        'due_date': _dt(l.due_date),
+        'returned_at': _dt(l.returned_at),
+        'status': l.status,
+        'overdue_days': l.overdue_days(as_of),
+        'fine': float(live_fine),
+        'fine_paid': l.fine_paid,
+        'created_at': _dt(l.created_at),
+    }
+
+
+@handler('library/books')
+def handle_library_books(request, params, body):
+    FM = {'id': 'pk', 'book_id': 'pk', 'category': 'category',
+          'department_id': 'department__pk', 'isbn': 'isbn', 'barcode': 'barcode'}
+    if request.method == 'GET':
+        qs = Book.objects.select_related('department').all()
+        # Free-text search across title/author/isbn/barcode (barcode/ISBN lookup).
+        q = params.get('q', '').replace('eq.', '').replace('ilike.', '').strip('%').strip()
+        if q:
+            qs = qs.filter(Q(title__icontains=q) | Q(author__icontains=q) |
+                           Q(isbn__icontains=q) | Q(barcode__icontains=q) |
+                           Q(category__icontains=q))
+        if params.get('available', '') == 'eq.true':
+            qs = qs.filter(available_copies__gt=0)
+        qs = apply_postgrest_filters(qs, params, FM)
+        qs = apply_order(qs, params.get('order', 'title.asc'), FM)
+        return [serialize_book(b) for b in qs[:500]]
+
+    if request.method == 'POST':
+        dept = Department.objects.filter(pk=body.get('department_id')).first()
+        total = int(body.get('total_copies') or 1)
+        b = Book.objects.create(
+            isbn=body.get('isbn', ''),
+            barcode=body.get('barcode', '') or f"LIB{timezone.now().strftime('%y%m%d%H%M%S')}",
+            title=body.get('title', 'Untitled'),
+            author=body.get('author', ''),
+            publisher=body.get('publisher', ''),
+            edition=body.get('edition', ''),
+            category=body.get('category', ''),
+            department=dept,
+            shelf=body.get('shelf', ''),
+            total_copies=total,
+            available_copies=total,
+            cover_url=body.get('cover_url', ''),
+        )
+        return [serialize_book(b)]
+
+    if request.method == 'PATCH':
+        bid = params.get('book_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        b = Book.objects.select_related('department').filter(pk=bid).first()
+        if not b:
+            return []
+        if 'department_id' in body:
+            b.department = Department.objects.filter(pk=body['department_id']).first()
+        for f in ['isbn', 'barcode', 'title', 'author', 'publisher', 'edition', 'category', 'shelf', 'cover_url']:
+            if f in body:
+                setattr(b, f, body[f])
+        # Adjust available copies in step with any change to the total stock.
+        if 'total_copies' in body:
+            new_total = int(body['total_copies'])
+            delta = new_total - b.total_copies
+            b.total_copies = new_total
+            b.available_copies = max(0, min(new_total, b.available_copies + delta))
+        b.save()
+        return [serialize_book(b)]
+
+    if request.method == 'DELETE':
+        bid = params.get('book_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        Book.objects.filter(pk=bid).delete()
+        return []
+
+    return []
+
+
+@handler('library/loans')
+def handle_library_loans(request, params, body):
+    FM = {'id': 'pk', 'loan_id': 'pk', 'status': 'status',
+          'book_id': 'book__pk', 'student_id': 'student__pk'}
+    if request.method == 'GET':
+        qs = BookLoan.objects.select_related('book', 'student__user').all()
+        sid = params.get('student_id', '')
+        if sid.startswith('eq.'):
+            val = sid[3:]
+            qs = qs.filter(Q(student__pk=int(val) if val.isdigit() else -1) |
+                           Q(student__user__pk=int(val) if val.isdigit() else -1) |
+                           Q(student__student_id=val))
+        else:
+            qs = apply_postgrest_filters(qs, params, FM)
+        qs = apply_order(qs, params.get('order', 'issued_at.desc'), FM)
+        return [serialize_loan(l) for l in qs[:400]]
+
+    if request.method == 'POST':
+        # Issue a book to a student.
+        book = Book.objects.filter(pk=body.get('book_id')).first()
+        stu = Student.objects.filter(pk=body.get('student_id')).first()
+        if not stu and str(body.get('student_id') or '').isdigit():
+            stu = Student.objects.filter(user__pk=body.get('student_id')).first()
+        if not book or not stu:
+            return {'error': 'book or student not found'}
+        if book.available_copies < 1:
+            return {'error': 'no copies available'}
+        loan_days = int(body.get('loan_days') or 14)
+        due = body.get('due_date') or (timezone.localdate() + timedelta(days=loan_days)).isoformat()
+        loan = BookLoan.objects.create(book=book, student=stu, due_date=due)
+        book.available_copies = max(0, book.available_copies - 1)
+        book.save(update_fields=['available_copies'])
+        return [serialize_loan(loan)]
+
+    if request.method == 'PATCH':
+        lid = params.get('loan_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        loan = BookLoan.objects.select_related('book', 'student__user').filter(pk=lid).first()
+        if not loan:
+            return []
+        action = body.get('action')
+        if action == 'return' and loan.status == 'issued':
+            loan.returned_at = timezone.localdate()
+            loan.fine = loan.computed_fine()
+            loan.status = 'returned'
+            loan.book.available_copies = min(loan.book.total_copies, loan.book.available_copies + 1)
+            loan.book.save(update_fields=['available_copies'])
+        elif action == 'lost':
+            loan.status = 'lost'
+        if body.get('fine_paid') is not None:
+            loan.fine_paid = bool(body['fine_paid'])
+        loan.save()
+        return [serialize_loan(loan)]
+
+    if request.method == 'DELETE':
+        lid = params.get('loan_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        loan = BookLoan.objects.select_related('book').filter(pk=lid).first()
+        if loan:
+            if loan.status == 'issued':  # return the copy to stock
+                loan.book.available_copies = min(loan.book.total_copies, loan.book.available_copies + 1)
+                loan.book.save(update_fields=['available_copies'])
+            loan.delete()
+        return []
+
+    return []
+
+
+@handler('library/stats')
+def handle_library_stats(request, params, body):
+    total_titles = Book.objects.count()
+    total_copies = Book.objects.aggregate(s=Sum('total_copies'))['s'] or 0
+    available = Book.objects.aggregate(s=Sum('available_copies'))['s'] or 0
+    active_loans = BookLoan.objects.filter(status='issued')
+    today = timezone.localdate()
+    overdue = active_loans.filter(due_date__lt=today).count()
+    outstanding_fine = sum(l.computed_fine() for l in active_loans.select_related('book')) + \
+        float(BookLoan.objects.filter(status='returned', fine_paid=False)
+              .aggregate(s=Sum('fine'))['s'] or 0)
+    return {
+        'total_titles': total_titles,
+        'total_copies': int(total_copies),
+        'available_copies': int(available),
+        'issued_copies': int(total_copies) - int(available),
+        'active_loans': active_loans.count(),
+        'overdue': overdue,
+        'outstanding_fine': float(outstanding_fine),
+    }
+
+
+# ── Student Internships & Achievements ───────────────────────────────────────
+
+def _resolve_student(val):
+    """Resolve a student from a pk, auth-user pk, or enrollment number."""
+    if not val:
+        return None
+    stu = None
+    if str(val).isdigit():
+        stu = Student.objects.filter(pk=val).first() or Student.objects.filter(user__pk=val).first()
+    return stu or Student.objects.filter(student_id=val).first()
+
+
+def serialize_internship(i):
+    return {
+        'id': str(i.pk),
+        'internship_id': str(i.pk),
+        'student_id': str(i.student.pk),
+        'student_name': f'{i.student.user.first_name} {i.student.user.last_name}'.strip(),
+        'enrollment_no': i.student.student_id,
+        'company': i.company,
+        'role': i.role,
+        'location': i.location,
+        'work_mode': i.work_mode,
+        'start_date': _dt(i.start_date),
+        'end_date': _dt(i.end_date),
+        'stipend': float(i.stipend),
+        'description': i.description,
+        'skills': i.skills,
+        'certificate_url': i.certificate_url,
+        'status': i.status,
+        'verification': i.verification,
+        'created_at': _dt(i.created_at),
+    }
+
+
+def serialize_achievement(a):
+    return {
+        'id': str(a.pk),
+        'achievement_id': str(a.pk),
+        'student_id': str(a.student.pk),
+        'student_name': f'{a.student.user.first_name} {a.student.user.last_name}'.strip(),
+        'enrollment_no': a.student.student_id,
+        'title': a.title,
+        'category': a.category,
+        'level': a.level,
+        'organization': a.organization,
+        'date_awarded': _dt(a.date_awarded),
+        'position': a.position,
+        'description': a.description,
+        'certificate_url': a.certificate_url,
+        'verification': a.verification,
+        'created_at': _dt(a.created_at),
+    }
+
+
+@handler('internships')
+def handle_internships(request, params, body):
+    FM = {'id': 'pk', 'internship_id': 'pk', 'status': 'status',
+          'verification': 'verification', 'student_id': 'student__pk'}
+    if request.method == 'GET':
+        qs = Internship.objects.select_related('student__user').all()
+        sid = params.get('student_id', '')
+        if sid.startswith('eq.'):
+            stu = _resolve_student(sid[3:])
+            qs = qs.filter(student=stu) if stu else qs.none()
+        else:
+            qs = apply_postgrest_filters(qs, params, FM)
+        qs = apply_order(qs, params.get('order', 'start_date.desc'), FM)
+        return [serialize_internship(i) for i in qs[:400]]
+
+    if request.method == 'POST':
+        stu = _resolve_student(body.get('student_id'))
+        if not stu:
+            return {'error': 'student not found'}
+        i = Internship.objects.create(
+            student=stu,
+            company=body.get('company', ''),
+            role=body.get('role', ''),
+            location=body.get('location', ''),
+            work_mode=body.get('work_mode', 'onsite'),
+            start_date=body.get('start_date') or timezone.localdate().isoformat(),
+            end_date=body.get('end_date') or None,
+            stipend=body.get('stipend') or 0,
+            description=body.get('description', ''),
+            skills=body.get('skills', ''),
+            certificate_url=body.get('certificate_url', ''),
+            status=body.get('status', 'ongoing'),
+        )
+        return [serialize_internship(i)]
+
+    if request.method == 'PATCH':
+        iid = params.get('internship_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        i = Internship.objects.select_related('student__user').filter(pk=iid).first()
+        if not i:
+            return []
+        for f in ['company', 'role', 'location', 'work_mode', 'description', 'skills',
+                  'certificate_url', 'status', 'verification']:
+            if f in body:
+                setattr(i, f, body[f])
+        for f in ['start_date', 'end_date']:
+            if f in body:
+                setattr(i, f, body[f] or None)
+        if 'stipend' in body:
+            i.stipend = body['stipend'] or 0
+        i.save()
+        return [serialize_internship(i)]
+
+    if request.method == 'DELETE':
+        iid = params.get('internship_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        Internship.objects.filter(pk=iid).delete()
+        return []
+
+    return []
+
+
+@handler('achievements')
+def handle_achievements(request, params, body):
+    FM = {'id': 'pk', 'achievement_id': 'pk', 'category': 'category',
+          'level': 'level', 'verification': 'verification', 'student_id': 'student__pk'}
+    if request.method == 'GET':
+        qs = Achievement.objects.select_related('student__user').all()
+        sid = params.get('student_id', '')
+        if sid.startswith('eq.'):
+            stu = _resolve_student(sid[3:])
+            qs = qs.filter(student=stu) if stu else qs.none()
+        else:
+            qs = apply_postgrest_filters(qs, params, FM)
+        qs = apply_order(qs, params.get('order', 'date_awarded.desc'), FM)
+        return [serialize_achievement(a) for a in qs[:400]]
+
+    if request.method == 'POST':
+        stu = _resolve_student(body.get('student_id'))
+        if not stu:
+            return {'error': 'student not found'}
+        a = Achievement.objects.create(
+            student=stu,
+            title=body.get('title', ''),
+            category=body.get('category', 'technical'),
+            level=body.get('level', 'college'),
+            organization=body.get('organization', ''),
+            date_awarded=body.get('date_awarded') or timezone.localdate().isoformat(),
+            position=body.get('position', ''),
+            description=body.get('description', ''),
+            certificate_url=body.get('certificate_url', ''),
+        )
+        return [serialize_achievement(a)]
+
+    if request.method == 'PATCH':
+        aid = params.get('achievement_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        a = Achievement.objects.select_related('student__user').filter(pk=aid).first()
+        if not a:
+            return []
+        for f in ['title', 'category', 'level', 'organization', 'position',
+                  'description', 'certificate_url', 'verification']:
+            if f in body:
+                setattr(a, f, body[f])
+        if 'date_awarded' in body:
+            a.date_awarded = body['date_awarded'] or a.date_awarded
+        a.save()
+        return [serialize_achievement(a)]
+
+    if request.method == 'DELETE':
+        aid = params.get('achievement_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        Achievement.objects.filter(pk=aid).delete()
+        return []
+
+    return []
+
+
+# ── HOD Permission Delegation ────────────────────────────────────────────────
+
+def serialize_delegation(d):
+    return {
+        'id': str(d.pk),
+        'delegation_id': str(d.pk),
+        'department_id': str(d.department.pk) if d.department else None,
+        'department_name': d.department.name if d.department else '—',
+        'delegator_id': str(d.delegator.pk),
+        'delegator_hod_id': str(d.delegator.pk),
+        'delegator_name': _faculty_name(d.delegator),
+        'delegate_id': str(d.delegate.pk),
+        'delegate_faculty_id': str(d.delegate.pk),
+        'delegate_user_id': str(d.delegate.user.pk),
+        'delegate_name': _faculty_name(d.delegate),
+        'delegate_designation': d.delegate.designation,
+        'can_approve_leaves': d.can_approve_leaves,
+        'can_manage_timetable': d.can_manage_timetable,
+        'scopes': d.scopes,
+        'start_date': _dt(d.start_date),
+        'end_date': _dt(d.end_date),
+        'is_active': d.is_active,
+        'is_effective': d.is_effective(),
+        'reason': d.reason,
+        'created_at': _dt(d.created_at),
+    }
+
+
+@handler('hod/delegations')
+def handle_delegations(request, params, body):
+    FM = {'id': 'pk', 'delegation_id': 'pk', 'department_id': 'department__pk',
+          'delegator_id': 'delegator__pk', 'delegate_id': 'delegate__pk'}
+    if request.method == 'GET':
+        qs = Delegation.objects.select_related(
+            'department', 'delegator__user', 'delegate__user').all()
+        # Match by the delegate's auth-user id (used by the deputy's own portal).
+        duid = params.get('delegate_user_id', '')
+        if duid.startswith('eq.'):
+            qs = qs.filter(delegate__user__pk=duid[3:] if duid[3:].isdigit() else -1)
+        qs = apply_postgrest_filters(qs, params, FM)
+        results = [serialize_delegation(d) for d in qs[:200]]
+        # active=eq.true → only currently effective delegations.
+        if params.get('active', '') == 'eq.true':
+            results = [r for r in results if r['is_effective']]
+        return results
+
+    if request.method == 'POST':
+        delegate = Faculty.objects.filter(pk=body.get('delegate_faculty_id') or body.get('delegate_id')).first()
+        delegator = None
+        if body.get('delegator_hod_id') or body.get('delegator_id'):
+            delegator = Faculty.objects.filter(pk=body.get('delegator_hod_id') or body.get('delegator_id')).first()
+        elif body.get('delegator_user_id'):
+            delegator = Faculty.objects.filter(user__pk=body['delegator_user_id']).first()
+        dept = Department.objects.filter(pk=body.get('department_id')).first() or \
+            (delegator.department if delegator else None)
+        if not delegate or not delegator or not dept:
+            return {'error': 'delegator, delegate and department are required'}
+        if delegate.pk == delegator.pk:
+            return {'error': 'cannot delegate to yourself'}
+        d = Delegation.objects.create(
+            department=dept, delegator=delegator, delegate=delegate,
+            can_approve_leaves=bool(body.get('can_approve_leaves', True)),
+            can_manage_timetable=bool(body.get('can_manage_timetable', False)),
+            start_date=body.get('start_date') or timezone.localdate().isoformat(),
+            end_date=body.get('end_date') or (timezone.localdate() + timedelta(days=7)).isoformat(),
+            reason=body.get('reason', ''),
+        )
+        return [serialize_delegation(d)]
+
+    if request.method == 'PATCH':
+        did = params.get('delegation_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        d = Delegation.objects.select_related('department', 'delegator__user', 'delegate__user').filter(pk=did).first()
+        if not d:
+            return []
+        if body.get('action') == 'revoke':
+            d.is_active = False
+        for f in ['can_approve_leaves', 'can_manage_timetable', 'is_active']:
+            if f in body:
+                setattr(d, f, bool(body[f]))
+        for f in ['start_date', 'end_date', 'reason']:
+            if f in body:
+                setattr(d, f, body[f])
+        d.save()
+        return [serialize_delegation(d)]
+
+    if request.method == 'DELETE':
+        did = params.get('delegation_id', '').replace('eq.', '') or params.get('id', '').replace('eq.', '')
+        Delegation.objects.filter(pk=did).delete()
+        return []
+
+    return []
+
+
+@handler('hod/my-access')
+def handle_hod_my_access(request, params, body):
+    """Effective delegated HOD powers held by a given user (the deputy's view)."""
+    uid = params.get('user_id', '').replace('eq.', '')
+    if not uid:
+        return {'isDelegate': False, 'scopes': [], 'delegations': []}
+    qs = Delegation.objects.select_related('department', 'delegator__user', 'delegate__user').filter(
+        delegate__user__pk=uid if uid.isdigit() else -1, is_active=True)
+    effective = [d for d in qs if d.is_effective()]
+    scopes = sorted({s for d in effective for s in d.scopes})
+    return {
+        'isDelegate': bool(effective),
+        'scopes': scopes,
+        # Department the deputy is acting for (first effective delegation).
+        'department_id': str(effective[0].department.pk) if effective else None,
+        'delegator_hod_id': str(effective[0].delegator.pk) if effective else None,
+        'delegator_name': _faculty_name(effective[0].delegator) if effective else None,
+        'delegations': [serialize_delegation(d) for d in effective],
+    }
+
+
+# ── Online Fee Payment Gateway (Razorpay-compatible) ─────────────────────────
+
+def serialize_txn(t):
+    return {
+        'id': str(t.pk),
+        'transaction_id': str(t.pk),
+        'fee_id': str(t.fee.pk),
+        'student_id': str(t.student.pk),
+        'gateway': t.gateway,
+        'order_id': t.order_id,
+        'payment_id': t.payment_id,
+        'amount': float(t.amount),
+        'currency': t.currency,
+        'method': t.method,
+        'status': t.status,
+        'receipt': t.receipt,
+        'fee_type': t.fee.fee_type,
+        'created_at': _dt(t.created_at),
+        'paid_at': _dt(t.paid_at),
+    }
+
+
+@handler('payments/config')
+def handle_payments_config(request, params, body):
+    """Public gateway config the checkout widget needs (key id, mode, currency)."""
+    from fees import gateway
+    return gateway.config()
+
+
+@handler('payments/create-order')
+def handle_payments_create_order(request, params, body):
+    """Step 1 — create a gateway order for a pending fee."""
+    from fees import gateway
+    if request.method != 'POST':
+        return []
+    fee = Fee.objects.select_related('student').filter(pk=body.get('fee_id')).first()
+    if not fee:
+        return {'error': 'fee not found'}
+    if fee.status == 'paid':
+        return {'error': 'fee already paid'}
+    order_id = gateway.new_order_id()
+    txn = PaymentTransaction.objects.create(
+        fee=fee, student=fee.student, gateway='razorpay',
+        order_id=order_id, amount=fee.amount, currency='INR',
+        receipt=gateway.receipt_for(fee), status='created',
+    )
+    cfg = gateway.config()
+    return {
+        'order_id': order_id,
+        'transaction_id': str(txn.pk),
+        'amount': float(fee.amount),
+        'amount_paise': int(round(float(fee.amount) * 100)),
+        'currency': 'INR',
+        'key_id': cfg['key_id'],
+        'mode': cfg['mode'],
+        'name': cfg['name'],
+        'description': f'{fee.get_fee_type_display()} — {fee.academic_year}',
+        'prefill': {
+            'name': f'{fee.student.user.first_name} {fee.student.user.last_name}'.strip(),
+            'email': fee.student.user.email,
+        },
+    }
+
+
+@handler('payments/mock-checkout')
+def handle_payments_mock_checkout(request, params, body):
+    """Test-mode only — stands in for Razorpay's hosted checkout widget."""
+    from fees import gateway
+    if request.method != 'POST':
+        return []
+    order_id = body.get('order_id')
+    if not PaymentTransaction.objects.filter(order_id=order_id).exists():
+        return {'error': 'unknown order'}
+    return gateway.simulate_checkout(
+        order_id, outcome=body.get('outcome', 'success'), method=body.get('method', 'card'))
+
+
+@handler('payments/verify')
+def handle_payments_verify(request, params, body):
+    """Step 3 — verify the gateway signature, then capture the payment and settle the fee."""
+    from fees import gateway
+    if request.method != 'POST':
+        return []
+    order_id = body.get('order_id') or body.get('razorpay_order_id')
+    payment_id = body.get('payment_id') or body.get('razorpay_payment_id')
+    signature = body.get('signature') or body.get('razorpay_signature')
+    txn = PaymentTransaction.objects.select_related('fee').filter(order_id=order_id).first()
+    if not txn:
+        return {'error': 'unknown order'}
+    if not payment_id or not gateway.verify_signature(order_id, payment_id, signature):
+        txn.status = 'failed'
+        txn.payment_id = payment_id or ''
+        txn.save(update_fields=['status', 'payment_id'])
+        return {'success': False, 'status': 'failed', 'error': 'signature verification failed'}
+    # Signature valid — capture the payment and mark the fee paid.
+    txn.payment_id = payment_id
+    txn.signature = signature
+    txn.method = body.get('method', 'card')
+    txn.status = 'paid'
+    txn.paid_at = timezone.now()
+    txn.save()
+    fee = txn.fee
+    fee.status = 'paid'
+    fee.payment_date = timezone.now().date()
+    fee.payment_method = f'razorpay/{txn.method}'
+    fee.transaction_id = payment_id
+    fee.save()
+    return {'success': True, 'status': 'paid', 'transaction': serialize_txn(txn), 'fee': serialize_fee(fee)}
+
+
+@handler('payments')
+def handle_payments(request, params, body):
+    """Transaction history (student- or fee-scoped)."""
+    FM = {'id': 'pk', 'transaction_id': 'pk', 'status': 'status',
+          'student_id': 'student__pk', 'fee_id': 'fee__pk'}
+    qs = PaymentTransaction.objects.select_related('fee', 'student').all()
+    sid = params.get('student_id', '')
+    if sid.startswith('eq.'):
+        val = sid[3:]
+        qs = qs.filter(Q(student__pk=int(val) if val.isdigit() else -1) |
+                       Q(student__user__pk=int(val) if val.isdigit() else -1))
+    else:
+        qs = apply_postgrest_filters(qs, params, FM)
+    qs = apply_order(qs, params.get('order', 'created_at.desc'), FM)
+    return [serialize_txn(t) for t in qs[:300]]
 
 
 # ── Main view ────────────────────────────────────────────────────────────────

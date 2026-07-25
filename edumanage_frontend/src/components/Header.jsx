@@ -78,7 +78,7 @@ export default function Header({ title = 'College360', showSearch = false, onSea
 
       {showSearch && (
         <div className="header-search">
-          <span>🔍</span>
+          <span><i className="bi bi-search"></i></span>
           <input
             type="text"
             placeholder="Search anything..."
@@ -95,7 +95,7 @@ export default function Header({ title = 'College360', showSearch = false, onSea
           onClick={handleBellClick}
           style={{ position: 'relative' }}
         >
-          🔔
+          <i className="bi bi-bell"></i>
           {unreadCount > 0 && <span className="notif-dot" id="notifDot"></span>}
         </button>
       </div>

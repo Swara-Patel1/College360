@@ -65,7 +65,7 @@ export default function Backlogs() {
   return (
     <>
       <div className="stat-card primary" style={{ marginBottom: '20px' }}>
-        <div className="stat-icon">📉</div>
+        <div className="stat-icon"><i className="bi bi-graph-down-arrow"></i></div>
         <div className="stat-value">Backlog / KT Tracker</div>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
           Track failed subjects, register for re-examinations, and see your clearance history.
@@ -73,14 +73,14 @@ export default function Backlogs() {
       </div>
 
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card primary"><div className="stat-icon">📚</div><div className="stat-value">{counts.total}</div><div className="stat-label">Total KTs</div></div>
-        <div className="stat-card danger"><div className="stat-icon">⚠️</div><div className="stat-value">{counts.active}</div><div className="stat-label">Active (register now)</div></div>
-        <div className="stat-card warning"><div className="stat-icon">📝</div><div className="stat-value">{counts.registered}</div><div className="stat-label">Registered</div></div>
-        <div className="stat-card success"><div className="stat-icon">✅</div><div className="stat-value">{counts.cleared}</div><div className="stat-label">Cleared</div></div>
+        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-book"></i></div><div className="stat-value">{counts.total}</div><div className="stat-label">Total KTs</div></div>
+        <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-exclamation-triangle"></i></div><div className="stat-value">{counts.active}</div><div className="stat-label">Active (register now)</div></div>
+        <div className="stat-card warning"><div className="stat-icon"><i className="bi bi-pencil-square"></i></div><div className="stat-value">{counts.registered}</div><div className="stat-label">Registered</div></div>
+        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div className="stat-value">{counts.cleared}</div><div className="stat-label">Cleared</div></div>
       </div>
 
       <div className="card col-12">
-        <div className="card-header"><div className="card-title">📖 My Backlog Records</div></div>
+        <div className="card-header"><div className="card-title"><i className="bi bi-journal-bookmark"></i> My Backlog Records</div></div>
         <div className="card-body" style={{ display: 'grid', gap: '14px' }}>
           {backlogs.length ? backlogs.map(b => (
             <div key={b.id} style={{ padding: '16px 20px', border: '1px solid var(--border)', borderRadius: '12px', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
@@ -99,7 +99,7 @@ export default function Backlogs() {
             </div>
           )) : (
             <div className="empty-state" style={{ padding: '40px', textAlign: 'center' }}>
-              <div className="empty-state-icon">🎉</div>
+              <div className="empty-state-icon"><i className="bi bi-balloon"></i></div>
               <h3>No backlogs — you're all clear!</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Keep it up. Failed subjects would appear here for re-registration.</p>
             </div>

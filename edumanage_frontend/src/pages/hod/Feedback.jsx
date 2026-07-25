@@ -53,13 +53,13 @@ export default function HODFeedback() {
       </div>
 
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card primary"><div className="stat-icon">👨‍🏫</div><div className="stat-value">{rows.length}</div><div className="stat-label">Faculty Rated</div></div>
-        <div className="stat-card info"><div className="stat-icon">🗳️</div><div className="stat-value">{totalResponses}</div><div className="stat-label">Total Responses</div></div>
-        <div className="stat-card success"><div className="stat-icon">⭐</div><div className="stat-value">{avgOverall}</div><div className="stat-label">Avg Overall (/5)</div></div>
+        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-person-video3"></i></div><div className="stat-value">{rows.length}</div><div className="stat-label">Faculty Rated</div></div>
+        <div className="stat-card info"><div className="stat-icon"><i className="bi bi-ui-checks"></i></div><div className="stat-value">{totalResponses}</div><div className="stat-label">Total Responses</div></div>
+        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-star-fill"></i></div><div className="stat-value">{avgOverall}</div><div className="stat-label">Avg Overall (/5)</div></div>
       </div>
 
       <div className="card col-12">
-        <div className="card-header"><div className="card-title">📊 Ratings by Faculty</div></div>
+        <div className="card-header"><div className="card-title"><i className="bi bi-bar-chart"></i> Ratings by Faculty</div></div>
         <div className="card-body" style={{ padding: 0 }}>
           {rows.length ? (
             <div style={{ overflowX: 'auto' }}>
@@ -93,7 +93,7 @@ export default function HODFeedback() {
             </div>
           ) : (
             <div className="empty-state" style={{ padding: '40px', textAlign: 'center' }}>
-              <div className="empty-state-icon">📊</div>
+              <div className="empty-state-icon"><i className="bi bi-bar-chart"></i></div>
               <p>No feedback has been submitted yet.</p>
             </div>
           )}

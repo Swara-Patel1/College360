@@ -115,7 +115,7 @@ export default function HODClasses() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>📊 Class Performance Rankings</h1>
+          <h1><i className="bi bi-bar-chart"></i> Class Performance Rankings</h1>
           <p>Analyze and rank class performance by Total Marks or SPI Average.</p>
         </div>
       </div>
@@ -174,7 +174,7 @@ export default function HODClasses() {
                 {sortedStudents.map((s, idx) => (
                   <tr key={s.id}>
                     <td style={{ textAlign: 'center', fontWeight: 700, color: idx === 0 ? '#FF9F43' : idx === 1 ? '#C084FC' : idx === 2 ? '#54A0FF' : 'var(--text-secondary)' }}>
-                      🏆 {idx + 1}
+                      <i className="bi bi-trophy"></i> {idx + 1}
                     </td>
                     <td style={{ fontWeight: 600 }}>{s.first_name} {s.last_name}</td>
                     <td><strong>{s.roll_number || '—'}</strong></td>
@@ -192,7 +192,7 @@ export default function HODClasses() {
             </table>
           ) : (
             <div className="empty-state" style={{ padding: '40px' }}>
-              <div className="empty-state-icon">📊</div>
+              <div className="empty-state-icon"><i className="bi bi-bar-chart"></i></div>
               <p>No students enrolled in the selected semester.</p>
             </div>
           )}

@@ -36,7 +36,7 @@ export default function ParentDashboard() {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}><div className="loading-spinner" /></div>;
   }
   if (error || !child) {
-    return <div className="empty-state" style={{ padding: '60px', textAlign: 'center' }}><div className="empty-state-icon">👪</div><h3>{error || 'No linked student found.'}</h3></div>;
+    return <div className="empty-state" style={{ padding: '60px', textAlign: 'center' }}><div className="empty-state-icon"><i className="bi bi-people"></i></div><h3>{error || 'No linked student found.'}</h3></div>;
   }
 
   const childName = `${child.user?.first_name || child.first_name || ''} ${child.user?.last_name || child.last_name || ''}`.trim();
@@ -57,23 +57,23 @@ export default function ParentDashboard() {
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
             {child.department_name || '—'} · Semester {child.semester || child.current_semester?.number || '—'} · Enrollment {child.student_id || child.enrollment_no || '—'}
           </p>
-          <span className="badge badge-info" style={{ marginTop: '6px', display: 'inline-block' }}>👪 Read-only parent view</span>
+          <span className="badge badge-info" style={{ marginTop: '6px', display: 'inline-block' }}><i className="bi bi-people"></i> Read-only parent view</span>
         </div>
       </div>
 
       {/* Summary stats */}
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card success"><div className="stat-icon">✅</div><div className="stat-value">{attPct}%</div><div className="stat-label">Attendance</div></div>
-        <div className="stat-card primary"><div className="stat-icon">📝</div><div className="stat-value">{avgPct}%</div><div className="stat-label">Avg Score</div></div>
-        <div className={`stat-card ${backlogs ? 'danger' : 'success'}`}><div className="stat-icon">📉</div><div className="stat-value">{backlogs}</div><div className="stat-label">Backlogs</div></div>
-        <div className={`stat-card ${pendingFees ? 'warning' : 'success'}`}><div className="stat-icon">💰</div><div className="stat-value">{Utils.formatCurrency(pendingFees)}</div><div className="stat-label">Pending Fees</div></div>
+        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div className="stat-value">{attPct}%</div><div className="stat-label">Attendance</div></div>
+        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-pencil-square"></i></div><div className="stat-value">{avgPct}%</div><div className="stat-label">Avg Score</div></div>
+        <div className={`stat-card ${backlogs ? 'danger' : 'success'}`}><div className="stat-icon"><i className="bi bi-graph-down-arrow"></i></div><div className="stat-value">{backlogs}</div><div className="stat-label">Backlogs</div></div>
+        <div className={`stat-card ${pendingFees ? 'warning' : 'success'}`}><div className="stat-icon"><i className="bi bi-cash-coin"></i></div><div className="stat-value">{Utils.formatCurrency(pendingFees)}</div><div className="stat-label">Pending Fees</div></div>
       </div>
 
       <div className="dashboard-grid">
         {/* Recent grades */}
         <div className="card col-6">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="card-title">📝 Recent Grades</div>
+            <div className="card-title"><i className="bi bi-pencil-square"></i> Recent Grades</div>
             <Link to="/parent/grades" className="btn btn-ghost btn-sm">View all</Link>
           </div>
           <div className="card-body" style={{ padding: 0 }}>
@@ -99,7 +99,7 @@ export default function ParentDashboard() {
         {/* Fee status */}
         <div className="card col-6">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="card-title">💰 Fee Status</div>
+            <div className="card-title"><i className="bi bi-cash-coin"></i> Fee Status</div>
             <Link to="/parent/fees" className="btn btn-ghost btn-sm">View all</Link>
           </div>
           <div className="card-body" style={{ padding: 0 }}>

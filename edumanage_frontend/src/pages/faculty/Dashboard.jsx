@@ -63,7 +63,7 @@ export default function Dashboard() {
         </div>
         <div className="page-header-right">
           <NavLink to="/faculty/attendance" className="btn btn-primary">
-            ✅ Mark Attendance
+            <i className="bi bi-check-circle-fill"></i> Mark Attendance
           </NavLink>
         </div>
       </div>
@@ -71,22 +71,22 @@ export default function Dashboard() {
       {/* Stats Cards */}
       <div className="stats-grid">
         <div className="stat-card primary">
-          <div className="stat-icon">📚</div>
+          <div className="stat-icon"><i className="bi bi-book"></i></div>
           <div className="stat-value">{courses.length}</div>
           <div className="stat-label">My Courses</div>
         </div>
         <div className="stat-card success">
-          <div className="stat-icon">🎓</div>
+          <div className="stat-icon"><i className="bi bi-mortarboard"></i></div>
           <div className="stat-value">{totalStudents}</div>
           <div className="stat-label">My Students</div>
         </div>
         <div className="stat-card info">
-          <div className="stat-icon">⏰</div>
+          <div className="stat-icon"><i className="bi bi-alarm"></i></div>
           <div className="stat-value">{schedule.length}</div>
           <div className="stat-label">Classes Today</div>
         </div>
         <div className="stat-card warning">
-          <div className="stat-icon">📊</div>
+          <div className="stat-icon"><i className="bi bi-bar-chart"></i></div>
           <div className="stat-value">87%</div>
           <div className="stat-label">Avg Attendance</div>
         </div>
@@ -96,7 +96,7 @@ export default function Dashboard() {
         {/* My Courses Section */}
         <div className="card col-6">
           <div className="card-header">
-            <div className="card-title">📚 Assigned Courses</div>
+            <div className="card-title"><i className="bi bi-book"></i> Assigned Courses</div>
             <NavLink to="/faculty/courses" className="btn btn-ghost btn-sm">View All</NavLink>
           </div>
           <div className="card-body">
@@ -104,7 +104,7 @@ export default function Dashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {courses.map((c) => (
                   <div className="list-item" key={c.subject_id}>
-                    <div className="list-icon" style={{ background: 'rgba(108,99,255,0.15)' }}>📚</div>
+                    <div className="list-icon" style={{ background: 'rgba(108,99,255,0.15)' }}><i className="bi bi-book"></i></div>
                     <div className="list-text">
                       <div className="list-title" style={{ fontWeight: 700 }}>{c.code} — {c.name}</div>
                       <div className="list-subtitle">Sem {c.semester} · {c.enrolled_count || 0} students · {c.credits} credits</div>
@@ -115,7 +115,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="empty-state">
-                <div className="empty-state-icon">📚</div>
+                <div className="empty-state-icon"><i className="bi bi-book"></i></div>
                 <p>No courses assigned yet.</p>
               </div>
             )}
@@ -125,7 +125,7 @@ export default function Dashboard() {
         {/* Today's Schedule */}
         <div className="card col-6">
           <div className="card-header">
-            <div className="card-title">📅 Today's Schedule</div>
+            <div className="card-title"><i className="bi bi-calendar3"></i> Today's Schedule</div>
             <NavLink to="/faculty/timetable" className="btn btn-ghost btn-sm">Full Timetable</NavLink>
           </div>
           <div className="card-body">
@@ -133,7 +133,7 @@ export default function Dashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {schedule.map((s, idx) => (
                   <div className="list-item" key={idx}>
-                    <div className="list-icon" style={{ background: 'rgba(0,212,170,0.15)' }}>📅</div>
+                    <div className="list-icon" style={{ background: 'rgba(0,212,170,0.15)' }}><i className="bi bi-calendar3"></i></div>
                     <div className="list-text">
                       <div className="list-title" style={{ fontWeight: 700 }}>{s.course_code} — {s.course_name}</div>
                       <div className="list-subtitle">{s.start_time?.substring(0, 5)} – {s.end_time?.substring(0, 5)} · Room {s.room || 'TBD'}</div>
@@ -144,7 +144,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="empty-state">
-                <div className="empty-state-icon">🎉</div>
+                <div className="empty-state-icon"><i className="bi bi-balloon"></i></div>
                 <h3>No Classes Today</h3>
                 <p>Enjoy your day off!</p>
               </div>
@@ -155,32 +155,32 @@ export default function Dashboard() {
         {/* Quick Actions */}
         <div className="card col-12">
           <div className="card-header">
-            <div className="card-title">⚡ Quick Actions</div>
+            <div className="card-title"><i className="bi bi-lightning-charge"></i> Quick Actions</div>
           </div>
           <div className="card-body">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px' }}>
               <NavLink to="/faculty/attendance" className="btn btn-secondary" style={{ height: '80px', flexDirection: 'column', gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '1.5rem' }}>✅</span>
+                <span style={{ fontSize: '1.5rem' }}><i className="bi bi-check-circle-fill"></i></span>
                 <span>Mark Attendance</span>
               </NavLink>
               <NavLink to="/faculty/grades" className="btn btn-secondary" style={{ height: '80px', flexDirection: 'column', gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '1.5rem' }}>📝</span>
+                <span style={{ fontSize: '1.5rem' }}><i className="bi bi-pencil-square"></i></span>
                 <span>Enter Grades</span>
               </NavLink>
               <NavLink to="/faculty/timetable" className="btn btn-secondary" style={{ height: '80px', flexDirection: 'column', gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '1.5rem' }}>📅</span>
+                <span style={{ fontSize: '1.5rem' }}><i className="bi bi-calendar3"></i></span>
                 <span>My Timetable</span>
               </NavLink>
               <NavLink to="/faculty/notices" className="btn btn-secondary" style={{ height: '80px', flexDirection: 'column', gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '1.5rem' }}>📢</span>
+                <span style={{ fontSize: '1.5rem' }}><i className="bi bi-megaphone"></i></span>
                 <span>Post Notice</span>
               </NavLink>
               <NavLink to="/faculty/leaves" className="btn btn-secondary" style={{ height: '80px', flexDirection: 'column', gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderColor: 'rgba(255,159,67,0.4)', background: 'rgba(255,159,67,0.06)' }}>
-                <span style={{ fontSize: '1.5rem' }}>🏖️</span>
+                <span style={{ fontSize: '1.5rem' }}><i className="bi bi-airplane"></i></span>
                 <span style={{ color: '#FF9F43' }}>Apply Leave</span>
               </NavLink>
               <NavLink to="/faculty/interchange" className="btn btn-secondary" style={{ height: '80px', flexDirection: 'column', gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderColor: 'rgba(0,212,170,0.4)', background: 'rgba(0,212,170,0.06)' }}>
-                <span style={{ fontSize: '1.5rem' }}>🔄</span>
+                <span style={{ fontSize: '1.5rem' }}><i className="bi bi-arrow-repeat"></i></span>
                 <span style={{ color: '#00D4AA' }}>Swap Lecture</span>
               </NavLink>
             </div>

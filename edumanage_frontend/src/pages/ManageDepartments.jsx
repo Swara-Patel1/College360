@@ -207,13 +207,13 @@ export default function ManageDepartments() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>🏛️ Manage Departments</h1>
+          <h1><i className="bi bi-building"></i> Manage Departments</h1>
           <p>Create departments with their HOD, faculty, and students — all in one place.</p>
         </div>
         {isAdmin && (
           <div className="page-header-right">
             <button className="btn btn-primary" onClick={() => { resetForm(); setIsAddOpen(true); }}>
-              ➕ Add Department
+              <i className="bi bi-plus-lg"></i> Add Department
             </button>
           </div>
         )}
@@ -221,28 +221,28 @@ export default function ManageDepartments() {
 
       <div className="stats-mini">
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(139,92,246,0.2)' }}>🏛️</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(139,92,246,0.2)' }}><i className="bi bi-building"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#8b5cf6' }}>{departments.length}</div>
             <div className="stats-mini-lbl">Departments</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(14,165,233,0.2)' }}>🧑‍🏫</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(14,165,233,0.2)' }}><i className="bi bi-person-video3"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#0ea5e9' }}>{faculty.length}</div>
             <div className="stats-mini-lbl">Total Faculty</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}>🎓</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}><i className="bi bi-mortarboard"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: 'var(--primary)' }}>{students.length}</div>
             <div className="stats-mini-lbl">Total Students</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(0,212,170,0.2)' }}>🏷️</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(0,212,170,0.2)' }}><i className="bi bi-tag"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#00D4AA' }}>{hods.length}</div>
             <div className="stats-mini-lbl">HODs Assigned</div>
@@ -281,11 +281,11 @@ export default function ManageDepartments() {
                     <td style={{ textAlign: 'center' }}>{deptStudents(d.id).length}</td>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => handleViewClick(d)}>🔍 View</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleViewClick(d)}><i className="bi bi-search"></i> View</button>
                         {isAdmin && (
                           <>
-                            <button className="btn btn-ghost btn-sm" onClick={() => handleEditClick(d)}>📝 Edit</button>
-                            <button className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => handleDeleteClick(d)}>🗑️ Delete</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => handleEditClick(d)}><i className="bi bi-pencil-square"></i> Edit</button>
+                            <button className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => handleDeleteClick(d)}><i className="bi bi-trash"></i> Delete</button>
                           </>
                         )}
                       </div>
@@ -296,7 +296,7 @@ export default function ManageDepartments() {
             </table>
           ) : (
             <div className="empty-state">
-              <div className="empty-state-icon">🏛️</div>
+              <div className="empty-state-icon"><i className="bi bi-building"></i></div>
               <p>No departments found.</p>
             </div>
           )}
@@ -324,8 +324,8 @@ export default function ManageDepartments() {
             {/* Faculty */}
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '15px', marginBottom: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <h4 style={{ margin: 0, color: 'var(--primary-light)' }}>🧑‍🏫 Faculty</h4>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={addFacultyRow}>➕ Add Faculty</button>
+                <h4 style={{ margin: 0, color: 'var(--primary-light)' }}><i className="bi bi-person-video3"></i> Faculty</h4>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={addFacultyRow}><i className="bi bi-plus-lg"></i> Add Faculty</button>
               </div>
               {facultyRows.map((f, i) => (
                 <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -341,7 +341,7 @@ export default function ManageDepartments() {
                     <input type="radio" name="hodPick" checked={String(hodIndex) === String(i)}
                       onChange={() => setHodIndex(i)} /> HOD
                   </label>
-                  <button type="button" className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => removeFacultyRow(i)}>✕</button>
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => removeFacultyRow(i)}><i className="bi bi-x-lg"></i></button>
                 </div>
               ))}
               <small style={{ color: 'var(--text-muted)' }}>Select the radio button to mark one faculty as this department's HOD.</small>
@@ -350,8 +350,8 @@ export default function ManageDepartments() {
             {/* Students */}
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '15px', marginBottom: '15px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <h4 style={{ margin: 0, color: 'var(--primary-light)' }}>🎓 Students</h4>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={addStudentRow}>➕ Add Student</button>
+                <h4 style={{ margin: 0, color: 'var(--primary-light)' }}><i className="bi bi-mortarboard"></i> Students</h4>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={addStudentRow}><i className="bi bi-plus-lg"></i> Add Student</button>
               </div>
               {studentRows.map((s, i) => (
                 <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -368,7 +368,7 @@ export default function ManageDepartments() {
                     <option value="">Semester</option>
                     {semesters.map(sem => <option key={sem.semester_id || sem.id} value={sem.semester_id || sem.id}>Sem {sem.number}</option>)}
                   </select>
-                  <button type="button" className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => removeStudentRow(i)}>✕</button>
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => removeStudentRow(i)}><i className="bi bi-x-lg"></i></button>
                 </div>
               ))}
               <small style={{ color: 'var(--text-muted)' }}>Leave rows blank to skip — you can always add faculty/students later.</small>
@@ -433,7 +433,7 @@ export default function ManageDepartments() {
             </div>
 
             <div>
-              <h4 style={{ margin: '0 0 8px', color: 'var(--primary-light)' }}>🧑‍🏫 Faculty ({deptFaculty(viewing.id).length})</h4>
+              <h4 style={{ margin: '0 0 8px', color: 'var(--primary-light)' }}><i className="bi bi-person-video3"></i> Faculty ({deptFaculty(viewing.id).length})</h4>
               {deptFaculty(viewing.id).length ? (
                 <table className="table" style={{ fontSize: '0.85rem' }}>
                   <thead><tr><th>Name</th><th>Emp ID</th><th>Email</th><th>Role</th></tr></thead>
@@ -454,7 +454,7 @@ export default function ManageDepartments() {
             </div>
 
             <div>
-              <h4 style={{ margin: '0 0 8px', color: 'var(--primary-light)' }}>🎓 Students ({deptStudents(viewing.id).length})</h4>
+              <h4 style={{ margin: '0 0 8px', color: 'var(--primary-light)' }}><i className="bi bi-mortarboard"></i> Students ({deptStudents(viewing.id).length})</h4>
               {deptStudents(viewing.id).length ? (
                 <table className="table" style={{ fontSize: '0.85rem' }}>
                   <thead><tr><th>Name</th><th>Enrollment</th><th>Semester</th><th>Status</th></tr></thead>

@@ -111,14 +111,14 @@ export default function ExamScheduling() {
   return (
     <>
       <div className="page-header">
-        <div className="page-header-left"><h1>🗓️ Examination Scheduling</h1><p>Create the exam timetable and generate seat plans.</p></div>
-        <div className="page-header-right"><button className="btn btn-primary" onClick={openCreate}>➕ Schedule Exam</button></div>
+        <div className="page-header-left"><h1><i className="bi bi-calendar-week"></i> Examination Scheduling</h1><p>Create the exam timetable and generate seat plans.</p></div>
+        <div className="page-header-right"><button className="btn btn-primary" onClick={openCreate}><i className="bi bi-plus-lg"></i> Schedule Exam</button></div>
       </div>
 
       {clashIds.size > 0 && (
         <div className="card col-12" style={{ marginBottom: '16px', borderLeft: '3px solid var(--accent, #FF6B6B)' }}>
           <div className="card-body" style={{ fontSize: '0.85rem' }}>
-            ⚠️ <strong>{clashIds.size} exam(s)</strong> share a room at overlapping times — highlighted below.
+            <i className="bi bi-exclamation-triangle"></i> <strong>{clashIds.size} exam(s)</strong> share a room at overlapping times — highlighted below.
           </div>
         </div>
       )}
@@ -138,9 +138,9 @@ export default function ExamScheduling() {
                       <td style={{ textTransform: 'capitalize' }}>{e.exam_type}</td>
                       <td>{e.room || '—'} {clashIds.has(e.id) && <span className="badge badge-danger" style={{ marginLeft: 6 }}>clash</span>}</td>
                       <td style={{ display: 'flex', gap: '6px' }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => openSeatPlan(e)}>🪑 Seats</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => openEdit(e)}>✏️</button>
-                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--accent, #FF6B6B)' }} onClick={() => remove(e)}>🗑️</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => openSeatPlan(e)}><i className="bi bi-grid-3x3-gap"></i> Seats</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => openEdit(e)}><i className="bi bi-pencil"></i></button>
+                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--accent, #FF6B6B)' }} onClick={() => remove(e)}><i className="bi bi-trash"></i></button>
                       </td>
                     </tr>
                   ))}
@@ -149,7 +149,7 @@ export default function ExamScheduling() {
             </div>
           ) : (
             <div className="empty-state" style={{ padding: '48px', textAlign: 'center' }}>
-              <div className="empty-state-icon">🗓️</div><h3>No exams scheduled</h3>
+              <div className="empty-state-icon"><i className="bi bi-calendar-week"></i></div><h3>No exams scheduled</h3>
               <button className="btn btn-primary" onClick={openCreate} style={{ marginTop: '12px' }}>Schedule your first exam</button>
             </div>
           )}

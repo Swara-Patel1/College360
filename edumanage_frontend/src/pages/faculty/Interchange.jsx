@@ -180,7 +180,7 @@ export default function FacultyInterchange() {
       <div style={{fontSize:'0.78rem',color:'var(--text-muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'4px'}}>{label || slot.day}</div>
       <div style={{fontWeight:700,color:'var(--text-primary)',fontSize:'0.95rem'}}>{slot.course_code} — {slot.course_name}</div>
       <div style={{color:'var(--text-muted)',fontSize:'0.82rem',marginTop:'4px'}}>
-        🕐 {slot.start_time?.substring(0,5)} – {slot.end_time?.substring(0,5)}
+        <i className="bi bi-clock"></i> {slot.start_time?.substring(0,5)} – {slot.end_time?.substring(0,5)}
         {slot.room && <span>  •  🚪 Room {slot.room}</span>}
       </div>
     </div>
@@ -200,10 +200,10 @@ export default function FacultyInterchange() {
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'12px',flexWrap:'wrap',gap:'10px'}}>
           <div>
             <div style={{fontWeight:700,color:'var(--text-primary)',fontSize:'1rem',marginBottom:'4px'}}>
-              🔄 {isIncoming ? `${otherName} wants to swap with you` : `Request to ${otherName}`}
+              <i className="bi bi-arrow-repeat"></i> {isIncoming ? `${otherName} wants to swap with you` : `Request to ${otherName}`}
             </div>
             <div style={{color:'var(--text-muted)',fontSize:'0.82rem'}}>
-              📅 Swap Date: {Utils.formatDate(mySlot?.date) || '—'}
+              <i className="bi bi-calendar3"></i> Swap Date: {Utils.formatDate(mySlot?.date) || '—'}
             </div>
           </div>
           <div style={{background:st.bg,color:st.color,borderRadius:'20px',padding:'5px 14px',fontSize:'0.82rem',fontWeight:700,whiteSpace:'nowrap'}}>
@@ -219,7 +219,7 @@ export default function FacultyInterchange() {
             <div style={{fontWeight:700,color:'var(--text-primary)',fontSize:'0.9rem'}}>{theirSlot?.course_code} — {theirSlot?.course_name}</div>
             <div style={{color:'var(--text-muted)',fontSize:'0.8rem',marginTop:'2px'}}>{theirSlot?.day} • {theirSlot?.start_time?.substring(0,5)}</div>
           </div>
-          <div style={{fontSize:'1.4rem',textAlign:'center'}}>⇄</div>
+          <div style={{fontSize:'1.4rem',textAlign:'center'}}><i className="bi bi-arrow-left-right"></i></div>
           <div style={{background:'rgba(0,212,170,0.08)',borderRadius:'10px',padding:'12px'}}>
             <div style={{fontSize:'0.75rem',color:'#00D4AA',fontWeight:600,marginBottom:'4px',textTransform:'uppercase'}}>
               {isIncoming ? 'Your Lecture' : 'Their Lecture'}
@@ -231,17 +231,17 @@ export default function FacultyInterchange() {
 
         {req.reason && (
           <p style={{color:'var(--text-muted)',fontSize:'0.85rem',marginBottom:'12px',background:'var(--card-bg)',padding:'10px 14px',borderRadius:'8px'}}>
-            📝 Reason: {req.reason}
+            <i className="bi bi-pencil-square"></i> Reason: {req.reason}
           </p>
         )}
 
         {isIncoming && req.status === 'pending' && (
           <div style={{display:'flex',gap:'10px',marginTop:'12px'}}>
             <button className="btn btn-success btn-sm" style={{flex:1}} onClick={() => handleAccept(req)}>
-              ✅ Accept — Notify HOD & Students
+              <i className="bi bi-check-circle-fill"></i> Accept — Notify HOD & Students
             </button>
             <button className="btn btn-danger btn-sm" style={{flex:1}} onClick={() => { setRejectModal(req); setRejectReason(''); }}>
-              ❌ Reject Request
+              <i className="bi bi-x-circle"></i> Reject Request
             </button>
           </div>
         )}
@@ -270,7 +270,7 @@ export default function FacultyInterchange() {
 
       <div className="page-header">
         <div className="page-header-left">
-          <h1>🔄 Lecture Interchange</h1>
+          <h1><i className="bi bi-arrow-repeat"></i> Lecture Interchange</h1>
           <p>Request lecture swaps with colleagues — pending target faculty approval.</p>
         </div>
         <div className="page-header-right">
@@ -327,7 +327,7 @@ export default function FacultyInterchange() {
             </div>
           ) : activeRequests.length === 0 ? (
             <div className="empty-state" style={{padding:'60px 20px'}}>
-              <div className="empty-state-icon">🔄</div>
+              <div className="empty-state-icon"><i className="bi bi-arrow-repeat"></i></div>
               <h3>No {activeTab} requests</h3>
               <p>{activeTab==='incoming' ? 'No one has sent you a swap request yet.' : 'Click "+ New Swap Request" to request a lecture interchange.'}</p>
             </div>
@@ -356,7 +356,7 @@ export default function FacultyInterchange() {
             {/* Modal Header */}
             <div style={{padding:'24px 28px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',position:'sticky',top:0,background:'var(--card-bg)',zIndex:1}}>
               <div>
-                <h2 style={{margin:0,fontSize:'1.3rem'}}>🔄 New Lecture Swap Request</h2>
+                <h2 style={{margin:0,fontSize:'1.3rem'}}><i className="bi bi-arrow-repeat"></i> New Lecture Swap Request</h2>
                 <div style={{display:'flex',gap:'8px',marginTop:'10px'}}>
                   {[1,2,3,4].map(s => (
                     <div key={s} style={{display:'flex',alignItems:'center',gap:'6px'}}>
@@ -384,7 +384,7 @@ export default function FacultyInterchange() {
                 <div>
                   <h3 style={{margin:'0 0 16px 0',fontSize:'1.1rem'}}>Step 1: Select Your Lecture Slot</h3>
                   {mySchedule.length === 0 ? (
-                    <div className="empty-state"><div className="empty-state-icon">📅</div><p>No timetable slots found for your profile.</p></div>
+                    <div className="empty-state"><div className="empty-state-icon"><i className="bi bi-calendar3"></i></div><p>No timetable slots found for your profile.</p></div>
                   ) : (
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'10px'}}>
                       {mySchedule.map((slot, i) => (
@@ -431,7 +431,7 @@ export default function FacultyInterchange() {
                     })}
                   </div>
                   <div style={{display:'flex',justifyContent:'space-between',marginTop:'20px'}}>
-                    <button className="btn btn-secondary" onClick={() => setModalStep(1)}>← Back</button>
+                    <button className="btn btn-secondary" onClick={() => setModalStep(1)}><i className="bi bi-arrow-left"></i> Back</button>
                     <button className="btn btn-primary" disabled={!selectedTargetFaculty} onClick={() => setModalStep(3)}>
                       Next: Choose Slot →
                     </button>
@@ -448,7 +448,7 @@ export default function FacultyInterchange() {
                       <div className="loading-spinner" />
                     </div>
                   ) : targetSchedule.length === 0 ? (
-                    <div className="empty-state"><div className="empty-state-icon">📅</div><p>No timetable found for this faculty.</p></div>
+                    <div className="empty-state"><div className="empty-state-icon"><i className="bi bi-calendar3"></i></div><p>No timetable found for this faculty.</p></div>
                   ) : (
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'10px'}}>
                       {targetSchedule.map((slot, i) => (
@@ -457,7 +457,7 @@ export default function FacultyInterchange() {
                     </div>
                   )}
                   <div style={{display:'flex',justifyContent:'space-between',marginTop:'20px'}}>
-                    <button className="btn btn-secondary" onClick={() => setModalStep(2)}>← Back</button>
+                    <button className="btn btn-secondary" onClick={() => setModalStep(2)}><i className="bi bi-arrow-left"></i> Back</button>
                     <button className="btn btn-primary" disabled={!selectedTargetSlot} onClick={() => setModalStep(4)}>
                       Next: Review & Send →
                     </button>
@@ -477,7 +477,7 @@ export default function FacultyInterchange() {
                       <div style={{fontWeight:700,fontSize:'0.9rem'}}>{selectedMySlot?.course_code} — {selectedMySlot?.course_name}</div>
                       <div style={{color:'var(--text-muted)',fontSize:'0.8rem'}}>{selectedMySlot?.day} • {selectedMySlot?.start_time?.substring(0,5)}</div>
                     </div>
-                    <div style={{fontSize:'1.5rem',textAlign:'center'}}>⇄</div>
+                    <div style={{fontSize:'1.5rem',textAlign:'center'}}><i className="bi bi-arrow-left-right"></i></div>
                     <div>
                       <div style={{fontSize:'0.75rem',color:'#00D4AA',fontWeight:600,textTransform:'uppercase',marginBottom:'4px'}}>{selectedTargetFaculty?.user?.first_name}'s Lecture</div>
                       <div style={{fontWeight:700,fontSize:'0.9rem'}}>{selectedTargetSlot?.course_code} — {selectedTargetSlot?.course_name}</div>
@@ -504,12 +504,12 @@ export default function FacultyInterchange() {
 
                   {modalError && (
                     <div style={{background:'rgba(255,107,107,0.1)',border:'1px solid #FF6B6B',color:'#FF6B6B',padding:'12px 16px',borderRadius:'10px',fontSize:'0.87rem',marginTop:'16px'}}>
-                      ⚠️ {modalError}
+                      <i className="bi bi-exclamation-triangle"></i> {modalError}
                     </div>
                   )}
 
                   <div style={{display:'flex',justifyContent:'space-between',marginTop:'20px',gap:'12px'}}>
-                    <button className="btn btn-secondary" onClick={() => setModalStep(3)} disabled={submitting}>← Back</button>
+                    <button className="btn btn-secondary" onClick={() => setModalStep(3)} disabled={submitting}><i className="bi bi-arrow-left"></i> Back</button>
                     <button className="btn btn-primary" onClick={handleSendRequest} disabled={submitting} style={{flex:1}}>
                       {submitting ? '⏳ Sending...' : '📨 Send Swap Request'}
                     </button>
@@ -528,7 +528,7 @@ export default function FacultyInterchange() {
           display:'flex',alignItems:'center',justifyContent:'center',zIndex:1100,padding:'20px'
         }}>
           <div style={{background:'var(--card-bg)',borderRadius:'16px',padding:'28px',width:'100%',maxWidth:'420px',border:'1px solid var(--border)'}}>
-            <h3 style={{margin:'0 0 16px 0'}}>❌ Reject Swap Request</h3>
+            <h3 style={{margin:'0 0 16px 0'}}><i className="bi bi-x-circle"></i> Reject Swap Request</h3>
             <p style={{color:'var(--text-muted)',marginBottom:'16px',fontSize:'0.9rem'}}>
               You are rejecting the swap request from <strong>{rejectModal.requester_faculty_name}</strong>.
               They will be notified of the rejection.

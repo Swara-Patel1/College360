@@ -119,7 +119,7 @@ export default function Login() {
       {/* Left Panel */}
       <div className="left-panel">
         <div className="brand-logo">
-          <div className="brand-icon">🎓</div>
+          <div className="brand-icon"><i className="bi bi-mortarboard"></i></div>
           <div className="brand-name">EduPulse</div>
         </div>
 
@@ -129,23 +129,23 @@ export default function Login() {
 
           <div className="features-list">
             <div className="feature-item">
-              <div className="feature-icon">👥</div>
+              <div className="feature-icon"><i className="bi bi-people"></i></div>
               <span>Student & Faculty Management with role-based access</span>
             </div>
             <div className="feature-item">
-              <div className="feature-icon">✅</div>
+              <div className="feature-icon"><i className="bi bi-check-circle-fill"></i></div>
               <span>Real-time Attendance Tracking with live updates</span>
             </div>
             <div className="feature-item">
-              <div className="feature-icon">📊</div>
+              <div className="feature-icon"><i className="bi bi-bar-chart"></i></div>
               <span>Analytics Dashboard with insightful charts</span>
             </div>
             <div className="feature-item">
-              <div className="feature-icon">💰</div>
+              <div className="feature-icon"><i className="bi bi-cash-coin"></i></div>
               <span>Fee Management & Payment Tracking</span>
             </div>
             <div className="feature-item">
-              <div className="feature-icon">🔔</div>
+              <div className="feature-icon"><i className="bi bi-bell"></i></div>
               <span>Real-time Notifications & Announcements</span>
             </div>
           </div>
@@ -181,7 +181,7 @@ export default function Login() {
         {/* Error message */}
         {error && (
           <div className="error-msg show" id="errorMsg">
-            ❌ {error}
+            <i className="bi bi-x-circle"></i> {error}
           </div>
         )}
 
@@ -190,7 +190,7 @@ export default function Login() {
           <div className="form-group">
             <label className="form-label" htmlFor="email">Username</label>
             <div className="input-wrapper">
-              <span className="input-icon">👤</span>
+              <span className="input-icon"><i className="bi bi-person"></i></span>
               <input
                 type="text"
                 id="email"
@@ -207,7 +207,7 @@ export default function Login() {
           <div className="form-group">
             <label className="form-label" htmlFor="password">Password</label>
             <div className="input-wrapper">
-              <span className="input-icon">🔒</span>
+              <span className="input-icon"><i className="bi bi-lock-fill"></i></span>
               <input
                 type={showPassword ? 'text' : 'password'}
                 id="password"

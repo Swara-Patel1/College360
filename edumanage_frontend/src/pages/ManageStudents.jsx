@@ -229,13 +229,13 @@ export default function ManageStudents() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>🎓 {isAdmin ? 'Manage Students' : 'Students Directory'}</h1>
+          <h1><i className="bi bi-mortarboard"></i> {isAdmin ? 'Manage Students' : 'Students Directory'}</h1>
           <p>{isAdmin ? 'Manage student enrollments, profiles, and academic status.' : 'View student listings and directory profiles.'}</p>
         </div>
         {isAdmin && (
           <div className="page-header-right">
             <button className="btn btn-primary" onClick={() => { resetForm(); setIsAddOpen(true); }}>
-              ➕ Add Student
+              <i className="bi bi-plus-lg"></i> Add Student
             </button>
           </div>
         )}
@@ -244,28 +244,28 @@ export default function ManageStudents() {
       {/* Mini Stats */}
       <div className="stats-mini">
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}>🎓</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}><i className="bi bi-mortarboard"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: 'var(--primary)' }}>{totalCount}</div>
             <div className="stats-mini-lbl">Total Students</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(0,212,170,0.2)' }}>✅</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(0,212,170,0.2)' }}><i className="bi bi-check-circle-fill"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#00D4AA' }}>{activeCount}</div>
             <div className="stats-mini-lbl">Active</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(84,160,255,0.2)' }}>🏆</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(84,160,255,0.2)' }}><i className="bi bi-trophy"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#54A0FF' }}>{graduatedCount}</div>
             <div className="stats-mini-lbl">Graduated</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}>⏸️</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}><i className="bi bi-pause"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#FF6B6B' }}>{inactiveCount}</div>
             <div className="stats-mini-lbl">Inactive</div>
@@ -334,11 +334,11 @@ export default function ManageStudents() {
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => handleViewClick(s)}>🔍 View</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleViewClick(s)}><i className="bi bi-search"></i> View</button>
                         {isAdmin && (
                           <>
-                            <button className="btn btn-ghost btn-sm" onClick={() => handleEditClick(s)}>📝 Edit</button>
-                            <button className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => handleDeleteClick(s)}>🗑️ Delete</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => handleEditClick(s)}><i className="bi bi-pencil-square"></i> Edit</button>
+                            <button className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => handleDeleteClick(s)}><i className="bi bi-trash"></i> Delete</button>
                           </>
                         )}
                       </div>
@@ -349,7 +349,7 @@ export default function ManageStudents() {
             </table>
           ) : (
             <div className="empty-state">
-              <div className="empty-state-icon">🎓</div>
+              <div className="empty-state-icon"><i className="bi bi-mortarboard"></i></div>
               <p>No student records match the filters.</p>
             </div>
           )}

@@ -1,11 +1,14 @@
 """
 RAG Service — Retrieval-Augmented Generation context builder.
-Queries the student's data from the Supabase PostgreSQL database via REST API.
+
+Queries the student's live data from the Django ORM (the app was consolidated
+onto Django + SQLite; the old Supabase REST layer was removed). Given a student
+and their message, it detects intents and assembles a focused context string.
 """
 import logging
-import requests
 from datetime import date, timedelta
-from django.conf import settings
+
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -57,365 +60,249 @@ INTENT_KEYWORDS = {
 }
 
 
-# Create a persistent global session for connection pooling (makes subsequent requests 6x faster)
-_session = requests.Session()
-
-def _supabase_request(table_or_path, query_params=None):
-    """Helper to perform requests to Supabase Rest API using connection pooling."""
-    url = f"{settings.SUPABASE_URL}/rest/v1/{table_or_path}"
-    headers = {
-        'apikey': settings.SUPABASE_ANON_KEY,
-        'Authorization': f"Bearer {settings.SUPABASE_ANON_KEY}",
-        'Content-Type': 'application/json',
-    }
-    try:
-        response = _session.get(url, headers=headers, params=query_params)
-        if response.status_code == 200:
-            return response.json()
-        logger.warning(f"Supabase request failed: {response.status_code} - {response.text}")
-        return []
-    except Exception as e:
-        logger.error(f"Error calling Supabase API: {e}")
-        return []
+def _resolve_student(user, supabase_user_id=None):
+    """Find the Student for the request — by auth user, then by the passed id."""
+    from students.models import Student
+    stu = getattr(user, 'student_profile', None)
+    if stu:
+        return stu
+    if user is not None and getattr(user, 'is_authenticated', False):
+        stu = Student.objects.filter(user=user).select_related('user', 'department').first()
+        if stu:
+            return stu
+    val = str(supabase_user_id or '').strip()
+    if val:
+        qs = Student.objects.select_related('user', 'department')
+        return (qs.filter(user__pk=val).first() if val.isdigit() else None) \
+            or qs.filter(student_id=val).first()
+    return None
 
 
 def build_rag_context(user, message, supabase_user_id=None):
-    """
-    Queries live student data from Supabase and builds prompt context.
-    """
-    if not supabase_user_id:
-        logger.warning("No Supabase user ID provided for context retrieval.")
+    """Assemble prompt context for the student's question from the Django ORM."""
+    student = _resolve_student(user, supabase_user_id)
+    if not student:
+        logger.warning("RAG: no student resolved for chat context.")
         return ""
 
     context_parts = []
-    message_lower = message.lower()
+    message_lower = (message or '').lower()
 
-    # 1. Fetch Student Profile from Supabase
-    student_rows = _supabase_request(
-        'students',
-        {'select': '*,department:departments(*),current_semester:semesters(*)', 'user_id': f'eq.{supabase_user_id}'}
+    dept_name = student.department.name if student.department else 'N/A'
+    context_parts.append(
+        "📋 STUDENT PROFILE:\n"
+        f"• Name: {student.user.first_name} {student.user.last_name}\n"
+        f"• Enrollment No: {student.student_id}\n"
+        f"• Roll Number: {student.roll_number or 'N/A'}\n"
+        f"• Department: {dept_name}\n"
+        f"• Semester: {student.semester} (Year {student.year_of_study})\n"
     )
 
-    if not student_rows:
-        logger.warning(f"Student not found in Supabase for user_id: {supabase_user_id}")
-        return ""
+    detected_intents = _detect_intents(message_lower) or ['summary']
 
-    student = student_rows[0]
-    student_id = student.get('student_id')
-
-    # Add basic profile info
-    profile_ctx = (
-        f"📋 STUDENT PROFILE:\n"
-        f"• Name: {student.get('first_name', '')} {student.get('last_name', '')}\n"
-        f"• Enrollment No: {student.get('enrollment_no', 'N/A')}\n"
-        f"• Roll Number: {student.get('current_rollno') or 'N/A'}\n"
-        f"• Department: {student.get('department', {}).get('name', 'N/A')}\n"
-        f"• Semester: {student.get('current_semester', {}).get('number', 'N/A')}\n"
-    )
-    context_parts.append(profile_ctx)
-
-    # Detect user intents
-    detected_intents = _detect_intents(message_lower)
-    if not detected_intents:
-        detected_intents = ['summary']
-
+    dispatch = {
+        'attendance': _get_attendance_data,
+        'grades': _get_grades_data,
+        'timetable': _get_timetable_data,
+        'fees': _get_fees_data,
+        'notices': lambda s: _get_notices_data(),
+        'courses': _get_courses_data,
+        'placement': _get_placement_data,
+        'complaints': _get_complaints_data,
+        'summary': _get_summary_data,
+    }
     for intent in detected_intents:
+        fn = dispatch.get(intent)
+        if not fn:
+            continue
         try:
-            if intent == 'attendance':
-                ctx = _get_attendance_data(student_id)
-            elif intent == 'grades':
-                ctx = _get_grades_data(student_id)
-            elif intent == 'timetable':
-                ctx = _get_timetable_data(student_id, student.get('department_id'), student.get('current_semester_id'))
-            elif intent == 'fees':
-                ctx = _get_fees_data(student_id)
-            elif intent == 'notices':
-                ctx = _get_notices_data()
-            elif intent == 'courses':
-                ctx = _get_courses_data(student_id)
-            elif intent == 'placement':
-                ctx = _get_placement_data(student_id, student.get('department', {}).get('name', 'N/A'))
-            elif intent == 'complaints':
-                ctx = _get_complaints_data(student_id)
-            elif intent == 'summary':
-                ctx = _get_summary_data(student_id)
-            else:
-                ctx = None
-
+            ctx = fn(student)
             if ctx:
                 context_parts.append(ctx)
         except Exception as e:
-            logger.warning(f"Error retrieving {intent} data from Supabase: {e}")
-            continue
+            logger.warning(f"RAG: error building '{intent}' context: {e}")
 
     return "\n\n".join(context_parts)
 
 
 def _detect_intents(message_lower):
-    detected = []
-    for intent, keywords in INTENT_KEYWORDS.items():
-        if any(kw in message_lower for kw in keywords):
-            detected.append(intent)
-    return detected
+    return [intent for intent, kws in INTENT_KEYWORDS.items()
+            if any(kw in message_lower for kw in kws)]
 
 
-def _get_attendance_data(student_id):
-    records = _supabase_request(
-        'attendance_records',
-        {'select': '*,course:subjects(*)', 'student_id': f'eq.{student_id}'}
-    )
+# ── Intent data builders (Django ORM) ────────────────────────────────────────
+
+def _get_attendance_data(student):
+    from attendance.models import AttendanceRecord
+    records = AttendanceRecord.objects.filter(student=student).select_related('course')
     if not records:
         return "📊 ATTENDANCE DATA:\nNo attendance records found."
 
-    course_attendance = {}
+    by_course = {}
     for r in records:
-        c = r.get('course') or {}
-        course_name = f"{c.get('code', 'N/A')} — {c.get('name', 'N/A')}"
-        if course_name not in course_attendance:
-            course_attendance[course_name] = {'total': 0, 'present': 0}
-        
-        course_attendance[course_name]['total'] += 1
-        db_status = r.get('status', '').upper()
-        if db_status in ('P', 'PRESENT', 'L', 'LATE'):
-            course_attendance[course_name]['present'] += 1
+        key = f"{r.course.code} — {r.course.name}"
+        d = by_course.setdefault(key, {'total': 0, 'present': 0})
+        d['total'] += 1
+        if (r.status or '').lower() in ('present', 'p', 'late', 'l', 'excused', 'e'):
+            d['present'] += 1
 
     lines = ["📊 ATTENDANCE DATA:"]
-    total_classes = 0
-    total_present = 0
-
-    for course, data in course_attendance.items():
-        pct = round((data['present'] / data['total']) * 100, 1) if data['total'] > 0 else 0
-        lines.append(f"• {course}: {data['present']}/{data['total']} ({pct}%)")
-        total_classes += data['total']
-        total_present += data['present']
-
-    overall_pct = round((total_present / total_classes) * 100, 1) if total_classes > 0 else 0
-    lines.append(f"\n• Overall Attendance: {total_present}/{total_classes} ({overall_pct}%)")
+    tot = pres = 0
+    for course, d in by_course.items():
+        pct = round(d['present'] / d['total'] * 100, 1) if d['total'] else 0
+        lines.append(f"• {course}: {d['present']}/{d['total']} ({pct}%)")
+        tot += d['total']; pres += d['present']
+    overall = round(pres / tot * 100, 1) if tot else 0
+    lines.append(f"\n• Overall Attendance: {pres}/{tot} ({overall}%)")
     return "\n".join(lines)
 
 
-def _get_grades_data(student_id):
-    records = _supabase_request(
-        'marks',
-        {'select': '*,course:subjects(*)', 'student_id': f'eq.{student_id}'}
-    )
+def _get_grades_data(student):
+    from grades.models import Grade
+    records = Grade.objects.filter(student=student).select_related('course')
     if not records:
         return "📝 GRADES DATA:\nNo grade records found."
 
     lines = ["📝 GRADES DATA:"]
     backlogs = []
-
-    grade_points = {
-        'O': 10, 'AA': 9, 'AB': 8, 'BB': 7,
-        'BC': 6.5, 'CC': 6, 'CD': 5, 'DD': 4, 'F': 0
-    }
-
-    total_credits = 0
-    total_weighted_points = 0
-
-    for r in records:
-        c = r.get('course') or {}
-        course_name = f"{c.get('code', 'N/A')} — {c.get('name', 'N/A')}"
-        grade = r.get('grade', 'F')
-        internal = float(r.get('internal_marks') or 0)
-        external = float(r.get('external_marks') or 0)
-        total = float(r.get('total_marks') or (internal + external))
-        
-        lines.append(f"• {course_name}: Grade {grade} (Marks: {total})")
-
-        credits = int(c.get('credits') or 3)
-        gp = grade_points.get(grade, 0)
+    total_credits = weighted = 0
+    for g in records:
+        course = f"{g.course.code} — {g.course.name}"
+        lines.append(f"• {course}: Grade {g.grade or '—'} "
+                     f"({g.marks_obtained}/{g.total_marks}, {g.percentage()}%)")
+        credits = int(getattr(g.course, 'credits', 3) or 3)
         total_credits += credits
-        total_weighted_points += gp * credits
+        weighted += g.grade_point() * credits
+        if (g.grade or '').upper() == 'F':
+            backlogs.append(course)
 
-        if grade == 'F':
-            backlogs.append(course_name)
-
-    cgpa = round(total_weighted_points / total_credits, 2) if total_credits > 0 else 0
+    cgpa = round(weighted / total_credits, 2) if total_credits else 0
     lines.append(f"\n• Calculated CGPA: {cgpa}/10")
     lines.append(f"• Total Credits: {total_credits}")
-
-    if backlogs:
-        lines.append(f"• ⚠️ Backlogs ({len(backlogs)}): {', '.join(backlogs)}")
-    else:
-        lines.append("• ✅ No backlogs")
-
+    lines.append(f"• ⚠️ Backlogs ({len(backlogs)}): {', '.join(backlogs)}" if backlogs
+                 else "• ✅ No backlogs")
     return "\n".join(lines)
 
 
-def _get_timetable_data(student_id, department_id, semester_id):
-    # Fetch timetable entries matching department and semester
-    schedules = _supabase_request(
-        'timetable',
-        {
-            'select': '*,course:subjects(*),faculty:faculty(*)',
-            'course.department_id': f'eq.{department_id}',
-            'course.semester_id': f'eq.{semester_id}'
-        }
-    )
-    
+def _get_timetable_data(student):
+    from timetable.models import Schedule
+    schedules = (Schedule.objects.filter(
+        course__department=student.department, course__semester=student.semester, is_active=True)
+        .select_related('course', 'faculty__user'))
     today = date.today()
     day_name = today.strftime('%A').lower()
-    
+
+    def fmt(s):
+        fac = f"{s.faculty.user.first_name} {s.faculty.user.last_name}".strip() if s.faculty and s.faculty.user else 'TBA'
+        return (f"• {str(s.start_time)[:5]} - {str(s.end_time)[:5]}: {s.course.name} "
+                f"| Room: {s.room or 'TBA'} | Faculty: {fac}")
+
     lines = [f"📅 TIMETABLE — {today.strftime('%A, %d %B %Y')}:"]
-    
-    today_schedules = [s for s in schedules if s.get('day_of_week', '').lower() == day_name]
-    
-    if not today_schedules:
-        lines.append("No classes scheduled for today.")
-        # Show tomorrow
-        tomorrow = today + timedelta(days=1)
-        tom_day = tomorrow.strftime('%A').lower()
-        tom_schedules = [s for s in schedules if s.get('day_of_week', '').lower() == tom_day]
-        if tom_schedules:
-            lines.append(f"\nTomorrow ({tomorrow.strftime('%A')}):")
-            for s in tom_schedules:
-                c = s.get('course') or {}
-                fac = s.get('faculty') or {}
-                fac_name = f"{fac.get('first_name','')} {fac.get('last_name','')}".strip() or 'TBA'
-                lines.append(f"• {s.get('start_time','')} - {s.get('end_time','')}: {c.get('name','')} | Room: {s.get('room_no','TBA')} | Faculty: {fac_name}")
+    today_s = [s for s in schedules if (s.day or '').lower() == day_name]
+    if today_s:
+        lines += [fmt(s) for s in today_s]
     else:
-        for s in today_schedules:
-            c = s.get('course') or {}
-            fac = s.get('faculty') or {}
-            fac_name = f"{fac.get('first_name','')} {fac.get('last_name','')}".strip() or 'TBA'
-            lines.append(f"• {s.get('start_time','')} - {s.get('end_time','')}: {c.get('name','')} | Room: {s.get('room_no','TBA')} | Faculty: {fac_name}")
-            
+        lines.append("No classes scheduled for today.")
+        tom = (today + timedelta(days=1)).strftime('%A')
+        tom_s = [s for s in schedules if (s.day or '').lower() == tom.lower()]
+        if tom_s:
+            lines.append(f"\nTomorrow ({tom}):")
+            lines += [fmt(s) for s in tom_s]
     return "\n".join(lines)
 
 
-def _get_fees_data(student_id):
-    payments = _supabase_request(
-        'fee_payments',
-        {'select': '*,fee_structures(*)', 'student_id': f'eq.{student_id}'}
-    )
-    if not payments:
-        return "💰 FEES DATA:\nNo fee payments found."
+def _get_fees_data(student):
+    from fees.models import Fee
+    fees = Fee.objects.filter(student=student)
+    if not fees:
+        return "💰 FEES DATA:\nNo fee records found."
 
     lines = ["💰 FEES DATA:"]
-    total_paid = 0
-    total_pending = 0
-
-    for p in payments:
-        struct = p.get('fee_structures') or {}
-        comp_name = struct.get('component_name', 'Tuition Fee')
-        amount = float(struct.get('amount') or 0)
-        status = p.get('status', 'pending')
-        
-        status_icon = '✅' if status == 'paid' else '⚠️' if status == 'pending' else '🔴'
-        lines.append(f"• {comp_name}: ₹{amount:,.2f} — {status_icon} {status.title()}")
-        
-        if status == 'paid':
-            total_paid += amount
-        else:
-            total_pending += amount
-
-    lines.append(f"\n• Total Paid: ₹{total_paid:,.2f}")
-    lines.append(f"• Total Pending: ₹{total_pending:,.2f}")
+    paid = pending = 0.0
+    for f in fees:
+        amt = float(f.amount or 0)
+        icon = '✅' if f.status == 'paid' else '🔴' if f.status == 'overdue' else '⚠️'
+        lines.append(f"• {f.get_fee_type_display()}: ₹{amt:,.2f} — {icon} {f.status.title()}")
+        if f.status == 'paid':
+            paid += amt
+        elif f.status in ('pending', 'overdue'):
+            pending += amt
+    lines.append(f"\n• Total Paid: ₹{paid:,.2f}")
+    lines.append(f"• Total Pending: ₹{pending:,.2f}")
     return "\n".join(lines)
 
 
 def _get_notices_data():
-    notices = _supabase_request(
-        'notices',
-        {'select': '*,author:users(*)', 'order': 'published_at.desc', 'limit': '5'}
-    )
+    from notices.models import Notice
+    notices = Notice.objects.filter(is_active=True).order_by('-created_at')[:5]
     if not notices:
         return "📢 NOTICES:\nNo active notices."
-
     lines = ["📢 RECENT NOTICES:"]
     for n in notices:
-        prio = n.get('priority', 'NORMAL').upper()
-        prio_icon = '🚨' if prio == 'URGENT' else '📋'
-        lines.append(f"• {prio_icon} [{prio}] {n.get('title')} ({n.get('published_at', '')[:10]})")
-        lines.append(f"  {n.get('content', '')[:120]}...")
-        
+        icon = '🚨' if n.notice_type == 'urgent' else '📋'
+        lines.append(f"• {icon} [{n.notice_type.upper()}] {n.title} ({str(n.created_at)[:10]})")
+        if n.content:
+            lines.append(f"  {n.content[:120]}")
     return "\n".join(lines)
 
 
-def _get_courses_data(student_id):
-    enrollments = _supabase_request(
-        'enrollments',
-        {'select': '*,course:subjects(*)', 'student_id': f'eq.{student_id}'}
-    )
+def _get_courses_data(student):
+    from courses.models import Enrollment
+    enrollments = (Enrollment.objects.filter(student=student, is_active=True)
+                   .select_related('course'))
     if not enrollments:
         return "📚 ENROLLED COURSES:\nNo active course enrollments found."
-
     lines = ["📚 ENROLLED COURSES:"]
     for e in enrollments:
-        c = e.get('course') or {}
-        lines.append(f"• {c.get('code','')} — {c.get('name','')} | Credits: {c.get('credits', 3)}")
-        
+        c = e.course
+        lines.append(f"• {c.code} — {c.name} | Credits: {getattr(c, 'credits', 3)}")
     return "\n".join(lines)
 
 
-def _get_placement_data(student_id, dept_name):
-    scores = _supabase_request(
-        'placement_scores',
-        {'student_id': f'eq.{student_id}'}
-    )
-    
-    # Also fetch grades to calculate CGPA
-    grades_ctx = _get_grades_data(student_id)
-    
+def _get_placement_data(student):
     lines = ["🎯 PLACEMENT ELIGIBILITY:"]
-    lines.append(f"• Department: {dept_name}")
-    if scores:
-        lines.append(f"• Placement Technical Score: {scores[0].get('total_score', 'N/A')}")
-        
-    if "Calculated CGPA" in grades_ctx:
-        cgpa_line = [l for l in grades_ctx.split('\n') if "Calculated CGPA" in l][0]
-        lines.append(f"• {cgpa_line.replace('• ', '')}")
-        
-    lines.append("\n💡 ELIGIBLE CAREER OPPORTUNITIES:")
-    lines.append("• Prepare well for DSA and Technical Coding tests")
-    lines.append("• Build projects using modern frontend frameworks like React")
+    lines.append(f"• Department: {student.department.name if student.department else 'N/A'}")
+    try:
+        from placement.service import compute_placement
+        score = compute_placement(student)
+        if isinstance(score, dict):
+            for k in ('total_score', 'readiness', 'cpi', 'attendance', 'backlogs'):
+                if k in score:
+                    lines.append(f"• {k.replace('_', ' ').title()}: {score[k]}")
+    except Exception as e:
+        logger.warning(f"RAG placement: {e}")
+    lines.append("\n💡 Prepare for DSA/technical rounds and build strong projects.")
     return "\n".join(lines)
 
 
-def _get_complaints_data(student_id):
-    complaints = _supabase_request(
-        'grievances',
-        {'student_id': f'eq.{student_id}', 'order': 'submitted_at.desc', 'limit': '5'}
-    )
+def _get_complaints_data(student):
+    from complaints.models import Complaint
+    complaints = Complaint.objects.filter(student=student).order_by('-created_at')[:5]
     if not complaints:
         return "📣 COMPLAINTS:\nNo complaints filed."
-
     lines = ["📣 MY COMPLAINTS:"]
     for c in complaints:
-        status = c.get('status', 'OPEN')
-        status_icon = '🟡' if status == 'OPEN' else '✅'
-        lines.append(f"• {status_icon} Description: {c.get('description')} — Status: {status}")
-        
+        icon = '✅' if c.status == 'resolved' else '🟡'
+        lines.append(f"• {icon} {c.title} — Status: {c.get_status_display()}")
     return "\n".join(lines)
 
 
-def _get_summary_data(student_id):
+def _get_summary_data(student):
     parts = []
-    
-    # 1. Quick CGPA summary
     try:
-        grades = _supabase_request('marks', {'student_id': f'eq.{student_id}'})
+        from grades.models import Grade
+        grades = list(Grade.objects.filter(student=student).select_related('course'))
         if grades:
-            grade_points = {'O':10, 'AA':9, 'AB':8, 'BB':7, 'BC':6.5, 'CC':6, 'CD':5, 'DD':4, 'F':0}
-            total_weighted = 0
-            for g in grades:
-                total_weighted += grade_points.get(g.get('grade','F'), 0)
-            cgpa = round(total_weighted / len(grades), 2)
-            parts.append(f"• CGPA: {cgpa}/10")
+            tc = sum(int(getattr(g.course, 'credits', 3) or 3) for g in grades)
+            wp = sum(g.grade_point() * int(getattr(g.course, 'credits', 3) or 3) for g in grades)
+            if tc:
+                parts.append(f"• CGPA: {round(wp / tc, 2)}/10")
     except Exception:
         pass
-        
-    # 2. Quick Fee status
     try:
-        fees = _supabase_request('fee_payments', {'student_id': f'eq.{student_id}', 'status': 'eq.pending'})
-        if fees:
-            parts.append(f"• Pending Fees: Yes, {len(fees)} payment(s) outstanding.")
-        else:
-            parts.append("• Fees: All paid ✅")
+        from fees.models import Fee
+        pending = Fee.objects.filter(student=student, status__in=['pending', 'overdue']).count()
+        parts.append(f"• Pending Fees: {pending} outstanding." if pending else "• Fees: All paid ✅")
     except Exception:
         pass
-
-    if parts:
-        return "📋 QUICK SUMMARY:\n" + "\n".join(parts)
-    return ""
+    return "📋 QUICK SUMMARY:\n" + "\n".join(parts) if parts else ""

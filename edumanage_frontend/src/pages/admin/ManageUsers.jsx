@@ -90,14 +90,14 @@ export default function ManageUsers() {
   return (
     <>
       <div className="page-header">
-        <div className="page-header-left"><h1>👥 User Accounts</h1><p>Master control for every account — roles, access, and passwords.</p></div>
+        <div className="page-header-left"><h1><i className="bi bi-people"></i> User Accounts</h1><p>Master control for every account — roles, access, and passwords.</p></div>
       </div>
 
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card primary"><div className="stat-icon">👥</div><div className="stat-value">{counts.total}</div><div className="stat-label">Total Users</div></div>
-        <div className="stat-card success"><div className="stat-icon">✅</div><div className="stat-value">{counts.active}</div><div className="stat-label">Active</div></div>
-        <div className="stat-card danger"><div className="stat-icon">🛡️</div><div className="stat-value">{counts.admins}</div><div className="stat-label">Admins</div></div>
-        <div className="stat-card info"><div className="stat-icon">🎓</div><div className="stat-value">{counts.students}</div><div className="stat-label">Students</div></div>
+        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-people"></i></div><div className="stat-value">{counts.total}</div><div className="stat-label">Total Users</div></div>
+        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div className="stat-value">{counts.active}</div><div className="stat-label">Active</div></div>
+        <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-shield-check"></i></div><div className="stat-value">{counts.admins}</div><div className="stat-label">Admins</div></div>
+        <div className="stat-card info"><div className="stat-icon"><i className="bi bi-mortarboard"></i></div><div className="stat-value">{counts.students}</div><div className="stat-label">Students</div></div>
       </div>
 
       <div className="card col-12">
@@ -134,8 +134,8 @@ export default function ManageUsers() {
                     <td>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                         <button className="btn btn-ghost btn-sm" title={u.is_active === false ? 'Activate' : 'Deactivate'} disabled={isMe} onClick={() => toggleActive(u)}>{u.is_active === false ? '🔓' : '🔒'}</button>
-                        <button className="btn btn-ghost btn-sm" title="Reset password" onClick={() => { setPwUser(u); setNewPw(''); }}>🔑</button>
-                        <button className="btn btn-ghost btn-sm" title="Delete" style={{ color: 'var(--accent, #FF6B6B)' }} disabled={isMe} onClick={() => removeUser(u)}>🗑️</button>
+                        <button className="btn btn-ghost btn-sm" title="Reset password" onClick={() => { setPwUser(u); setNewPw(''); }}><i className="bi bi-key"></i></button>
+                        <button className="btn btn-ghost btn-sm" title="Delete" style={{ color: 'var(--accent, #FF6B6B)' }} disabled={isMe} onClick={() => removeUser(u)}><i className="bi bi-trash"></i></button>
                       </div>
                     </td>
                   </tr>

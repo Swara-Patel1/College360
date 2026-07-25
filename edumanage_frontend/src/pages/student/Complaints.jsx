@@ -109,19 +109,19 @@ export default function Complaints() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>📣 Support & Complaints</h1>
+          <h1><i className="bi bi-megaphone"></i> Support & Complaints</h1>
           <p id="pageSubtitle">
             {complaints.length} complaint{complaints.length !== 1 ? 's' : ''} raised by you.
           </p>
         </div>
         <div className="page-header-right">
-          <button className="btn btn-primary" onClick={handleOpenModal}>📣 Raise New Complaint</button>
+          <button className="btn btn-primary" onClick={handleOpenModal}><i className="bi bi-megaphone"></i> Raise New Complaint</button>
         </div>
       </div>
 
       <div className="card col-12">
         <div className="card-header">
-          <div className="card-title">📋 Complaint Log & Status</div>
+          <div className="card-title"><i className="bi bi-clipboard"></i> Complaint Log & Status</div>
         </div>
         
         <div className="card-body" id="complaintsList" style={{ display: 'grid', gap: '16px' }}>
@@ -149,8 +149,8 @@ export default function Complaints() {
                       <span className="cat-chip" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
                         {catLabel[c.category] || c.category}
                       </span>
-                      <span>🗓️ {new Date(c.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                      {c.is_anonymous && <span style={{ color: 'var(--accent)' }}>🕵️ Anonymous</span>}
+                      <span><i className="bi bi-calendar-week"></i> {new Date(c.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                      {c.is_anonymous && <span style={{ color: 'var(--accent)' }}><i className="bi bi-search"></i> Anonymous</span>}
                     </div>
                   </div>
                   <span className={getStatusClass(c.status)} style={{ textTransform: 'capitalize' }}>
@@ -164,7 +164,7 @@ export default function Complaints() {
 
                 {c.hod_response && (
                   <div className="hod-response" style={{ background: 'rgba(108,99,255,0.04)', borderLeft: '3px solid #6C63FF', padding: '12px', borderRadius: '0 8px 8px 0', marginTop: '4px' }}>
-                    <div className="hod-response-label" style={{ color: '#6C63FF', fontSize: '0.75rem', fontWeight: 700, marginBottom: '4px' }}>🎓 HOD Response</div>
+                    <div className="hod-response-label" style={{ color: '#6C63FF', fontSize: '0.75rem', fontWeight: 700, marginBottom: '4px' }}><i className="bi bi-mortarboard"></i> HOD Response</div>
                     <div className="hod-response-text" style={{ fontSize: '0.82rem', lineHeight: 1.5, color: 'var(--text-secondary)' }}>{c.hod_response}</div>
                   </div>
                 )}
@@ -172,7 +172,7 @@ export default function Complaints() {
             ))
           ) : (
             <div className="empty-state" style={{ padding: '40px', textAlign: 'center' }}>
-              <div className="empty-icon" style={{ fontSize: '2.5rem', marginBottom: '12px' }}>📭</div>
+              <div className="empty-icon" style={{ fontSize: '2.5rem', marginBottom: '12px' }}><i className="bi bi-inbox"></i></div>
               <h3 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>No Complaints Yet</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 If you have any issue, click <strong>Raise New Complaint</strong> to notify the HOD.

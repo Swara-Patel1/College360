@@ -6,6 +6,7 @@ export const useAuthStore = create((set, get) => ({
   token: localStorage.getItem('access_token') || null,
   user: JSON.parse(localStorage.getItem('user') || 'null'),
   studentProfile: JSON.parse(localStorage.getItem('student_profile') || 'null'),
+  delegatedAccess: JSON.parse(localStorage.getItem('delegated_access') || '[]'),
   isLoggedIn: !!localStorage.getItem('access_token'),
 
   login: async (usernameOrEmail, password) => {
@@ -26,7 +27,12 @@ export const useAuthStore = create((set, get) => ({
           user: data.user,
           isLoggedIn: true
         });
-        
+
+        // Faculty may hold temporary delegated HOD powers — load them.
+        if (data.user.role === 'faculty' || data.user.role === 'hod') {
+          get().refreshDelegatedAccess();
+        }
+
         // Wait briefly for background student profile fetch to execute
         if (data.user.role === 'student') {
           setTimeout(() => {
@@ -54,9 +60,24 @@ export const useAuthStore = create((set, get) => ({
       token: null,
       user: null,
       studentProfile: null,
+      delegatedAccess: [],
       isLoggedIn: false
     });
     Toast.info('Logged out successfully.');
+  },
+
+  /** Refresh the set of delegated HOD scopes (e.g. ['leaves','timetable']) held by this user. */
+  refreshDelegatedAccess: async () => {
+    const user = get().user;
+    if (!user) return;
+    try {
+      const acc = await API.get(`hod/my-access?user_id=eq.${user.id}`);
+      const scopes = (acc && acc.isDelegate) ? (acc.scopes || []) : [];
+      localStorage.setItem('delegated_access', JSON.stringify(scopes));
+      set({ delegatedAccess: scopes });
+    } catch (e) {
+      console.error('Could not load delegated access:', e);
+    }
   },
 
   refreshStudentProfile: async () => {

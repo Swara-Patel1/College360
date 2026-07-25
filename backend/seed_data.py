@@ -37,7 +37,8 @@ from fees.models import Fee
 from timetable.models import Schedule
 from notices.models import Notice
 from complaints.models import Complaint
-from campus.models import StudyMaterial, Doubt, Alumnus, FacultyFeedback, Parent, Backlog, Exam
+from campus.models import (StudyMaterial, Doubt, Alumnus, FacultyFeedback, Parent, Backlog, Exam,
+                            Book, BookLoan, Internship, Achievement, Delegation)
 from placement.models import PlacementCompany
 
 
@@ -73,6 +74,11 @@ with transaction.atomic():
     Parent.objects.all().delete()
     Backlog.objects.all().delete()
     Exam.objects.all().delete()
+    Internship.objects.all().delete()
+    Achievement.objects.all().delete()
+    Delegation.objects.all().delete()
+    BookLoan.objects.all().delete()
+    Book.objects.all().delete()
     PlacementCompany.objects.all().delete()
     AttendanceRecord.objects.all().delete()
     Grade.objects.all().delete()
@@ -200,6 +206,28 @@ with transaction.atomic():
 
     print(f"  ✅ {len(faculty_map)} faculty")
 
+    # Ensure every department has exactly one HOD (the legacy hod.json ids don't
+    # line up with the imported users, so promote a faculty member per department).
+    print("\n🏷️  Assigning HODs per department...")
+    hod_login = None
+    for dept in Department.objects.all():
+        dept_fac = list(Faculty.objects.filter(department=dept, is_active=True).select_related('user'))
+        if not dept_fac:
+            continue
+        existing = next((f for f in dept_fac if f.designation == 'hod'), None)
+        hod = existing or dept_fac[0]
+        # Exactly one HOD per department.
+        Faculty.objects.filter(department=dept, designation='hod').exclude(pk=hod.pk) \
+            .update(designation='assistant_professor')
+        hod.designation = 'hod'
+        hod.save()
+        hod.user.role = 'hod'
+        if hod_login is None:  # give the primary HOD a known password for demos
+            hod.user.set_password('hod123')
+            hod_login = hod.user.email
+        hod.user.save()
+    print(f"  ✅ HODs assigned" + (f" — primary HOD login: {hod_login} / hod123" if hod_login else ""))
+
     # ── 4. STUDENTS ───────────────────────────────────────────────
     print("\n🎓 Importing students...")
     student_rows = load('students.json')
@@ -247,6 +275,16 @@ with transaction.atomic():
         student_map[s.get('student_id') or s.get('id')] = stu
 
     print(f"  ✅ {len(student_map)} students")
+
+    # Set a known demo password on one representative student so the printed
+    # login credentials are usable (imported rows have unknown pwds). The faculty
+    # demo login is set later (after HOD/deputy assignment) to avoid a collision.
+    faculty_login = student_login = None
+    demo_stu = next(iter(student_map.values()), None)
+    if demo_stu:
+        demo_stu.user.set_password('student123')
+        demo_stu.user.save()
+        student_login = demo_stu.user.email
 
     # ── 5. COURSES (Subjects) ─────────────────────────────────────
     print("\n📚 Importing courses...")
@@ -390,6 +428,34 @@ with transaction.atomic():
         fee_count += 1
     print(f"  ✅ {fee_count} fee records")
 
+    # Demo the online payment gateway: settle a few pending fees through the
+    # full Razorpay-style order → verify handshake so payment history is populated.
+    print("\n💳 Processing sample online fee payments...")
+    from fees.models import PaymentTransaction
+    from fees import gateway as _pg
+    PaymentTransaction.objects.all().delete()
+    paid_online = 0
+    for fee in Fee.objects.select_related('student').filter(status='pending')[:6]:
+        oid = _pg.new_order_id()
+        txn = PaymentTransaction.objects.create(
+            fee=fee, student=fee.student, gateway='razorpay', order_id=oid,
+            amount=fee.amount, currency='INR', receipt=_pg.receipt_for(fee), status='created')
+        checkout = _pg.simulate_checkout(oid, 'success', method=['card', 'upi', 'netbanking'][paid_online % 3])
+        if _pg.verify_signature(oid, checkout['payment_id'], checkout['signature']):
+            txn.payment_id = checkout['payment_id']
+            txn.signature = checkout['signature']
+            txn.method = checkout['method']
+            txn.status = 'paid'
+            txn.paid_at = timezone.now()
+            txn.save()
+            fee.status = 'paid'
+            fee.payment_date = timezone.now().date()
+            fee.payment_method = f'razorpay/{txn.method}'
+            fee.transaction_id = checkout['payment_id']
+            fee.save()
+            paid_online += 1
+    print(f"  ✅ {paid_online} fees paid via gateway ({_pg.config()['mode']} mode)")
+
     # ── 10. TIMETABLE ─────────────────────────────────────────────
     print("\n🗓️  Importing timetable...")
     timetable_rows = load('timetable.json')
@@ -426,6 +492,28 @@ with transaction.atomic():
         )
         tt_count += 1
     print(f"  ✅ {tt_count} timetable entries")
+
+    # Seed a couple of deliberate scheduling conflicts per department so the
+    # HOD timetable clash-detector has something to catch (room + faculty clashes).
+    clash_pairs = 0
+    for dept in Department.objects.all():
+        dcourses = list(Course.objects.filter(department=dept).select_related('faculty')[:2])
+        if len(dcourses) < 2:
+            continue
+        c1, c2 = dcourses[0], dcourses[1]
+        shared_fac = c1.faculty or c2.faculty
+        # Room double-booking: same room, overlapping time (Wed 11:00–12:00 ∩ 11:30–12:30).
+        Schedule.objects.update_or_create(course=c1, day='wednesday', start_time='11:00',
+            defaults={'faculty': c1.faculty, 'end_time': '12:00', 'room': 'SEM-HALL-1'})
+        Schedule.objects.update_or_create(course=c2, day='wednesday', start_time='11:30',
+            defaults={'faculty': c2.faculty, 'end_time': '12:30', 'room': 'SEM-HALL-1'})
+        # Faculty double-booking: same faculty, overlapping time, different rooms (Thu 14:00 ∩ 14:30).
+        Schedule.objects.update_or_create(course=c1, day='thursday', start_time='14:00',
+            defaults={'faculty': shared_fac, 'end_time': '15:00', 'room': 'A-201'})
+        Schedule.objects.update_or_create(course=c2, day='thursday', start_time='14:30',
+            defaults={'faculty': shared_fac, 'end_time': '15:30', 'room': 'B-305'})
+        clash_pairs += 2
+    print(f"  ⚠️  {clash_pairs} deliberate clash pairs injected (for clash-detection demo)")
 
     # ── 11. NOTICES ───────────────────────────────────────────────
     print("\n📢 Importing notices...")
@@ -539,6 +627,37 @@ with transaction.atomic():
         )
         doubt_count += 1
     print(f"  ✅ {doubt_count} doubts")
+
+    # Demo the AI Syllabus Assistant on a few doubts whose course has study material.
+    print("\n🤖 Generating AI answers for sample doubts...")
+    try:
+        from chatbot.services.doubt_ai import answer_doubt
+        ai_done = 0
+        sample = (Doubt.objects.select_related('course', 'student__user')
+                  .filter(course__study_materials__isnull=False, resolution='')
+                  .distinct()[:4])
+        for i, dbt in enumerate(sample):
+            ai = answer_doubt(dbt)
+            dbt.ai_answer = ai['answer']
+            dbt.ai_confidence = ai['confidence']
+            dbt.ai_sources = ai['sources']
+            dbt.ai_answered_at = timezone.now()
+            dbt.status = 'ai_answered'
+            if i == 0:  # student accepted the AI answer
+                dbt.status = 'resolved'
+                dbt.resolution = dbt.ai_answer
+                dbt.ai_helpful = True
+                dbt.resolved_at = timezone.now()
+            elif i == 1:  # student escalated to faculty
+                dbt.status = 'under_review'
+                dbt.ai_helpful = False
+                if dbt.course and dbt.course.faculty:
+                    dbt.assigned_faculty = dbt.course.faculty
+            dbt.save()
+            ai_done += 1
+        print(f"  ✅ AI-answered {ai_done} sample doubt(s)")
+    except Exception as _e:
+        print(f"  ⚠️  Skipped AI doubt seeding: {_e}")
 
     # ── 15. ALUMNI (synthesized from senior students) ─────────────
     print("\n🎓 Building alumni directory...")
@@ -711,16 +830,152 @@ with transaction.atomic():
         exam_count += 1
     print(f"  ✅ {exam_count} exams scheduled")
 
+    # ── 21. LIBRARY (book inventory + loans) ──────────────────────
+    print("\n📚 Stocking the library...")
+    depts = list(Department.objects.all())
+    LIBRARY_BOOKS = [
+        ('9780262033848', 'Introduction to Algorithms', 'Cormen, Leiserson, Rivest, Stein', 'MIT Press', '3rd Ed.', 'Algorithms', 'A-01', 6),
+        ('9780132350884', 'Clean Code', 'Robert C. Martin', 'Prentice Hall', '1st Ed.', 'Software Engineering', 'A-02', 4),
+        ('9780134685991', 'Effective Java', 'Joshua Bloch', 'Addison-Wesley', '3rd Ed.', 'Programming', 'A-03', 5),
+        ('9780596007126', 'Head First Design Patterns', 'Freeman & Robson', "O'Reilly", '1st Ed.', 'Software Design', 'A-04', 3),
+        ('9781491950357', 'Designing Data-Intensive Applications', 'Martin Kleppmann', "O'Reilly", '1st Ed.', 'Databases', 'B-01', 4),
+        ('9780136042594', 'Artificial Intelligence: A Modern Approach', 'Russell & Norvig', 'Pearson', '3rd Ed.', 'AI / ML', 'B-02', 5),
+        ('9780073523323', 'Database System Concepts', 'Silberschatz, Korth, Sudarshan', 'McGraw-Hill', '6th Ed.', 'Databases', 'B-03', 4),
+        ('9780133594140', 'Computer Networking: A Top-Down Approach', 'Kurose & Ross', 'Pearson', '7th Ed.', 'Networking', 'C-01', 3),
+        ('9780123944245', 'Computer Organization and Design', 'Patterson & Hennessy', 'Morgan Kaufmann', '5th Ed.', 'Architecture', 'C-02', 3),
+        ('9781118063330', 'Operating System Concepts', 'Silberschatz, Galvin, Gagne', 'Wiley', '9th Ed.', 'Operating Systems', 'C-03', 4),
+        ('9780321486813', 'The C Programming Language', 'Kernighan & Ritchie', 'Prentice Hall', '2nd Ed.', 'Programming', 'A-05', 6),
+        ('9781449331818', 'Learning Python', 'Mark Lutz', "O'Reilly", '5th Ed.', 'Programming', 'A-06', 5),
+    ]
+    book_objs = []
+    for i, (isbn, title, author, pub, ed, cat, shelf, copies) in enumerate(LIBRARY_BOOKS):
+        b = Book.objects.create(
+            isbn=isbn, barcode=f'LIB{100001 + i}', title=title, author=author,
+            publisher=pub, edition=ed, category=cat,
+            department=depts[i % len(depts)] if depts else None,
+            shelf=shelf, total_copies=copies, available_copies=copies)
+        book_objs.append(b)
+    print(f"  ✅ {len(book_objs)} book titles catalogued")
+
+    # Issue a few books — mix of on-time, due-soon and overdue (with fines).
+    loan_students = list(student_map.values())[:12]
+    today = date.today()
+    loan_count = 0
+    for i, stu in enumerate(loan_students):
+        book = book_objs[i % len(book_objs)]
+        if book.available_copies < 1:
+            continue
+        if i % 4 == 0:      # overdue → accrues a fine
+            issued, due = today - timedelta(days=25), today - timedelta(days=11)
+        elif i % 4 == 1:    # due soon
+            issued, due = today - timedelta(days=10), today + timedelta(days=4)
+        else:               # freshly issued
+            issued, due = today - timedelta(days=2), today + timedelta(days=12)
+        loan = BookLoan.objects.create(book=book, student=stu, issued_at=issued, due_date=due)
+        book.available_copies -= 1
+        book.save(update_fields=['available_copies'])
+        loan_count += 1
+    # One returned loan with a settled fine, for history.
+    if book_objs and loan_students:
+        rb = book_objs[-1]
+        BookLoan.objects.create(
+            book=rb, student=loan_students[-1],
+            issued_at=today - timedelta(days=40), due_date=today - timedelta(days=26),
+            returned_at=today - timedelta(days=20), status='returned',
+            fine=6 * 5, fine_paid=True)
+        loan_count += 1
+    print(f"  ✅ {loan_count} book loans issued")
+
+    # ── 22. INTERNSHIPS & ACHIEVEMENTS (student portfolio) ────────
+    print("\n🏆 Seeding student portfolios (internships & achievements)...")
+    INTERN_SEED = [
+        ('Google', 'Software Engineering Intern', 'Bengaluru', 'onsite', 'React, Go, GCP', 80000),
+        ('Microsoft', 'SDE Intern', 'Hyderabad', 'hybrid', 'C#, Azure, TypeScript', 75000),
+        ('Zomato', 'Backend Intern', 'Gurugram', 'remote', 'Python, Django, Redis', 40000),
+        ('TCS', 'Data Analyst Intern', 'Pune', 'onsite', 'SQL, PowerBI', 25000),
+        ('Infosys', 'Full-Stack Intern', 'Mysuru', 'onsite', 'Java, Spring, Angular', 20000),
+        ('Razorpay', 'Frontend Intern', 'Remote', 'remote', 'React, TypeScript', 50000),
+    ]
+    ACH_SEED = [
+        ('Smart India Hackathon 2025 Winner', 'technical', 'national', 'Govt. of India', '1st Prize'),
+        ('State-Level Chess Championship', 'sports', 'state', 'Gujarat Sports Authority', 'Runner-up'),
+        ('Cultural Fest — Solo Singing', 'cultural', 'college', 'LJ University', '1st Prize'),
+        ('IEEE Paper Presentation', 'academic', 'national', 'IEEE', 'Best Paper'),
+        ('NSS Blood Donation Drive Lead', 'social', 'college', 'NSS Unit', 'Coordinator'),
+        ('CodeChef Long Challenge', 'technical', 'international', 'CodeChef', 'Global Rank 214'),
+    ]
+    portfolio_students = list(student_map.values())[:14]
+    intern_count = ach_count = 0
+    verifs = ['verified', 'verified', 'pending', 'rejected']
+    for i, stu in enumerate(portfolio_students):
+        company, role, loc, mode, skills, stipend = INTERN_SEED[i % len(INTERN_SEED)]
+        completed = i % 3 != 0
+        start = date(2025, 5, 1) + timedelta(days=(i % 6) * 15)
+        Internship.objects.create(
+            student=stu, company=company, role=role, location=loc, work_mode=mode,
+            start_date=start, end_date=(start + timedelta(days=60)) if completed else None,
+            stipend=stipend, skills=skills,
+            description=f'{role} working on production systems at {company}.',
+            certificate_url='https://example.com/certificate.pdf' if completed else '',
+            status='completed' if completed else 'ongoing',
+            verification=verifs[i % len(verifs)])
+        intern_count += 1
+
+        title, cat, level, org, pos = ACH_SEED[i % len(ACH_SEED)]
+        Achievement.objects.create(
+            student=stu, title=title, category=cat, level=level, organization=org,
+            date_awarded=date(2025, 2, 1) + timedelta(days=(i % 10) * 20), position=pos,
+            description=f'Recognised for {title.lower()}.',
+            certificate_url='https://example.com/award.pdf',
+            verification=verifs[(i + 1) % len(verifs)])
+        ach_count += 1
+    print(f"  ✅ {intern_count} internships, {ach_count} achievements")
+
+    # ── 23. HOD PERMISSION DELEGATION (deputy acting-HOD) ─────────
+    print("\n🤝 Setting up an HOD duty delegation...")
+    deleg_count = 0
+    deputy_login = None
+    for hod in Faculty.objects.filter(designation='hod').select_related('department', 'user'):
+        if not hod.department:
+            continue
+        deputy = (Faculty.objects.filter(department=hod.department)
+                  .exclude(pk=hod.pk).select_related('user').first())
+        if not deputy:
+            continue
+        Delegation.objects.create(
+            department=hod.department, delegator=hod, delegate=deputy,
+            can_approve_leaves=True, can_manage_timetable=True,
+            start_date=date.today() - timedelta(days=1),
+            end_date=date.today() + timedelta(days=10),
+            reason='Acting HOD while on conference leave')
+        deleg_count += 1
+        if deputy_login is None:
+            deputy_login = deputy.user.email
+            # Give the demo deputy a known password so the delegation is testable.
+            deputy.user.set_password('deputy123')
+            deputy.user.save()
+    print(f"  ✅ {deleg_count} delegation(s)" + (f" — deputy login: {deputy_login} / deputy123" if deputy_login else ""))
+
+    # Demo faculty login — a plain faculty member (not an HOD, not the demo deputy).
+    demo_fac = (Faculty.objects.exclude(designation='hod').select_related('user')
+                .exclude(user__email=deputy_login or '').first())
+    if demo_fac:
+        demo_fac.user.set_password('faculty123')
+        demo_fac.user.save()
+        faculty_login = demo_fac.user.email
+
 print("\n" + "=" * 60)
 print("✅ Database seeded successfully!")
 print("\n📋 Login Credentials:")
-print("=" * 40)
-print("🔑 Admin:   admin@lju.edu.in   / admin123")
-print("🔑 HOD:     hod@lju.edu.in     / hod123")
-print("🔑 Faculty: fac@lju.edu.in     / fac123")
-print("🔑 Student: rushi@lju.edu.in   / rushi123")
-print("🔑 Parent:  parent1@lju.edu.in  / parent123")
-print("=" * 40)
+print("=" * 60)
+_admin = User.objects.filter(role='admin').first()
+print(f"🔑 Admin:   {_admin.email if _admin else 'admin@lju.edu.in'}   / admin123")
+print(f"🔑 HOD:     {hod_login or '—'}   / hod123")
+print(f"🔑 Deputy:  {deputy_login or '—'}   / deputy123  (acting-HOD via delegation)")
+print(f"🔑 Faculty: {faculty_login or '—'}   / faculty123")
+print(f"🔑 Student: {student_login or '—'}   / student123")
+print(f"🔑 Parent:  parent1@lju.edu.in   / parent123")
+print("=" * 60)
 print(f"\n📊 Summary:")
 print(f"  Departments: {Department.objects.count()}")
 print(f"  Users:       {User.objects.count()}")
@@ -731,6 +986,8 @@ print(f"  Enrollments: {Enrollment.objects.count()}")
 print(f"  Attendance:  {AttendanceRecord.objects.count()}")
 print(f"  Grades:      {Grade.objects.count()}")
 print(f"  Fees:        {Fee.objects.count()}")
+from fees.models import PaymentTransaction as _PT
+print(f"  Payments:    {_PT.objects.count()}")
 print(f"  Timetable:   {Schedule.objects.count()}")
 print(f"  Notices:     {Notice.objects.count()}")
 print(f"  Complaints:  {Complaint.objects.count()}")
@@ -742,3 +999,8 @@ print(f"  Companies:   {PlacementCompany.objects.count()}")
 print(f"  Parents:     {Parent.objects.count()}")
 print(f"  Backlogs:    {Backlog.objects.count()}")
 print(f"  Exams:       {Exam.objects.count()}")
+print(f"  Books:       {Book.objects.count()}")
+print(f"  Book Loans:  {BookLoan.objects.count()}")
+print(f"  Internships: {Internship.objects.count()}")
+print(f"  Achievements:{Achievement.objects.count()}")
+print(f"  Delegations: {Delegation.objects.count()}")

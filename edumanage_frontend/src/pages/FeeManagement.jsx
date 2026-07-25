@@ -73,35 +73,35 @@ export default function FeeManagement() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>💰 Fee Management</h1>
+          <h1><i className="bi bi-cash-coin"></i> Fee Management</h1>
           <p>Track and manage student fee payments across the institution.</p>
         </div>
       </div>
 
       <div className="stats-mini">
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(0,212,170,0.2)' }}>✅</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(0,212,170,0.2)' }}><i className="bi bi-check-circle-fill"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#00D4AA' }}>{Utils.formatCurrency(totalCollected)}</div>
             <div className="stats-mini-lbl">Collected</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(255,159,67,0.2)' }}>⏳</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(255,159,67,0.2)' }}><i className="bi bi-hourglass-split"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#FF9F43' }}>{Utils.formatCurrency(totalPending)}</div>
             <div className="stats-mini-lbl">Pending</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}>🧾</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}><i className="bi bi-receipt"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: 'var(--primary)' }}>{paidCount}</div>
             <div className="stats-mini-lbl">Paid Records</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}>🚨</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}><i className="bi bi-exclamation-octagon-fill"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#FF6B6B' }}>{pendingCount}</div>
             <div className="stats-mini-lbl">Pending Records</div>
@@ -153,7 +153,7 @@ export default function FeeManagement() {
                     {isAdmin && (
                       <td style={{ textAlign: 'center' }}>
                         {p.status !== 'paid' ? (
-                          <button className="btn btn-ghost btn-sm" style={{ color: '#00D4AA' }} onClick={() => handlePayClick(p)}>✅ Mark Paid</button>
+                          <button className="btn btn-ghost btn-sm" style={{ color: '#00D4AA' }} onClick={() => handlePayClick(p)}><i className="bi bi-check-circle-fill"></i> Mark Paid</button>
                         ) : (
                           <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>—</span>
                         )}
@@ -165,7 +165,7 @@ export default function FeeManagement() {
             </table>
           ) : (
             <div className="empty-state">
-              <div className="empty-state-icon">💰</div>
+              <div className="empty-state-icon"><i className="bi bi-cash-coin"></i></div>
               <p>No fee records match the filters.</p>
             </div>
           )}

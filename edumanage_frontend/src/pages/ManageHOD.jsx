@@ -104,40 +104,40 @@ export default function ManageHOD() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>🏛️ Manage HODs</h1>
+          <h1><i className="bi bi-building"></i> Manage HODs</h1>
           <p>Assign and manage Heads of Department. Assigning promotes a faculty member to HOD.</p>
         </div>
         {isAdmin && (
           <div className="page-header-right">
-            <button className="btn btn-primary" onClick={() => openAssign()}>➕ Assign HOD</button>
+            <button className="btn btn-primary" onClick={() => openAssign()}><i className="bi bi-plus-lg"></i> Assign HOD</button>
           </div>
         )}
       </div>
 
       <div className="stats-mini">
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(139,92,246,0.2)' }}>🏛️</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(139,92,246,0.2)' }}><i className="bi bi-building"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#8b5cf6' }}>{hods.length}</div>
             <div className="stats-mini-lbl">HODs Assigned</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(255,159,67,0.2)' }}>⚠️</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(255,159,67,0.2)' }}><i className="bi bi-exclamation-triangle"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#FF9F43' }}>{departmentsWithoutHod.length}</div>
             <div className="stats-mini-lbl">Without HOD</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(14,165,233,0.2)' }}>🧑‍🏫</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(14,165,233,0.2)' }}><i className="bi bi-person-video3"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#0ea5e9' }}>{faculty.length}</div>
             <div className="stats-mini-lbl">Total Faculty</div>
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}>🏢</div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}><i className="bi bi-building"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: 'var(--primary)' }}>{departments.length}</div>
             <div className="stats-mini-lbl">Departments</div>
@@ -149,7 +149,7 @@ export default function ManageHOD() {
       {isAdmin && departmentsWithoutHod.length > 0 && (
         <div className="card" style={{ marginBottom: '20px' }}>
           <div className="card-body" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>⚠️ Departments without an HOD:</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}><i className="bi bi-exclamation-triangle"></i> Departments without an HOD:</span>
             {departmentsWithoutHod.map(d => (
               <button key={d.id} className="btn btn-ghost btn-sm" onClick={() => openAssign(d.id)}>
                 {d.name} ➕
@@ -195,8 +195,8 @@ export default function ManageHOD() {
                     {isAdmin && (
                       <td style={{ textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                          <button className="btn btn-ghost btn-sm" onClick={() => openAssign(h.department_id)}>🔄 Change</button>
-                          <button className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => handleRemoveClick(h)}>🗑️ Remove</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => openAssign(h.department_id)}><i className="bi bi-arrow-repeat"></i> Change</button>
+                          <button className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => handleRemoveClick(h)}><i className="bi bi-trash"></i> Remove</button>
                         </div>
                       </td>
                     )}
@@ -206,7 +206,7 @@ export default function ManageHOD() {
             </table>
           ) : (
             <div className="empty-state">
-              <div className="empty-state-icon">🏛️</div>
+              <div className="empty-state-icon"><i className="bi bi-building"></i></div>
               <p>No HODs assigned yet.</p>
             </div>
           )}

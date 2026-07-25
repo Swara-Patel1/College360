@@ -1,14 +1,19 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore.js';
 
-export const ProtectedRoute = ({ allowedRoles }) => {
-  const { isLoggedIn, user } = useAuthStore();
+export const ProtectedRoute = ({ allowedRoles, delegationScope }) => {
+  const { isLoggedIn, user, delegatedAccess } = useAuthStore();
 
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user?.role?.toLowerCase())) {
+  const role = user?.role?.toLowerCase();
+  const roleAllowed = !allowedRoles || allowedRoles.includes(role);
+  // A deputy faculty may reach a route if they hold the matching delegated scope.
+  const delegationAllowed = delegationScope && (delegatedAccess || []).includes(delegationScope);
+
+  if (!roleAllowed && !delegationAllowed) {
     // Redirect unauthorized user to their respective dashboard
     const roleDestinations = {
       admin: '/dashboard/admin',

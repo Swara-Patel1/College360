@@ -201,7 +201,7 @@ export default function Grades() {
         /* ENTER GRADES MODE */
         <div className="card col-12">
           <div className="card-header">
-            <div className="card-title">📝 Enter Semester Grades</div>
+            <div className="card-title"><i className="bi bi-pencil-square"></i> Enter Semester Grades</div>
           </div>
           <div className="card-body">
             <div className="form-row" style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
@@ -236,7 +236,7 @@ export default function Grades() {
                 background: dragOver ? 'rgba(108,99,255,0.08)' : 'var(--bg-secondary)', transition: 'all 0.2s ease',
               }}
             >
-              <div style={{ fontSize: '1.6rem', marginBottom: '6px' }}>📥</div>
+              <div style={{ fontSize: '1.6rem', marginBottom: '6px' }}><i className="bi bi-box-arrow-in-down"></i></div>
               <div style={{ fontWeight: 600, marginBottom: '4px' }}>
                 {importing ? 'Importing…' : 'Bulk import marks from CSV'}
               </div>
@@ -256,8 +256,8 @@ export default function Grades() {
             {importResult && (
               <div className="card" style={{ marginBottom: '20px', padding: '14px 18px', background: 'var(--bg-secondary)' }}>
                 <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '0.85rem', marginBottom: importResult.rows?.length ? '10px' : 0 }}>
-                  <span>✅ Imported: <strong>{importResult.imported}</strong></span>
-                  <span>⏭️ Skipped: <strong>{importResult.skipped}</strong></span>
+                  <span><i className="bi bi-check-circle-fill"></i> Imported: <strong>{importResult.imported}</strong></span>
+                  <span><i className="bi bi-skip-end"></i> Skipped: <strong>{importResult.skipped}</strong></span>
                   <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setImportResult(null)}>Dismiss</button>
                 </div>
                 {importResult.rows?.some(r => r.status === 'skipped') && (
@@ -310,7 +310,7 @@ export default function Grades() {
               </>
             ) : (
               <div className="empty-state">
-                <div className="empty-state-icon">📝</div>
+                <div className="empty-state-icon"><i className="bi bi-pencil-square"></i></div>
                 <p>Select a course to view students and enter grades</p>
               </div>
             )}
@@ -320,7 +320,7 @@ export default function Grades() {
         /* VIEW RECORDS LOG MODE */
         <div className="card col-12">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="card-title">📋 Grades Log</div>
+            <div className="card-title"><i className="bi bi-clipboard"></i> Grades Log</div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <select className="form-input" style={{ width: '200px', padding: '6px 10px', fontSize: '0.8rem' }} value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
                 <option value="">All Courses</option>
@@ -362,7 +362,7 @@ export default function Grades() {
               </table>
             ) : (
               <div className="empty-state">
-                <div className="empty-state-icon">📋</div>
+                <div className="empty-state-icon"><i className="bi bi-clipboard"></i></div>
                 <p>No student grade records found.</p>
               </div>
             )}

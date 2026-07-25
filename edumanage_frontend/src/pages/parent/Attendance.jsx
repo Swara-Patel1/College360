@@ -27,13 +27,13 @@ export default function ParentAttendance() {
 
   return (
     <>
-      <div className="page-header"><div className="page-header-left"><h1>✅ Attendance</h1><p>Read-only view of your child’s attendance.</p></div></div>
+      <div className="page-header"><div className="page-header-left"><h1><i className="bi bi-check-circle-fill"></i> Attendance</h1><p>Read-only view of your child’s attendance.</p></div></div>
       {stats && (
         <div className="stats-grid" style={{ marginBottom: '24px' }}>
-          <div className="stat-card success"><div className="stat-icon">📊</div><div className="stat-value">{stats.percentage}%</div><div className="stat-label">Overall</div></div>
-          <div className="stat-card primary"><div className="stat-icon">✅</div><div className="stat-value">{stats.present}</div><div className="stat-label">Present</div></div>
-          <div className="stat-card danger"><div className="stat-icon">❌</div><div className="stat-value">{stats.absent}</div><div className="stat-label">Absent</div></div>
-          <div className="stat-card warning"><div className="stat-icon">⏰</div><div className="stat-value">{stats.late}</div><div className="stat-label">Late</div></div>
+          <div className="stat-card success"><div className="stat-icon"><i className="bi bi-bar-chart"></i></div><div className="stat-value">{stats.percentage}%</div><div className="stat-label">Overall</div></div>
+          <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div className="stat-value">{stats.present}</div><div className="stat-label">Present</div></div>
+          <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-x-circle"></i></div><div className="stat-value">{stats.absent}</div><div className="stat-label">Absent</div></div>
+          <div className="stat-card warning"><div className="stat-icon"><i className="bi bi-alarm"></i></div><div className="stat-value">{stats.late}</div><div className="stat-label">Late</div></div>
         </div>
       )}
       <div className="card col-12">
@@ -54,7 +54,7 @@ export default function ParentAttendance() {
                 </tbody>
               </table>
             </div>
-          ) : <div className="empty-state" style={{ padding: '40px', textAlign: 'center' }}><div className="empty-state-icon">✅</div><p>No attendance records found.</p></div>}
+          ) : <div className="empty-state" style={{ padding: '40px', textAlign: 'center' }}><div className="empty-state-icon"><i className="bi bi-check-circle-fill"></i></div><p>No attendance records found.</p></div>}
         </div>
       </div>
     </>

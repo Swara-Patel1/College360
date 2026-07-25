@@ -176,7 +176,7 @@ export default function ChatBot() {
 
           {/* ── Header ── */}
           <div className="chatbot-header">
-            <div className="chatbot-avatar">✨</div>
+            <div className="chatbot-avatar"><i className="bi bi-stars"></i></div>
             <div className="chatbot-header-info">
               <div className="chatbot-header-title">LJU Student Assistant</div>
               <div className="chatbot-header-status">Online</div>
@@ -188,7 +188,7 @@ export default function ChatBot() {
                 title="Chat history"
                 aria-label="Toggle chat history"
               >
-                📋
+                <i className="bi bi-clipboard"></i>
               </button>
               <button
                 className="chatbot-header-btn"
@@ -196,7 +196,7 @@ export default function ChatBot() {
                 title="New chat"
                 aria-label="Start new chat"
               >
-                ✏️
+                <i className="bi bi-pencil"></i>
               </button>
               <button
                 className="chatbot-header-btn"
@@ -212,7 +212,7 @@ export default function ChatBot() {
                 title="Close"
                 aria-label="Close chatbot"
               >
-                ✕
+                <i className="bi bi-x-lg"></i>
               </button>
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function ChatBot() {
               <div className="chatbot-sidebar-header">
                 <span className="chatbot-sidebar-title">Chat History</span>
                 <button className="chatbot-sidebar-close" onClick={toggleSidebar} aria-label="Close sidebar">
-                  ✕
+                  <i className="bi bi-x-lg"></i>
                 </button>
               </div>
 
@@ -239,7 +239,7 @@ export default function ChatBot() {
                       className={`chatbot-sidebar-item ${session.id === currentSessionId ? 'active' : ''}`}
                       onClick={() => loadSession(session.id)}
                     >
-                      <span className="chatbot-sidebar-item-icon">💬</span>
+                      <span className="chatbot-sidebar-item-icon"><i className="bi bi-chat-dots"></i></span>
                       <div className="chatbot-sidebar-item-content">
                         <div className="chatbot-sidebar-item-title">{session.title}</div>
                         <div className="chatbot-sidebar-item-preview">
@@ -257,7 +257,7 @@ export default function ChatBot() {
                         title="Delete conversation"
                         aria-label="Delete conversation"
                       >
-                        🗑️
+                        <i className="bi bi-trash"></i>
                       </button>
                     </div>
                   ))
@@ -266,11 +266,11 @@ export default function ChatBot() {
 
               <div className="chatbot-sidebar-footer">
                 <button className="chatbot-sidebar-new-btn" onClick={() => { startNewChat(); toggleSidebar(); }}>
-                  ✏️ New Conversation
+                  <i className="bi bi-pencil"></i> New Conversation
                 </button>
                 {sessions.length > 0 && (
                   <button className="chatbot-sidebar-clear-btn" onClick={clearAllHistory}>
-                    🗑️ Clear All History
+                    <i className="bi bi-trash"></i> Clear All History
                   </button>
                 )}
               </div>
@@ -282,7 +282,7 @@ export default function ChatBot() {
             {messages.length === 0 && !isLoading ? (
               /* Welcome State */
               <div className="chatbot-welcome">
-                <div className="chatbot-welcome-avatar">✨</div>
+                <div className="chatbot-welcome-avatar"><i className="bi bi-stars"></i></div>
                 <div className="chatbot-welcome-title">
                   Hi{user?.first_name ? ` ${user.first_name}` : ''}! 👋
                 </div>
@@ -326,7 +326,7 @@ export default function ChatBot() {
             {/* Typing Indicator */}
             {isLoading && (
               <div className="chatbot-typing">
-                <div className="chatbot-typing-avatar">✨</div>
+                <div className="chatbot-typing-avatar"><i className="bi bi-stars"></i></div>
                 <div className="chatbot-typing-bubble">
                   <div className="chatbot-typing-dot" />
                   <div className="chatbot-typing-dot" />
@@ -338,9 +338,9 @@ export default function ChatBot() {
             {/* Error Message */}
             {error && (
               <div className="chatbot-error">
-                ⚠️ {error}
+                <i className="bi bi-exclamation-triangle"></i> {error}
                 <button className="chatbot-error-dismiss" onClick={clearError} aria-label="Dismiss error">
-                  ✕
+                  <i className="bi bi-x-lg"></i>
                 </button>
               </div>
             )}
@@ -373,7 +373,7 @@ export default function ChatBot() {
                 title="Send message"
                 aria-label="Send message"
               >
-                ➤
+                <i className="bi bi-arrow-right-short"></i>
               </button>
             </div>
             <div className="chatbot-powered-by">

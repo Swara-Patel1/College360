@@ -39,3 +39,34 @@ class Fee(models.Model):
 
     def __str__(self):
         return f"{self.student} - {self.fee_type} - {self.status}"
+
+
+class PaymentTransaction(models.Model):
+    """A payment-gateway transaction for a fee (Razorpay-style order → verify handshake)."""
+    STATUS_CHOICES = [
+        ('created', 'Created'),   # order created, awaiting payment
+        ('paid', 'Paid'),         # payment captured & signature verified
+        ('failed', 'Failed'),     # payment failed / cancelled
+    ]
+    METHOD_CHOICES = [
+        ('card', 'Card'), ('upi', 'UPI'), ('netbanking', 'Net Banking'), ('wallet', 'Wallet'),
+    ]
+    fee = models.ForeignKey(Fee, on_delete=models.CASCADE, related_name='transactions')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='payment_transactions')
+    gateway = models.CharField(max_length=20, default='razorpay')
+    order_id = models.CharField(max_length=64, unique=True)
+    payment_id = models.CharField(max_length=64, blank=True)
+    signature = models.CharField(max_length=128, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=6, default='INR')
+    method = models.CharField(max_length=12, choices=METHOD_CHOICES, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='created')
+    receipt = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.gateway}:{self.order_id} ({self.status})"

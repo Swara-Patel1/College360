@@ -96,12 +96,12 @@ export default function HODSeminars() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>🎙️ Seminar Scheduling & Management</h1>
+          <h1><i className="bi bi-mic"></i> Seminar Scheduling & Management</h1>
           <p>Schedule academic and career counseling seminars for your students.</p>
         </div>
         <div className="page-header-right">
           <button className="btn btn-primary" onClick={() => { resetForm(); setIsAddOpen(true); }}>
-            ➕ Schedule Seminar
+            <i className="bi bi-plus-lg"></i> Schedule Seminar
           </button>
         </div>
       </div>
@@ -113,9 +113,9 @@ export default function HODSeminars() {
             <div className="card-header" style={{ padding: '15px 20px', borderBottom: '1px solid var(--border)', display: 'block' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <span className={`badge badge-${sem.target === 'all' ? 'success' : 'warning'}`}>
-                  🎯 {sem.target === 'all' ? 'All Students' : 'Low Placement Prep Only'}
+                  <i className="bi bi-bullseye"></i> {sem.target === 'all' ? 'All Students' : 'Low Placement Prep Only'}
                 </span>
-                <span className="badge badge-info">📍 {sem.room}</span>
+                <span className="badge badge-info"><i className="bi bi-geo-alt"></i> {sem.room}</span>
               </div>
               <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-primary)' }}>{sem.title}</h3>
             </div>
@@ -124,8 +124,8 @@ export default function HODSeminars() {
                 {sem.description}
               </p>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                <div>👨‍🏫 <strong>Speaker:</strong> {sem.speaker}</div>
-                <div style={{ marginTop: '4px' }}>📅 <strong>Date:</strong> {new Date(sem.seminar_date).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                <div><i className="bi bi-person-video3"></i> <strong>Speaker:</strong> {sem.speaker}</div>
+                <div style={{ marginTop: '4px' }}><i className="bi bi-calendar3"></i> <strong>Date:</strong> {new Date(sem.seminar_date).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
               </div>
             </div>
           </div>

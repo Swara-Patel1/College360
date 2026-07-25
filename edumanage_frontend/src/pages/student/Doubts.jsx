@@ -3,6 +3,19 @@ import { API, Utils, SupaAPI } from '../../api/client.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
 import Modal from '../../components/Modal.jsx';
 
+// Minimal renderer for the AI answer's **bold** + newline formatting.
+function renderRich(text) {
+  return (text || '').split('\n').map((line, i) => (
+    <p key={i} style={{ margin: '0 0 6px 0', fontSize: '0.85rem', lineHeight: 1.55, color: 'var(--text-secondary)' }}>
+      {line.split(/(\*\*[^*]+\*\*)/g).map((seg, j) =>
+        seg.startsWith('**') && seg.endsWith('**')
+          ? <strong key={j} style={{ color: 'var(--text-primary)' }}>{seg.slice(2, -2)}</strong>
+          : <span key={j}>{seg}</span>
+      )}
+    </p>
+  ));
+}
+
 export default function Doubts() {
   const { user } = useAuthStore();
   const [allDoubts, setAllDoubts] = useState([]);
@@ -61,12 +74,26 @@ export default function Doubts() {
     const hoursLeft = (deadline - now) / 3600000;
     
     if (hoursLeft < 0) {
-      return <span className="sla-warn" style={{ color: 'var(--accent)', background: 'rgba(255,107,107,0.15)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, marginLeft: '8px' }}>⚠️ SLA Breached — Escalating to HOD</span>;
+      return <span className="sla-warn" style={{ color: 'var(--accent)', background: 'rgba(255,107,107,0.15)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, marginLeft: '8px' }}><i className="bi bi-exclamation-triangle"></i> SLA Breached — Escalating to HOD</span>;
     }
-    return <span className="sla-warn" style={{ color: 'var(--primary-light)', background: 'rgba(108,99,255,0.15)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, marginLeft: '8px' }}>⏰ {Math.round(hoursLeft)}h left for reply</span>;
+    return <span className="sla-warn" style={{ color: 'var(--primary-light)', background: 'rgba(108,99,255,0.15)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, marginLeft: '8px' }}><i className="bi bi-alarm"></i> {Math.round(hoursLeft)}h left for reply</span>;
+  };
+
+  const [busyId, setBusyId] = useState(null);
+
+  const handleAcceptAI = async (d) => {
+    try { setBusyId(d.id); await SupaAPI.doubts.acceptAI(d.id); await fetchDoubts(); }
+    catch (e) { alert('Failed to update: ' + (e.message || '')); }
+    finally { setBusyId(null); }
+  };
+  const handleEscalate = async (d) => {
+    try { setBusyId(d.id); await SupaAPI.doubts.escalate(d.id); await fetchDoubts(); }
+    catch (e) { alert('Failed to escalate: ' + (e.message || '')); }
+    finally { setBusyId(null); }
   };
 
   const totalCount = allDoubts.length;
+  const aiCount = allDoubts.filter(d => d.status === 'ai_answered').length;
   const openCount = allDoubts.filter(d => d.status === 'open' || d.status === 'under_review').length;
   const resolvedCount = allDoubts.filter(d => d.status === 'resolved').length;
   const escalatedCount = allDoubts.filter(d => d.status === 'escalated').length;
@@ -137,34 +164,34 @@ export default function Doubts() {
       {/* Row 1: Doubts Q&A title card */}
       <div className="stat-card primary" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div className="stat-icon">📋</div>
+          <div className="stat-icon"><i className="bi bi-clipboard"></i></div>
           <div className="stat-value">Doubts Q&A</div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-            Get answers to your conceptual doubts from faculty experts.
+            Get an <strong>instant AI answer</strong> from your course syllabus — escalate to faculty experts if you need more.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={handleOpenModal} style={{ flexShrink: 0 }}>❓ Ask a Doubt</button>
+        <button className="btn btn-primary" onClick={handleOpenModal} style={{ flexShrink: 0 }}><i className="bi bi-question-circle"></i> Ask a Doubt</button>
       </div>
 
       {/* Stats row */}
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
         <div className="stat-card primary">
-          <div className="stat-icon">❓</div>
+          <div className="stat-icon"><i className="bi bi-question-circle"></i></div>
           <div className="stat-value" id="st-total">{totalCount}</div>
           <div className="stat-label">Total Doubts</div>
         </div>
         <div className="stat-card warning">
-          <div className="stat-icon">⏳</div>
-          <div className="stat-value" id="st-open">{openCount}</div>
-          <div className="stat-label">Pending Response</div>
+          <div className="stat-icon"><i className="bi bi-robot"></i></div>
+          <div className="stat-value" id="st-ai">{aiCount}</div>
+          <div className="stat-label">AI Answered</div>
         </div>
         <div className="stat-card success">
-          <div className="stat-icon">✅</div>
+          <div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div>
           <div className="stat-value" id="st-resolved">{resolvedCount}</div>
           <div className="stat-label">Resolved</div>
         </div>
         <div className="stat-card danger">
-          <div className="stat-icon">🚨</div>
+          <div className="stat-icon"><i className="bi bi-exclamation-octagon-fill"></i></div>
           <div className="stat-value" id="st-escalated">{escalatedCount}</div>
           <div className="stat-label">Escalated to HOD</div>
         </div>
@@ -173,15 +200,21 @@ export default function Doubts() {
       {/* Doubts Browser */}
       <div className="card col-12">
         <div className="card-header" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
-          <div className="card-title">📖 Doubt History</div>
+          <div className="card-title"><i className="bi bi-journal-bookmark"></i> Doubt History</div>
           <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-            <button 
+            <button
               className={`btn ${selectedFilter === 'all' ? 'btn-primary' : 'btn-ghost'} btn-sm`}
               onClick={() => setSelectedFilter('all')}
             >
               All
             </button>
-            <button 
+            <button
+              className={`btn ${selectedFilter === 'ai_answered' ? 'btn-primary' : 'btn-ghost'} btn-sm`}
+              onClick={() => setSelectedFilter('ai_answered')}
+            >
+              <i className="bi bi-robot"></i> AI Answered
+            </button>
+            <button
               className={`btn ${selectedFilter === 'open' ? 'btn-primary' : 'btn-ghost'} btn-sm`}
               onClick={() => setSelectedFilter('open')}
             >
@@ -232,22 +265,47 @@ export default function Doubts() {
                 </div>
                 
                 <div className="doubt-meta" style={{ display: 'flex', gap: '16px', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: d.resolution ? '16px' : '0' }}>
-                  <span>📚 {d.subject_name || '—'}</span>
-                  {d.assigned_faculty_name && <span>👨‍🏫 {d.assigned_faculty_name}</span>}
-                  {d.resolved_at && <span>✅ Resolved {new Date(d.resolved_at).toLocaleDateString('en-IN')}</span>}
+                  <span><i className="bi bi-book"></i> {d.subject_name || '—'}</span>
+                  {d.assigned_faculty_name && <span><i className="bi bi-person-video3"></i> {d.assigned_faculty_name}</span>}
+                  {d.resolved_at && <span><i className="bi bi-check-circle-fill"></i> Resolved {new Date(d.resolved_at).toLocaleDateString('en-IN')}</span>}
                 </div>
+
+                {/* AI syllabus-assistant answer — instant first response, pending student's call */}
+                {d.status === 'ai_answered' && d.ai_answer && (
+                  <div style={{ background: 'rgba(108,99,255,0.05)', border: '1px solid rgba(108,99,255,0.25)', borderRadius: '10px', padding: '14px 16px', marginTop: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                      <h4 style={{ color: 'var(--primary-light, #6C63FF)', margin: 0, fontSize: '0.85rem', fontWeight: 700 }}><i className="bi bi-robot"></i> AI Syllabus Assistant</h4>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: d.ai_confidence >= 60 ? '#00D4AA' : '#FF9F43', background: d.ai_confidence >= 60 ? 'rgba(0,212,170,0.12)' : 'rgba(255,159,67,0.12)', padding: '2px 8px', borderRadius: '10px' }}>
+                        {d.ai_confidence}% confidence
+                      </span>
+                    </div>
+                    <div>{renderRich(d.ai_answer)}</div>
+                    {d.ai_sources && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' }}><i className="bi bi-book"></i> Sources: {d.ai_sources}</div>
+                    )}
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
+                      <button className="btn btn-success btn-sm" disabled={busyId === d.id} onClick={() => handleAcceptAI(d)}><i className="bi bi-check-circle-fill"></i> This solved it</button>
+                      <button className="btn btn-ghost btn-sm" disabled={busyId === d.id} onClick={() => handleEscalate(d)}><i className="bi bi-person-video3"></i> Ask a faculty member</button>
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+                      <i className="bi bi-lightbulb"></i> AI-generated from your course syllabus &amp; materials. Not sure? Escalate to a faculty expert.
+                    </div>
+                  </div>
+                )}
 
                 {d.resolution && (
                   <div className="resolution-box" style={{ background: 'rgba(0,212,170,0.04)', borderLeft: '3px solid #00D4AA', padding: '14px', borderRadius: '0 8px 8px 0', marginTop: '12px' }}>
-                    <h4 style={{ color: '#00D4AA', margin: '0 0 6px 0', fontSize: '0.85rem', fontWeight: 700 }}>📖 Faculty Answer:</h4>
-                    <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.5, color: 'var(--text-secondary)' }}>{d.resolution}</p>
+                    <h4 style={{ color: '#00D4AA', margin: '0 0 6px 0', fontSize: '0.85rem', fontWeight: 700 }}>
+                      {d.ai_helpful === true && !d.assigned_faculty_name ? '🤖 Resolved by AI Assistant:' : '📖 Faculty Answer:'}
+                    </h4>
+                    <div>{renderRich(d.resolution)}</div>
                   </div>
                 )}
               </div>
             ))
           ) : (
             <div className="empty-state" style={{ padding: '40px', textAlign: 'center' }}>
-              <div className="empty-state-icon">📭</div>
+              <div className="empty-state-icon"><i className="bi bi-inbox"></i></div>
               <h3>No doubts in this category</h3>
               <p style={{ margin: '8px 0 16px 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 Your doubts and faculty responses will appear here.
@@ -301,7 +359,7 @@ export default function Doubts() {
               className="btn btn-primary"
               disabled={isSubmitting || questionText.trim().length < 20}
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Doubt'}
+              {isSubmitting ? '🤖 Getting instant AI answer…' : 'Submit Doubt'}
             </button>
           </div>
         </form>

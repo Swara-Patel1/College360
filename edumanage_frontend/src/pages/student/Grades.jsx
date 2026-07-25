@@ -89,22 +89,22 @@ export default function Grades() {
       {/* Summary Row */}
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
         <div className="stat-card primary">
-          <div className="stat-icon">📚</div>
+          <div className="stat-icon"><i className="bi bi-book"></i></div>
           <div className="stat-value" id="sumTotal">{totalCount || '—'}</div>
           <div className="stat-label">Total Courses</div>
         </div>
         <div className="stat-card success">
-          <div className="stat-icon">📈</div>
+          <div className="stat-icon"><i className="bi bi-graph-up-arrow"></i></div>
           <div className="stat-value" id="sumAvg">{totalCount ? `${averagePercentage}%` : '—'}</div>
           <div className="stat-label">Average Marks</div>
         </div>
         <div className="stat-card info">
-          <div className="stat-icon">🏆</div>
+          <div className="stat-icon"><i className="bi bi-trophy"></i></div>
           <div className="stat-value" id="sumBest">{bestGrade}</div>
           <div className="stat-label">Best Grade</div>
         </div>
         <div className="stat-card danger">
-          <div className="stat-icon">❌</div>
+          <div className="stat-icon"><i className="bi bi-x-circle"></i></div>
           <div className="stat-value" id="sumFailed">{totalCount ? failedCount : '—'}</div>
           <div className="stat-label">Failed Courses</div>
         </div>
@@ -113,7 +113,7 @@ export default function Grades() {
       {/* Main Container */}
       <div className="card col-12">
         <div className="card-header" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
-          <div className="card-title">📖 Subject Transcripts</div>
+          <div className="card-title"><i className="bi bi-journal-bookmark"></i> Subject Transcripts</div>
           <div id="examChips" style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
             {examTypes.map((type, idx) => (
               <button 
@@ -146,9 +146,9 @@ export default function Grades() {
                       <div className="grade-course-name">{g.course_name || 'Unknown Course'}</div>
                       <span className="grade-course-code">{g.course_code || ''}</span>
                       <div className="grade-meta">
-                        <span className="grade-meta-item">📋 {g.exam_type || 'Exam'}</span>
-                        <span className="grade-meta-item">📅 {dateStr}</span>
-                        {g.remarks && <span className="grade-meta-item">💬 {g.remarks}</span>}
+                        <span className="grade-meta-item"><i className="bi bi-clipboard"></i> {g.exam_type || 'Exam'}</span>
+                        <span className="grade-meta-item"><i className="bi bi-calendar3"></i> {dateStr}</span>
+                        {g.remarks && <span className="grade-meta-item"><i className="bi bi-chat-dots"></i> {g.remarks}</span>}
                       </div>
                     </div>
 
@@ -166,7 +166,7 @@ export default function Grades() {
               })
             ) : (
               <div className="no-grades">
-                <div className="no-grades-icon">📭</div>
+                <div className="no-grades-icon"><i className="bi bi-inbox"></i></div>
                 <h3>No grades yet</h3>
                 <p>Grades will appear here once they are published by your faculty.</p>
               </div>
