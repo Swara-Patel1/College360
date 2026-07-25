@@ -305,7 +305,7 @@ export default function ManageDepartments() {
 
       {/* ── ADD DEPARTMENT (with faculty, HOD, students) ── */}
       {isAddOpen && (
-        <Modal onClose={() => !submitting && setIsAddOpen(false)} title="➕ Add New Department">
+        <Modal onClose={() => !submitting && setIsAddOpen(false)} title={<><i className="bi bi-plus-circle me-2"></i>Add New Department</>}>
           <form onSubmit={handleAddSubmit}>
             {/* Department details */}
             <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
@@ -378,7 +378,7 @@ export default function ManageDepartments() {
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{progress}</span>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button type="button" className="btn btn-ghost" onClick={() => setIsAddOpen(false)} disabled={submitting}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? '⏳ Saving…' : '➕ Create Department'}</button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Saving…' : <><i className="bi bi-plus-lg me-1"></i>Create Department</>}</button>
               </div>
             </div>
           </form>
@@ -387,7 +387,7 @@ export default function ManageDepartments() {
 
       {/* ── EDIT ── */}
       {isEditOpen && (
-        <Modal onClose={() => setIsEditOpen(false)} title="📝 Edit Department">
+        <Modal onClose={() => setIsEditOpen(false)} title={<><i className="bi bi-pencil-square me-2"></i>Edit Department</>}>
           <form onSubmit={handleEditSubmit}>
             <div className="form-group" style={{ marginBottom: '15px' }}>
               <label className="form-label">Department Name *</label>
@@ -399,7 +399,7 @@ export default function ManageDepartments() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setIsEditOpen(false)} disabled={submitting}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? '⏳ Saving...' : '💾 Save Changes'}</button>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Saving...' : <><i className="bi bi-save me-1"></i>Save Changes</>}</button>
             </div>
           </form>
         </Modal>
@@ -407,13 +407,13 @@ export default function ManageDepartments() {
 
       {/* ── DELETE ── */}
       {isDeleteOpen && (
-        <Modal onClose={() => setIsDeleteOpen(false)} title="🗑️ Delete Department">
+        <Modal onClose={() => setIsDeleteOpen(false)} title={<><i className="bi bi-trash me-2"></i>Delete Department</>}>
           <div style={{ padding: '10px 0' }}>
             <h3 style={{ marginBottom: '10px' }}>{deleting?.name} ({deleting?.code})</h3>
             <p>Are you sure you want to delete this department? Faculty and students in it will be unassigned. This cannot be undone.</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
               <button className="btn btn-ghost" onClick={() => setIsDeleteOpen(false)} disabled={submitting}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleDeleteConfirm} disabled={submitting}>{submitting ? '⏳ Deleting...' : '🗑️ Delete Department'}</button>
+              <button className="btn btn-danger" onClick={handleDeleteConfirm} disabled={submitting}>{submitting ? 'Deleting...' : <><i className="bi bi-trash me-1"></i>Delete Department</>}</button>
             </div>
           </div>
         </Modal>
@@ -421,7 +421,7 @@ export default function ManageDepartments() {
 
       {/* ── VIEW (department people) ── */}
       {isViewOpen && viewing && (
-        <Modal onClose={() => setIsViewOpen(false)} title={`🔍 ${viewing.name} (${viewing.code})`}>
+        <Modal onClose={() => setIsViewOpen(false)} title={<><i className="bi bi-search me-2"></i>{viewing.name} ({viewing.code})</>}>
           <div style={{ display: 'grid', gap: '18px', padding: '5px 0' }}>
             <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
               <div><span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>HOD</span>

@@ -260,14 +260,19 @@ export default function Courses() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1><i className="bi bi-book"></i> Course Catalog</h1>
-          <p id="pageDesc">
-            {isStudent 
-              ? `You are enrolled in ${courses.length} course${courses.length !== 1 ? 's' : ''} for your current semester (Semester ${activeSemesterNumber}).`
-              : isFaculty
-                ? `You are teaching ${courses.length} course${courses.length !== 1 ? 's' : ''} in the current active semester (Semester ${activeSemesterNumber}).`
-                : `Showing ${courses.length} course${courses.length !== 1 ? 's' : ''} for the current active semester (Semester ${activeSemesterNumber}).`}
-          </p>
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-book"></i>
+          </div>
+          <div>
+            <h1>Course Catalog</h1>
+            <p id="pageDesc">
+              {isStudent 
+                ? `You are enrolled in ${courses.length} course${courses.length !== 1 ? 's' : ''} for your current semester (Semester ${activeSemesterNumber}).`
+                : isFaculty
+                  ? `You are teaching ${courses.length} course${courses.length !== 1 ? 's' : ''} in the current active semester (Semester ${activeSemesterNumber}).`
+                  : `Showing ${courses.length} course${courses.length !== 1 ? 's' : ''} for the current active semester (Semester ${activeSemesterNumber}).`}
+            </p>
+          </div>
         </div>
         {isAdmin && (
           <div className="page-header-right" id="addCourseWrap">
@@ -280,20 +285,26 @@ export default function Courses() {
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
         <div className="stat-card primary">
           <div className="stat-icon"><i className="bi bi-book"></i></div>
-          <div className="stat-value" id="totalCourses">{courses.length}</div>
-          <div className="stat-label">Total Courses</div>
+          <div>
+            <div className="stat-value" id="totalCourses">{courses.length}</div>
+            <div className="stat-label">Total Courses</div>
+          </div>
         </div>
         <div className="stat-card success">
           <div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div>
-          <div className="stat-value" id="activeCourses">
-            {courses.filter(c => c.is_active !== false).length}
+          <div>
+            <div className="stat-value" id="activeCourses">
+              {courses.filter(c => c.is_active !== false).length}
+            </div>
+            <div className="stat-label">Active Courses</div>
           </div>
-          <div className="stat-label">Active Courses</div>
         </div>
         <div className="stat-card info">
           <div className="stat-icon"><i className="bi bi-award"></i></div>
-          <div className="stat-value" id="totalCredits">{totalCredits || '—'}</div>
-          <div className="stat-label">Total Credits</div>
+          <div>
+            <div className="stat-value" id="totalCredits">{totalCredits || '—'}</div>
+            <div className="stat-label">Total Credits</div>
+          </div>
         </div>
       </div>
 
@@ -547,7 +558,7 @@ export default function Courses() {
       </div>
 
       {/* ======================== ADD COURSE MODAL ======================== */}
-      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="➕ Add New Course">
+      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title={<><i className="bi bi-plus-circle me-2"></i>Add New Course</>}>
         <form onSubmit={handleAddSubmit}>
           <div className="section-divider" style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
             <i className="bi bi-book"></i> Course Information
@@ -661,7 +672,7 @@ export default function Courses() {
       </Modal>
 
       {/* ======================== EDIT COURSE MODAL ======================== */}
-      <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="✏️ Edit Course">
+      <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title={<><i className="bi bi-pencil-square me-2"></i>Edit Course</>}>
         <form onSubmit={handleEditSubmit}>
           <div className="section-divider" style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
             <i className="bi bi-book"></i> Course Information
@@ -770,7 +781,7 @@ export default function Courses() {
       </Modal>
 
       {/* ======================== DELETE COURSE MODAL ======================== */}
-      <Modal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} title="🗑️ Delete Course">
+      <Modal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} title={<><i className="bi bi-trash me-2"></i>Delete Course</>}>
         <div style={{ marginBottom: '20px' }}>
           Are you sure you want to delete course <strong>{deletingCourse?.name}</strong> (<strong>{deletingCourse?.code || deletingCourse?.course_code}</strong>)?
           <br />

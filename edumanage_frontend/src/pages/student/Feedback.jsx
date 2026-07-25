@@ -111,12 +111,16 @@ export default function Feedback() {
 
   return (
     <>
-      <div className="stat-card primary" style={{ marginBottom: '20px' }}>
-        <div className="stat-icon"><i className="bi bi-star-fill"></i></div>
-        <div className="stat-value">Faculty Feedback</div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-          Rate your instructors. Feedback can be submitted anonymously and helps your department improve teaching.
-        </p>
+      <div className="page-header">
+        <div className="page-header-left">
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-star-fill"></i>
+          </div>
+          <div>
+            <h1>Faculty Feedback</h1>
+            <p>Rate your instructors. Feedback can be submitted anonymously and helps your department improve teaching.</p>
+          </div>
+        </div>
       </div>
 
       {items.length ? (

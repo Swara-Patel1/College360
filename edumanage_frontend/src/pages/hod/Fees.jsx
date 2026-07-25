@@ -184,7 +184,7 @@ export default function HODFees() {
 
       {/* ======================== SEND EMAIL MODAL ======================== */}
       {isEmailOpen && selectedPayment && (
-        <Modal isOpen={isEmailOpen} onClose={() => setIsEmailOpen(false)} title={`✉️ Send Fee Reminder Notice`}>
+        <Modal isOpen={isEmailOpen} onClose={() => setIsEmailOpen(false)} title={<><i className="bi bi-envelope me-2"></i>Send Fee Reminder Notice</>}>
           <form onSubmit={handleSendEmail}>
             <div className="form-group" style={{ marginBottom: '15px' }}>
               <label className="form-label">Parent Email</label>

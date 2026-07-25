@@ -32,11 +32,11 @@ export const initSocket = () => {
   });
 
   socket.on('connect', () => {
-    console.log('⚡ Connected to real-time Socket.io server.');
+    console.log('Connected to real-time Socket.io server.');
   });
 
   socket.on('disconnect', () => {
-    console.log('🔌 Disconnected from Socket.io server.');
+    console.log('Disconnected from Socket.io server.');
   });
 
   socket.on('online_count', (count) => {

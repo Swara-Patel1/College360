@@ -125,18 +125,22 @@ export default function Portfolio() {
 
   return (
     <>
-      <div className="stat-card primary" style={{ marginBottom: '20px' }}>
-        <div className="stat-icon"><i className="bi bi-trophy"></i></div>
-        <div className="stat-value">My Portfolio</div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-          Log your internships, achievements and extracurricular activities. Submissions are reviewed and verified by the department.
-        </p>
+      <div className="page-header">
+        <div className="page-header-left">
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-trophy"></i>
+          </div>
+          <div>
+            <h1>My Portfolio</h1>
+            <p>Log your internships, achievements and extracurricular activities. Submissions are reviewed and verified by the department.</p>
+          </div>
+        </div>
       </div>
 
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-briefcase"></i></div><div className="stat-value">{internships.length}</div><div className="stat-label">Internships</div></div>
-        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-award"></i></div><div className="stat-value">{achievements.length}</div><div className="stat-label">Achievements</div></div>
-        <div className="stat-card"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div className="stat-value">{verifiedCount}</div><div className="stat-label">Verified</div></div>
+        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-briefcase"></i></div><div><div className="stat-value">{internships.length}</div><div className="stat-label">Internships</div></div></div>
+        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-award"></i></div><div><div className="stat-value">{achievements.length}</div><div className="stat-label">Achievements</div></div></div>
+        <div className="stat-card"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div><div className="stat-value">{verifiedCount}</div><div className="stat-label">Verified</div></div></div>
       </div>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -220,7 +224,7 @@ export default function Portfolio() {
       )}
 
       {/* Internship modal */}
-      <Modal isOpen={iModal} onClose={() => setIModal(false)} title={iEditing ? '✏️ Edit Internship' : '➕ Add Internship'}>
+      <Modal isOpen={iModal} onClose={() => setIModal(false)} title={iEditing ? <><i className="bi bi-pencil-square me-2"></i>Edit Internship</> : <><i className="bi bi-plus-circle me-2"></i>Add Internship</>}>
         <form onSubmit={saveIntern}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
             <div className="form-group"><label className="form-label">Company *</label><input className="form-control" value={iForm.company} onChange={(e) => setIForm({ ...iForm, company: e.target.value })} required /></div>
@@ -253,7 +257,7 @@ export default function Portfolio() {
       </Modal>
 
       {/* Achievement modal */}
-      <Modal isOpen={aModal} onClose={() => setAModal(false)} title={aEditing ? '✏️ Edit Achievement' : '➕ Add Achievement'}>
+      <Modal isOpen={aModal} onClose={() => setAModal(false)} title={aEditing ? <><i className="bi bi-pencil-square me-2"></i>Edit Achievement</> : <><i className="bi bi-plus-circle me-2"></i>Add Achievement</>}>
         <form onSubmit={saveAch}>
           <div className="form-group" style={{ marginBottom: '12px' }}><label className="form-label">Title *</label><input className="form-control" value={aForm.title} onChange={(e) => setAForm({ ...aForm, title: e.target.value })} required placeholder="e.g. Won Smart India Hackathon" /></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>

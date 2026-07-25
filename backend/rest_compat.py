@@ -117,6 +117,9 @@ def serialize_faculty(f):
 def serialize_student(s):
     if s is None:
         return None
+    parent_email = f"parent.{s.student_id.lower()}@gmail.com" if s.student_id else None
+    parent_phone = s.guardian_phone if s.guardian_phone else "+91 98765 43210"
+    guardian_name = s.guardian_name if s.guardian_name else f"Mr. & Mrs. {s.user.last_name}"
     return {
         'student_id': str(s.pk),
         'id': str(s.pk),
@@ -127,7 +130,8 @@ def serialize_student(s):
         'date_of_birth': _dt(s.admission_date),
         'department_id': str(s.department.pk) if s.department else None,
         'current_semester_id': f'sem-{s.semester:02d}',
-        'current_rollno': s.roll_number or '',
+        'current_rollno': s.roll_number or (s.student_id[-3:] if s.student_id else ''),
+        'roll_number': s.roll_number or (s.student_id[-3:] if s.student_id else ''),
         'status': s.status,
         'created_at': _dt(s.created_at),
         'user': serialize_user(s.user),
@@ -137,10 +141,15 @@ def serialize_student(s):
             'number': s.semester,
             'name': f'Semester {s.semester}',
         },
-        # Extra convenience fields
         'department_name': s.department.name if s.department else '—',
         'year_of_study': s.year_of_study,
+        'semester': s.semester,
         'email': s.user.email,
+        'guardian_name': guardian_name,
+        'guardian_phone': parent_phone,
+        'parent_email': parent_email,
+        'parent_phone': parent_phone,
+        'address': '124 Campus Avenue, University Housing, Block B'
     }
 
 
@@ -354,8 +363,18 @@ def apply_postgrest_filters(qs, params, field_map):
                     qs = qs.filter(Q(pk=int(val) if val.isdigit() else -1) | Q(code=val))
                 else:
                     qs = qs.filter(**{orm_field: val})
+            elif '__pk' in orm_field or orm_field == 'pk':
+                # Integer PK field — handle non-integer values (e.g. legacy UUIDs) gracefully
+                if val.isdigit():
+                    qs = qs.filter(**{orm_field: int(val)})
+                else:
+                    # Non-integer value for a PK field: return empty set safely
+                    qs = qs.none()
             else:
-                qs = qs.filter(**{orm_field: val})
+                try:
+                    qs = qs.filter(**{orm_field: val})
+                except (ValueError, TypeError):
+                    qs = qs.none()
         elif op == 'neq':
             qs = qs.exclude(**{orm_field: val})
         elif op == 'in':

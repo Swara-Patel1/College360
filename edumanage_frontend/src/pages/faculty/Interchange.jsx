@@ -3,9 +3,9 @@ import { API, Utils, SupaAPI } from '../../api/client.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
 
 const STATUS_STYLES = {
-  pending:  { bg: 'rgba(255,159,67,0.15)',  color: '#FF9F43', label: 'Pending',  icon: '⏳' },
-  accepted: { bg: 'rgba(0,212,170,0.15)',   color: '#00D4AA', label: 'Accepted', icon: '✅' },
-  rejected: { bg: 'rgba(255,107,107,0.15)', color: '#FF6B6B', label: 'Rejected', icon: '❌' },
+  pending:  { bg: 'rgba(255,159,67,0.15)',  color: '#FF9F43', label: 'Pending',  icon: <i className="bi bi-clock-history" /> },
+  accepted: { bg: 'rgba(0,212,170,0.15)',   color: '#00D4AA', label: 'Accepted', icon: <i className="bi bi-check-circle" /> },
+  rejected: { bg: 'rgba(255,107,107,0.15)', color: '#FF6B6B', label: 'Rejected', icon: <i className="bi bi-x-circle" /> },
 };
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -116,7 +116,7 @@ export default function FacultyInterchange() {
         },
         reason: swapReason,
       });
-      showToast(`Swap request sent to ${selectedTargetFaculty.user?.first_name || 'Faculty'}! 🔄`);
+      showToast(`Swap request sent to ${selectedTargetFaculty.user?.first_name || 'Faculty'}!`);
       setShowModal(false);
       resetModal();
       await loadData();
@@ -140,7 +140,7 @@ export default function FacultyInterchange() {
   const handleAccept = async (req) => {
     try {
       await API.post(`faculty/interchange/${req.interchange_id}/accept`, {});
-      showToast('Swap accepted! HOD and students have been notified. ✅');
+      showToast('Swap accepted! HOD and students have been notified.');
       await loadData();
     } catch (e) {
       showToast(e?.message || 'Failed to accept.', 'error');
@@ -181,17 +181,13 @@ export default function FacultyInterchange() {
       <div style={{fontWeight:700,color:'var(--text-primary)',fontSize:'0.95rem'}}>{slot.course_code} — {slot.course_name}</div>
       <div style={{color:'var(--text-muted)',fontSize:'0.82rem',marginTop:'4px'}}>
         <i className="bi bi-clock"></i> {slot.start_time?.substring(0,5)} – {slot.end_time?.substring(0,5)}
-        {slot.room && <span>  •  🚪 Room {slot.room}</span>}
+        {slot.room && <span>  •  <i className="bi bi-geo-alt"></i> Room {slot.room}</span>}
       </div>
     </div>
   );
 
   const RequestCard = ({ req, isIncoming }) => {
     const st = STATUS_STYLES[req.status] || STATUS_STYLES.pending;
-    const mySlot = isIncoming ? req.target_slot : req.requester_slot;
-    const theirSlot = isIncoming ? req.requester_slot : req.target_slot;
-    const otherName = isIncoming ? req.requester_faculty_name : req.target_faculty_name;
-
     return (
       <div style={{
         background:'var(--surface)',border:'1px solid var(--border)',
@@ -283,10 +279,10 @@ export default function FacultyInterchange() {
       {/* Summary stats */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:'16px',marginBottom:'24px'}}>
         {[
-          { label:'Pending Incoming', val: incomingRequests.filter(r=>r.status==='pending').length, icon:'📬', color:'#FF9F43' },
-          { label:'Sent Requests', val: sentRequests.length, icon:'📤', color:'var(--primary)' },
-          { label:'Accepted Swaps', val: requests.filter(r=>r.status==='accepted').length, icon:'✅', color:'#00D4AA' },
-          { label:'Total Requests', val: requests.length, icon:'📊', color:'#54A0FF' },
+          { label:'Pending Incoming', val: incomingRequests.filter(r=>r.status==='pending').length, icon:<i className="bi bi-inbox" />, color:'#FF9F43' },
+          { label:'Sent Requests', val: sentRequests.length, icon:<i className="bi bi-send" />, color:'var(--primary)' },
+          { label:'Accepted Swaps', val: requests.filter(r=>r.status==='accepted').length, icon:<i className="bi bi-check-circle" />, color:'#00D4AA' },
+          { label:'Total Requests', val: requests.length, icon:<i className="bi bi-bar-chart-line" />, color:'#54A0FF' },
         ].map(s => (
           <div key={s.label} style={{background:'var(--card-bg)',border:'1px solid var(--border)',borderRadius:'14px',padding:'18px'}}>
             <div style={{fontSize:'1.6rem',marginBottom:'6px'}}>{s.icon}</div>
@@ -365,7 +361,7 @@ export default function FacultyInterchange() {
                         fontSize:'0.78rem',fontWeight:700,
                         background: modalStep>s ? '#00D4AA' : modalStep===s ? 'var(--primary)' : 'var(--border)',
                         color: modalStep>=s ? '#fff' : 'var(--text-muted)'
-                      }}>{modalStep>s ? '✓' : s}</div>
+                      }}>{modalStep>s ? <i className="bi bi-check-lg" /> : s}</div>
                       {s<4 && <div style={{width:'20px',height:'2px',background: modalStep>s ? '#00D4AA' : 'var(--border)'}} />}
                     </div>
                   ))}
@@ -511,7 +507,7 @@ export default function FacultyInterchange() {
                   <div style={{display:'flex',justifyContent:'space-between',marginTop:'20px',gap:'12px'}}>
                     <button className="btn btn-secondary" onClick={() => setModalStep(3)} disabled={submitting}><i className="bi bi-arrow-left"></i> Back</button>
                     <button className="btn btn-primary" onClick={handleSendRequest} disabled={submitting} style={{flex:1}}>
-                      {submitting ? '⏳ Sending...' : '📨 Send Swap Request'}
+                      {submitting ? 'Sending...' : <><i className="bi bi-send me-1"></i>Send Swap Request</>}
                     </button>
                   </div>
                 </div>

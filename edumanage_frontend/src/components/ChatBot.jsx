@@ -22,12 +22,12 @@ import '../css/chatbot.css';
 
 // ── Suggested Questions shown in the welcome state ──
 const SUGGESTED_QUESTIONS = [
-  { icon: '📊', text: 'What is my attendance percentage?' },
-  { icon: '🎯', text: 'Am I eligible for placements?' },
-  { icon: '📅', text: "Show today's timetable" },
-  { icon: '🎉', text: 'What are upcoming events?' },
-  { icon: '📚', text: 'Recommend courses for me' },
-  { icon: '🏢', text: 'Which companies can I apply to?' },
+  { icon: <i className="bi bi-bar-chart-line" />, text: 'What is my attendance percentage?' },
+  { icon: <i className="bi bi-crosshair" />, text: 'Am I eligible for placements?' },
+  { icon: <i className="bi bi-calendar3" />, text: "Show today's timetable" },
+  { icon: <i className="bi bi-balloon" />, text: 'What are upcoming events?' },
+  { icon: <i className="bi bi-journal-bookmark" />, text: 'Recommend courses for me' },
+  { icon: <i className="bi bi-building" />, text: 'Which companies can I apply to?' },
 ];
 
 export default function ChatBot() {
@@ -167,7 +167,7 @@ export default function ChatBot() {
         title={isOpen ? 'Close assistant' : 'LJU Student Assistant'}
         aria-label="Toggle chatbot"
       >
-        {isOpen ? '✕' : '✨'}
+        {isOpen ? <i className="bi bi-x-lg" /> : <i className="bi bi-stars" />}
       </button>
 
       {/* ── Chat Modal ── */}
@@ -204,7 +204,7 @@ export default function ChatBot() {
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                 aria-label="Toggle theme"
               >
-                {theme === 'dark' ? '☀️' : '🌙'}
+                {theme === 'dark' ? <i className="bi bi-sun" /> : <i className="bi bi-moon" />}
               </button>
               <button
                 className="chatbot-header-btn"
@@ -230,7 +230,7 @@ export default function ChatBot() {
               <div className="chatbot-sidebar-list">
                 {sessions.length === 0 ? (
                   <div className="chatbot-sidebar-empty">
-                    No conversations yet.<br />Start a new chat! 💬
+                    No conversations yet.<br />Start a new chat!
                   </div>
                 ) : (
                   sessions.map((session) => (
@@ -284,7 +284,7 @@ export default function ChatBot() {
               <div className="chatbot-welcome">
                 <div className="chatbot-welcome-avatar"><i className="bi bi-stars"></i></div>
                 <div className="chatbot-welcome-title">
-                  Hi{user?.first_name ? ` ${user.first_name}` : ''}! 👋
+                  Hi{user?.first_name ? ` ${user.first_name}` : ''}!
                 </div>
                 <div className="chatbot-welcome-subtitle">
                   I'm your LJU Student Assistant. Ask me about your attendance, grades, timetable, fees, placements, or anything university-related!
@@ -309,7 +309,7 @@ export default function ChatBot() {
                 {messages.map((msg) => (
                   <div key={msg.id} className={`chatbot-msg ${msg.sender}`}>
                     <div className="chatbot-msg-avatar">
-                      {msg.sender === 'assistant' ? '✨' : userInitials}
+                      {msg.sender === 'assistant' ? <i className="bi bi-stars" /> : userInitials}
                     </div>
                     <div>
                       <div
@@ -377,7 +377,7 @@ export default function ChatBot() {
               </button>
             </div>
             <div className="chatbot-powered-by">
-              Powered by Groq AI · LJU EduPulse
+              Powered by Groq AI · College360
             </div>
           </div>
         </div>

@@ -192,7 +192,7 @@ export default function Grades() {
             className="btn btn-primary" 
             onClick={() => setIsEntryMode(!isEntryMode)}
           >
-            {isEntryMode ? '📋 View Records' : '📝 Enter Grades'}
+            {isEntryMode ? <><i className="bi bi-clipboard me-1"></i>View Records</> : <><i className="bi bi-pencil-square me-1"></i>Enter Grades</>}
           </button>
         </div>
       </div>
@@ -304,7 +304,7 @@ export default function Grades() {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', gap: '10px' }}>
                   <button className="btn btn-ghost" onClick={() => setIsEntryMode(false)}>Cancel</button>
                   <button className="btn btn-primary" onClick={submitGrades} disabled={submitting}>
-                    {submitting ? 'Saving...' : '📝 Save Grades'}
+                    {submitting ? 'Saving...' : <><i className="bi bi-save me-1"></i>Save Grades</>}
                   </button>
                 </div>
               </>

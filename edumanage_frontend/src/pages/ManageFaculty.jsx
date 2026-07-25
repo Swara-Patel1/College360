@@ -11,29 +11,29 @@ export default function ManageFaculty() {
   const [loading, setLoading] = useState(true);
 
   // Filters
-  const [searchQuery, setSearchQuery]   = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
 
   // Modals
-  const [isAddOpen,    setIsAddOpen]    = useState(false);
-  const [isEditOpen,   setIsEditOpen]   = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [isViewOpen,   setIsViewOpen]   = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
 
   // Form fields
-  const [firstName,   setFirstName]   = useState('');
-  const [lastName,    setLastName]    = useState('');
-  const [email,       setEmail]       = useState('');
-  const [employeeId,  setEmployeeId]  = useState('');
-  const [deptId,      setDeptId]      = useState('');
-  const [role,        setRole]        = useState('faculty');
-  const [status,      setStatus]      = useState('active');
-  const [password,    setPassword]    = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [deptId, setDeptId] = useState('');
+  const [role, setRole] = useState('faculty');
+  const [status, setStatus] = useState('active');
+  const [password, setPassword] = useState('');
 
-  const [editingFaculty,  setEditingFaculty]  = useState(null);
+  const [editingFaculty, setEditingFaculty] = useState(null);
   const [deletingFaculty, setDeletingFaculty] = useState(null);
-  const [viewingFaculty,  setViewingFaculty]  = useState(null);
+  const [viewingFaculty, setViewingFaculty] = useState(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -126,7 +126,7 @@ export default function ManageFaculty() {
   const handleViewClick = (f) => { setViewingFaculty(f); setIsViewOpen(true); };
 
   // ─── DELETE ────────────────────────────────────────────────────────────────
-  const handleDeleteClick   = (f) => { setDeletingFaculty(f); setIsDeleteOpen(true); };
+  const handleDeleteClick = (f) => { setDeletingFaculty(f); setIsDeleteOpen(true); };
   const handleDeleteConfirm = async () => {
     try {
       setLoading(true);
@@ -142,21 +142,21 @@ export default function ManageFaculty() {
 
   // ─── FILTER ────────────────────────────────────────────────────────────────
   const filtered = faculty.filter(f => {
-    const name  = `${f.first_name || ''} ${f.last_name || ''}`.toLowerCase();
-    const em    = (f.email || '').toLowerCase();
+    const name = `${f.first_name || ''} ${f.last_name || ''}`.toLowerCase();
+    const em = (f.email || '').toLowerCase();
     const empid = String(f.employee_id || '').toLowerCase();
-    const q     = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase();
     return (
       (name.includes(q) || em.includes(q) || empid.includes(q)) &&
-      (selectedDept   ? f.department_id === selectedDept   : true) &&
-      (selectedStatus ? f.status === selectedStatus         : true)
+      (selectedDept ? f.department_id === selectedDept : true) &&
+      (selectedStatus ? f.status === selectedStatus : true)
     );
   });
 
-  const totalCount    = faculty.length;
-  const activeCount   = faculty.filter(f => f.status === 'active').length;
+  const totalCount = faculty.length;
+  const activeCount = faculty.filter(f => f.status === 'active').length;
   const inactiveCount = faculty.filter(f => f.status === 'inactive').length;
-  const hodCount      = faculty.filter(f => (f.user?.roles || f.user?.role) === 'hod').length;
+  const hodCount = faculty.filter(f => (f.user?.roles || f.user?.role) === 'hod').length;
 
   if (loading && !faculty.length) {
     return (
@@ -289,7 +289,7 @@ export default function ManageFaculty() {
 
       {/* ── ADD FACULTY MODAL ── */}
       {isAddOpen && (
-        <Modal onClose={() => setIsAddOpen(false)} title="➕ Add New Faculty">
+        <Modal onClose={() => setIsAddOpen(false)} title={<><i className="bi bi-plus-circle me-2"></i>Add New Faculty</>}>
           <form onSubmit={handleAddSubmit}>
             <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
               <div className="form-group" style={{ flex: 1 }}>
@@ -348,7 +348,7 @@ export default function ManageFaculty() {
 
       {/* ── EDIT FACULTY MODAL ── */}
       {isEditOpen && (
-        <Modal onClose={() => setIsEditOpen(false)} title="📝 Edit Faculty Profile">
+        <Modal onClose={() => setIsEditOpen(false)} title={<><i className="bi bi-pencil-square me-2"></i>Edit Faculty Profile</>}>
           <form onSubmit={handleEditSubmit}>
             <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
               <div className="form-group" style={{ flex: 1 }}>
@@ -394,7 +394,7 @@ export default function ManageFaculty() {
 
       {/* ── DELETE MODAL ── */}
       {isDeleteOpen && (
-        <Modal onClose={() => setIsDeleteOpen(false)} title="🗑️ Delete Faculty">
+        <Modal onClose={() => setIsDeleteOpen(false)} title={<><i className="bi bi-trash me-2"></i>Delete Faculty</>}>
           <div style={{ padding: '10px 0' }}>
             <h3 style={{ marginBottom: '10px' }}>{deletingFaculty?.first_name} {deletingFaculty?.last_name}</h3>
             <p>Are you sure you want to delete this faculty profile? This will permanently remove their records from the portal.</p>
@@ -408,7 +408,7 @@ export default function ManageFaculty() {
 
       {/* ── VIEW DETAILS MODAL ── */}
       {isViewOpen && viewingFaculty && (
-        <Modal onClose={() => setIsViewOpen(false)} title="🔍 Faculty Details">
+        <Modal onClose={() => setIsViewOpen(false)} title={<><i className="bi bi-search me-2"></i>Faculty Details</>}>
           <div style={{ display: 'grid', gap: '20px', padding: '10px 0' }}>
             {/* Avatar + name */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px', borderBottom: '1px solid var(--border)', paddingBottom: '15px' }}>
@@ -426,10 +426,10 @@ export default function ManageFaculty() {
             {/* Details grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
               {[
-                { label: 'Employee ID',  value: viewingFaculty.employee_id || '—' },
-                { label: 'Email',        value: viewingFaculty.email || '—' },
-                { label: 'Department',   value: viewingFaculty.department_name || '—' },
-                { label: 'Role',         value: (viewingFaculty.user?.roles || viewingFaculty.user?.role || 'faculty').toUpperCase() },
+                { label: 'Employee ID', value: viewingFaculty.employee_id || '—' },
+                { label: 'Email', value: viewingFaculty.email || '—' },
+                { label: 'Department', value: viewingFaculty.department_name || '—' },
+                { label: 'Role', value: (viewingFaculty.user?.roles || viewingFaculty.user?.role || 'faculty').toUpperCase() },
               ].map(({ label, value }) => (
                 <div key={label}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>{label}</span>

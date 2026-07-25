@@ -58,7 +58,7 @@ export default function HODSeminars() {
       // Also post a notice about the new seminar
       const audienceAlert = target === 'all' ? 'All Students' : 'Students with Low Placement Predictor Scores';
       await API.post('notices', {
-        title: `🎙️ New Seminar Scheduled: ${title}`,
+        title: `New Seminar Scheduled: ${title}`,
         content: `Expert speaker ${speaker} will conduct a seminar on "${title}". Targeted for: ${audienceAlert}. Time: ${new Date(seminarDate).toLocaleString()}. Venue: ${room}. Attendance is recommended.`,
         audience: 'students',
         notice_type: 'general'
@@ -134,7 +134,7 @@ export default function HODSeminars() {
 
       {/* ======================== SCHEDULE SEMINAR MODAL ======================== */}
       {isAddOpen && (
-        <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="🎙️ Schedule New Expert Seminar">
+        <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title={<><i className="bi bi-mic me-2"></i>Schedule New Expert Seminar</>}>
           <form onSubmit={handleAddSubmit}>
             <div className="form-group" style={{ marginBottom: '15px' }}>
               <label className="form-label">Seminar Title *</label>

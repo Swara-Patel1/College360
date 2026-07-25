@@ -1,24 +1,15 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore.js';
-import { Utils } from '../api/client.js';
 
 export default function Sidebar() {
-  const { user, logout, delegatedAccess } = useAuthStore();
-  const navigate = useNavigate();
+  const { user, delegatedAccess } = useAuthStore();
 
   if (!user) return null;
 
   const role = (user.role || '').toLowerCase();
-  const initials = Utils.getInitials(`${user.first_name || ''} ${user.last_name || ''}`);
-  const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'User';
-
-  let brandSubtitle = 'Portal';
-  let brandHref = '#';
   let navItems = [];
 
   if (role === 'student') {
-    brandSubtitle = 'Student Portal';
-    brandHref = '/dashboard/student';
     navItems = [
       { type: 'section', label: 'Main' },
       { type: 'link', label: 'My Dashboard', icon: 'bi-speedometer2', to: '/dashboard/student' },
@@ -40,15 +31,12 @@ export default function Sidebar() {
       { type: 'link', label: 'Notices', icon: 'bi-broadcast', to: '/student/notices' },
       { type: 'section', label: 'Career' },
       { type: 'link', label: 'My Portfolio', icon: 'bi-trophy', to: '/student/portfolio' },
-      { type: 'link', label: 'Placement Score', icon: 'bi-bullseye', to: '/student/placement' },
-      { type: 'link', label: 'Alumni Network', icon: 'bi-mortarboard', to: '/student/alumni' }
+      { type: 'link', label: 'Placement Predictor', icon: 'bi-graph-up', to: '/student/placement' },
     ];
   } else if (role === 'faculty' || role === 'hod') {
-    brandSubtitle = role === 'hod' ? 'HOD Portal' : 'Faculty Portal';
-    brandHref = '/dashboard/faculty';
     navItems = [
       { type: 'section', label: 'Main' },
-      { type: 'link', label: 'My Dashboard', icon: 'bi-speedometer2', to: '/dashboard/faculty' },
+      { type: 'link', label: 'My Dashboard', icon: 'bi-speedometer2', to: role === 'hod' ? '/hod/dashboard' : '/dashboard/faculty' },
       { type: 'section', label: 'My Classes' },
       { type: 'link', label: 'Mark Attendance', icon: 'bi-check2-square', to: '/faculty/attendance' },
       { type: 'link', label: 'Enter Grades', icon: 'bi-journal-text', to: '/faculty/grades' },
@@ -74,7 +62,6 @@ export default function Sidebar() {
       );
     }
 
-    // Deputy faculty: surface any HOD duties temporarily delegated to them.
     const scopes = delegatedAccess || [];
     if (role === 'faculty' && scopes.length) {
       navItems.push({ type: 'section', label: 'Acting HOD (Delegated)' });
@@ -89,8 +76,6 @@ export default function Sidebar() {
       { type: 'link', label: 'Notices', icon: 'bi-broadcast', to: '/faculty/notices' }
     );
   } else if (role === 'parent') {
-    brandSubtitle = 'Parent Portal';
-    brandHref = '/dashboard/parent';
     navItems = [
       { type: 'section', label: 'Main' },
       { type: 'link', label: 'Overview', icon: 'bi-speedometer2', to: '/dashboard/parent' },
@@ -102,8 +87,6 @@ export default function Sidebar() {
       { type: 'link', label: 'Notices', icon: 'bi-broadcast', to: '/parent/notices' },
     ];
   } else if (role === 'admin') {
-    brandSubtitle = 'Admin Panel';
-    brandHref = '/dashboard/admin';
     navItems = [
       { type: 'section', label: 'Main' },
       { type: 'link', label: 'Dashboard', icon: 'bi-speedometer2', to: '/dashboard/admin' },
@@ -114,7 +97,6 @@ export default function Sidebar() {
       { type: 'link', label: 'HODs', icon: 'bi-person-badge', to: '/admin/hod' },
       { type: 'link', label: 'Courses', icon: 'bi-book', to: '/admin/courses' },
       { type: 'link', label: 'Departments', icon: 'bi-building', to: '/admin/departments' },
-      { type: 'link', label: 'Alumni', icon: 'bi-mortarboard', to: '/admin/alumni' },
       { type: 'link', label: 'Student Records', icon: 'bi-trophy', to: '/admin/student-records' },
       { type: 'section', label: 'Academic' },
       { type: 'link', label: 'Attendance', icon: 'bi-check2-square', to: '/admin/attendance' },
@@ -128,21 +110,8 @@ export default function Sidebar() {
     ];
   }
 
-  const handleUserLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   return (
     <aside className="sidebar" id="sidebar">
-      <NavLink className="sidebar-brand" to={brandHref}>
-        <div className="sidebar-brand-icon"><i className="bi bi-mortarboard-fill"></i></div>
-        <div className="sidebar-brand-text">
-          <div className="sidebar-brand-title">EduPulse</div>
-          <div className="sidebar-brand-subtitle">{brandSubtitle}</div>
-        </div>
-      </NavLink>
-
       <nav className="sidebar-nav">
         {navItems.map((item, idx) => {
           if (item.type === 'section') {
@@ -163,19 +132,6 @@ export default function Sidebar() {
           );
         })}
       </nav>
-
-      <div className="sidebar-footer">
-        <div className="sidebar-user" onClick={handleUserLogout}>
-          <div className="user-avatar">{initials}</div>
-          <div className="user-info">
-            <div className="user-name">{userName}</div>
-            <div className="user-role">
-              {role === 'hod' ? 'HOD' : role.charAt(0).toUpperCase() + role.slice(1)}
-            </div>
-          </div>
-          <span style={{ color: 'var(--text-muted)', cursor: 'pointer' }}><i className="bi bi-power"></i></span>
-        </div>
-      </div>
     </aside>
   );
 }

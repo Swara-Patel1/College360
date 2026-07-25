@@ -155,7 +155,7 @@ export default function Delegation() {
         </div>
       )}
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="🤝 Delegate Duties">
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={<><i className="bi bi-people me-2"></i>Delegate Duties</>}>
         <form onSubmit={save}>
           <div className="form-group" style={{ marginBottom: '14px' }}>
             <label className="form-label">Deputy (department faculty) *</label>

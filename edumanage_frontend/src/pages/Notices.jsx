@@ -67,11 +67,11 @@ export default function Notices() {
   }, [selectedType, notices]);
 
   const typeConfig = {
-    general: { color: '#54A0FF', bg: 'rgba(84,160,255,0.1)', border: 'rgba(84,160,255,0.3)', icon: '📋', label: 'General' },
-    exam:    { color: '#FF9F43', bg: 'rgba(255,159,67,0.1)',  border: 'rgba(255,159,67,0.3)',  icon: '📝', label: 'Exam' },
-    holiday: { color: '#00D4AA', bg: 'rgba(0,212,170,0.1)',   border: 'rgba(0,212,170,0.3)',   icon: '🎉', label: 'Holiday' },
-    event:   { color: '#6C63FF', bg: 'rgba(108,99,255,0.1)',  border: 'rgba(108,99,255,0.3)',  icon: '🎪', label: 'Event' },
-    urgent:  { color: '#FF6B6B', bg: 'rgba(255,107,107,0.1)', border: 'rgba(255,107,107,0.3)', icon: '🚨', label: 'Urgent' },
+    general: { color: '#54A0FF', bg: 'rgba(84,160,255,0.1)', border: 'rgba(84,160,255,0.3)', icon: <i className="bi bi-clipboard" />, label: 'General' },
+    exam:    { color: '#FF9F43', bg: 'rgba(255,159,67,0.1)',  border: 'rgba(255,159,67,0.3)',  icon: <i className="bi bi-journal-text" />, label: 'Exam' },
+    holiday: { color: '#00D4AA', bg: 'rgba(0,212,170,0.1)',   border: 'rgba(0,212,170,0.3)',   icon: <i className="bi bi-calendar-event" />, label: 'Holiday' },
+    event:   { color: '#6C63FF', bg: 'rgba(108,99,255,0.1)',  border: 'rgba(108,99,255,0.3)',  icon: <i className="bi bi-balloon" />, label: 'Event' },
+    urgent:  { color: '#FF6B6B', bg: 'rgba(255,107,107,0.1)', border: 'rgba(255,107,107,0.3)', icon: <i className="bi bi-exclamation-triangle" />, label: 'Urgent' },
   };
 
   const handleOpenAdd = () => {
@@ -145,8 +145,13 @@ export default function Notices() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1><i className="bi bi-megaphone"></i> Bulletin Notice Board</h1>
-          <p>Official notices and academic announcements.</p>
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-megaphone"></i>
+          </div>
+          <div>
+            <h1>Bulletin Notice Board</h1>
+            <p>Official notices and academic announcements.</p>
+          </div>
         </div>
         {!isStudent && (
           <div className="page-header-right">
@@ -189,7 +194,7 @@ export default function Notices() {
         {filteredNotices.length ? (
           filteredNotices.map((n, i) => {
             const cfg = typeConfig[n.notice_type] || typeConfig.general;
-            const audLabel = n.audience === 'all' ? '👥 Everyone' : n.audience === 'students' ? '🎓 Students' : '👨‍🏫 Faculty';
+            const audLabel = n.audience === 'all' ? <><i className="bi bi-people me-1"></i>Everyone</> : n.audience === 'students' ? <><i className="bi bi-mortarboard me-1"></i>Students</> : <><i className="bi bi-person-badge me-1"></i>Faculty</>;
             return (
               <div 
                 className="card" 
@@ -251,7 +256,7 @@ export default function Notices() {
       </div>
 
       {/* ======================== POST / EDIT NOTICE MODAL ======================== */}
-      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={editingId ? '✏️ Edit Notice' : '📢 Post New Notice'}>
+      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={editingId ? <><i className="bi bi-pencil-square me-2"></i>Edit Notice</> : <><i className="bi bi-megaphone me-2"></i>Post New Notice</>}>
         <form onSubmit={handleSubmit}>
           <div className="form-group" style={{ marginBottom: '16px' }}>
             <label className="form-label">Notice Type *</label>

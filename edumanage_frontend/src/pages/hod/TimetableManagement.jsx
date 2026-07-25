@@ -211,7 +211,7 @@ export default function TimetableManagement() {
   days.forEach(d => byDay[d.toLowerCase()] = []);
   timetable.forEach(s => { if (byDay[s._day]) byDay[s._day].push(s); });
 
-  const reasonLabel = (r) => (r === 'room' ? '📍 Room' : '👨‍🏫 Faculty');
+  const reasonLabel = (r) => (r === 'room' ? 'Room' : 'Faculty');
 
   if (loading && !timetable.length) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}><div className="loading-spinner" /></div>;
@@ -231,7 +231,7 @@ export default function TimetableManagement() {
             onClick={() => setClashOpen(true)}
             title="Detect room & faculty double-bookings"
           >
-            {conflicts.length ? `🚨 ${conflicts.length} Clash${conflicts.length > 1 ? 'es' : ''}` : '✅ No Clashes'}
+            {conflicts.length ? <><i className="bi bi-exclamation-octagon me-1"></i>{conflicts.length} Clash{conflicts.length > 1 ? 'es' : ''}</> : <><i className="bi bi-check-circle me-1"></i>No Clashes</>}
           </button>
           <button className="btn btn-primary" onClick={handleOpenAdd}><i className="bi bi-plus-lg"></i> Add Slot</button>
         </div>
@@ -303,7 +303,7 @@ export default function TimetableManagement() {
       </div>
 
       {/* ── Clash detection wizard ── */}
-      <Modal isOpen={clashOpen} onClose={() => setClashOpen(false)} title="🚨 Clash Detection">
+      <Modal isOpen={clashOpen} onClose={() => setClashOpen(false)} title={<><i className="bi bi-exclamation-octagon me-2"></i>Clash Detection</>}>
         {conflicts.length === 0 ? (
           <div className="empty-state" style={{ padding: '30px', textAlign: 'center' }}>
             <div className="empty-state-icon"><i className="bi bi-check-circle-fill"></i></div>
@@ -332,7 +332,7 @@ export default function TimetableManagement() {
                           style={{ textAlign: 'left', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', cursor: 'pointer' }}
                         >
                           <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{s._courseCode} · {s._courseName}</div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}><i className="bi bi-geo-alt"></i> {s._room || 'TBA'} · 👨‍🏫 {s._facultyName || '—'}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}><i className="bi bi-geo-alt"></i> {s._room || 'TBA'} · <i className="bi bi-person-video3"></i> {s._facultyName || '—'}</div>
                         </button>
                       </span>
                     ))}
@@ -346,7 +346,7 @@ export default function TimetableManagement() {
 
       {/* ── Add / edit slot modal ── */}
       {isOpen && (
-        <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={selectedSlot ? '📝 Edit Timetable Slot' : '➕ Add Timetable Slot'}>
+        <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={selectedSlot ? <><i className="bi bi-pencil-square me-2"></i>Edit Timetable Slot</> : <><i className="bi bi-plus-circle me-2"></i>Add Timetable Slot</>}>
           <form onSubmit={handleSubmit}>
             {liveClash.length > 0 && (
               <div style={{ border: '1px solid #FF6B6B', background: 'rgba(255,107,107,0.08)', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', fontSize: '0.82rem' }}>

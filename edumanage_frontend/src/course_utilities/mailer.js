@@ -19,13 +19,13 @@ async function getTransporter() {
         pass: testAccount.pass,
       },
     });
-    console.log('✉️  Nodemailer test transporter configured:', testAccount.user);
+    console.log('Nodemailer test transporter configured:', testAccount.user);
   } catch (err) {
     // Fallback transport simulation if offline
     transporter = nodemailer.createTransport({
       jsonTransport: true
     });
-    console.log('✉️  Nodemailer fallback JSON transport active.');
+    console.log('Nodemailer fallback JSON transport active.');
   }
 
   return transporter;
@@ -40,7 +40,7 @@ export async function sendFeeReminderEmail(recipientEmail, studentName, feeAmoun
   const mailOptions = {
     from: '"College360 Accounts" <finance@college360.edu>',
     to: recipientEmail,
-    subject: `⚠️ Fee Payment Reminder: Due Date ${dueDate}`,
+    subject: `Fee Payment Reminder: Due Date ${dueDate}`,
     text: `Dear ${studentName},\n\nThis is a reminder that your pending fee of $${feeAmount} is due on ${dueDate}.\n\nPlease complete your payment at the earliest.\n\nRegards,\nCollege Management Office`,
     html: `
       <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
@@ -69,9 +69,9 @@ export async function sendFeeReminderEmail(recipientEmail, studentName, feeAmoun
   let previewUrl = null;
   if (testAccount && nodemailer.getTestMessageUrl) {
     previewUrl = nodemailer.getTestMessageUrl(info);
-    console.log(`✉️ Fee Reminder sent to ${recipientEmail} → Preview URL: ${previewUrl}`);
+    console.log(`Fee Reminder sent to ${recipientEmail} → Preview URL: ${previewUrl}`);
   } else {
-    console.log(`✉️ Fee Reminder sent to ${recipientEmail}`);
+    console.log(`Fee Reminder sent to ${recipientEmail}`);
   }
 
   return {

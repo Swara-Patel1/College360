@@ -5,12 +5,24 @@ from .models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
+    role = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name',
                   'role', 'phone', 'address', 'date_of_birth', 'profile_pic',
                   'is_active', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_role(self, obj):
+        if obj.role == 'hod':
+            return 'hod'
+        try:
+            if hasattr(obj, 'faculty_profile') and obj.faculty_profile and obj.faculty_profile.designation == 'hod':
+                return 'hod'
+        except Exception:
+            pass
+        return obj.role
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -69,6 +81,13 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError({'error': 'account_disabled',
                                                'message': 'Account is disabled.'})
 
+        role = user.role
+        try:
+            if hasattr(user, 'faculty_profile') and user.faculty_profile and user.faculty_profile.designation == 'hod':
+                role = 'hod'
+        except Exception:
+            pass
+
         refresh = RefreshToken.for_user(user)
         return {
             'access': str(refresh.access_token),
@@ -79,7 +98,7 @@ class LoginSerializer(serializers.Serializer):
                 'username': user.username,
                 'first_name': user.first_name,
                 'last_name': user.last_name,
-                'role': user.role,
+                'role': role,
                 'phone': user.phone or '',
                 'is_active': user.is_active,
             }

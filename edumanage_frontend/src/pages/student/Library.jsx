@@ -42,18 +42,22 @@ export default function Library() {
 
   return (
     <>
-      <div className="stat-card primary" style={{ marginBottom: '20px' }}>
-        <div className="stat-icon"><i className="bi bi-book"></i></div>
-        <div className="stat-value">Library</div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-          Browse the catalogue and track the books you've borrowed. Visit the library desk to issue or return.
-        </p>
+      <div className="page-header">
+        <div className="page-header-left">
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-book"></i>
+          </div>
+          <div>
+            <h1>Library</h1>
+            <p>Browse the catalogue and track the books you've borrowed. Visit the library desk to issue or return.</p>
+          </div>
+        </div>
       </div>
 
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-journal-bookmark"></i></div><div className="stat-value">{books.length}</div><div className="stat-label">Titles in Catalogue</div></div>
-        <div className="stat-card warning"><div className="stat-icon"><i className="bi bi-box-arrow-up"></i></div><div className="stat-value">{activeLoans.length}</div><div className="stat-label">Currently Borrowed</div></div>
-        <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-cash-coin"></i></div><div className="stat-value">{Utils.formatCurrency(outstanding)}</div><div className="stat-label">Fines Due</div></div>
+        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-journal-bookmark"></i></div><div><div className="stat-value">{books.length}</div><div className="stat-label">Titles in Catalogue</div></div></div>
+        <div className="stat-card warning"><div className="stat-icon"><i className="bi bi-box-arrow-up"></i></div><div><div className="stat-value">{activeLoans.length}</div><div className="stat-label">Currently Borrowed</div></div></div>
+        <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-cash-coin"></i></div><div><div className="stat-value">{Utils.formatCurrency(outstanding)}</div><div className="stat-label">Fines Due</div></div></div>
       </div>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
@@ -65,7 +69,7 @@ export default function Library() {
         <div className="card col-12">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div className="card-title"><i className="bi bi-book"></i> Book Catalogue</div>
-            <input className="form-control" style={{ maxWidth: '320px' }} placeholder="🔎 Search by title, author, ISBN…"
+            <input className="form-control" style={{ maxWidth: '320px' }} placeholder="Search by title, author, ISBN…"
               value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="card-body" style={{ padding: 0 }}>

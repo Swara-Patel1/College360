@@ -162,15 +162,19 @@ export default function Doubts() {
   return (
     <>
       {/* Row 1: Doubts Q&A title card */}
-      <div className="stat-card primary" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div className="stat-icon"><i className="bi bi-clipboard"></i></div>
-          <div className="stat-value">Doubts Q&A</div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-            Get an <strong>instant AI answer</strong> from your course syllabus — escalate to faculty experts if you need more.
-          </p>
+      <div className="page-header">
+        <div className="page-header-left">
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-patch-question"></i>
+          </div>
+          <div>
+            <h1>Doubts Q&A</h1>
+            <p>Get an <strong>instant AI answer</strong> from your course syllabus — escalate to faculty experts if you need more.</p>
+          </div>
         </div>
-        <button className="btn btn-primary" onClick={handleOpenModal} style={{ flexShrink: 0 }}><i className="bi bi-question-circle"></i> Ask a Doubt</button>
+        <div className="page-header-right">
+          <button className="btn btn-primary" onClick={handleOpenModal}><i className="bi bi-question-circle"></i> Ask a Doubt</button>
+        </div>
       </div>
 
       {/* Stats row */}
@@ -296,7 +300,7 @@ export default function Doubts() {
                 {d.resolution && (
                   <div className="resolution-box" style={{ background: 'rgba(0,212,170,0.04)', borderLeft: '3px solid #00D4AA', padding: '14px', borderRadius: '0 8px 8px 0', marginTop: '12px' }}>
                     <h4 style={{ color: '#00D4AA', margin: '0 0 6px 0', fontSize: '0.85rem', fontWeight: 700 }}>
-                      {d.ai_helpful === true && !d.assigned_faculty_name ? '🤖 Resolved by AI Assistant:' : '📖 Faculty Answer:'}
+                      {d.ai_helpful === true && !d.assigned_faculty_name ? <><i className="bi bi-robot me-1"></i>Resolved by AI Assistant:</> : <><i className="bi bi-book me-1"></i>Faculty Answer:</>}
                     </h4>
                     <div>{renderRich(d.resolution)}</div>
                   </div>
@@ -317,7 +321,7 @@ export default function Doubts() {
       </div>
 
       {/* ======================== ASK DOUBT MODAL ======================== */}
-      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="❓ Ask a New Doubt">
+      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={<><i className="bi bi-question-circle me-2"></i>Ask a New Doubt</>}>
         <form onSubmit={handleSubmitDoubt}>
           <div className="form-group" style={{ marginBottom: '16px' }}>
             <label className="form-label">Select Course / Subject *</label>
@@ -359,7 +363,7 @@ export default function Doubts() {
               className="btn btn-primary"
               disabled={isSubmitting || questionText.trim().length < 20}
             >
-              {isSubmitting ? '🤖 Getting instant AI answer…' : 'Submit Doubt'}
+              {isSubmitting ? 'Getting instant AI answer…' : 'Submit Doubt'}
             </button>
           </div>
         </form>

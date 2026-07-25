@@ -1,4 +1,4 @@
-# EduPulse: College Management System
+# College360: College Management System
 
 > ### ▶️ To run this project, follow **[SETUP.md](SETUP.md)**.
 > **The database is included in this repo** — a MongoDB snapshot lives in

@@ -1,9 +1,9 @@
 @echo off
-title EduPulse - College Management System
+title College360 - College Management System
 color 0A
 echo.
 echo  =============================================
-echo   EduPulse - College Management System
+echo   College360 - College Management System
 echo  =============================================
 echo.
 echo  Starting all services...

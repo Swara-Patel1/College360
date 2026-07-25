@@ -64,19 +64,23 @@ export default function Backlogs() {
 
   return (
     <>
-      <div className="stat-card primary" style={{ marginBottom: '20px' }}>
-        <div className="stat-icon"><i className="bi bi-graph-down-arrow"></i></div>
-        <div className="stat-value">Backlog / KT Tracker</div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-          Track failed subjects, register for re-examinations, and see your clearance history.
-        </p>
+      <div className="page-header">
+        <div className="page-header-left">
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-graph-down-arrow"></i>
+          </div>
+          <div>
+            <h1>Backlog / KT Tracker</h1>
+            <p>Track failed subjects, register for re-examinations, and see your clearance history.</p>
+          </div>
+        </div>
       </div>
 
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-book"></i></div><div className="stat-value">{counts.total}</div><div className="stat-label">Total KTs</div></div>
-        <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-exclamation-triangle"></i></div><div className="stat-value">{counts.active}</div><div className="stat-label">Active (register now)</div></div>
-        <div className="stat-card warning"><div className="stat-icon"><i className="bi bi-pencil-square"></i></div><div className="stat-value">{counts.registered}</div><div className="stat-label">Registered</div></div>
-        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div className="stat-value">{counts.cleared}</div><div className="stat-label">Cleared</div></div>
+        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-book"></i></div><div><div className="stat-value">{counts.total}</div><div className="stat-label">Total KTs</div></div></div>
+        <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-exclamation-triangle"></i></div><div><div className="stat-value">{counts.active}</div><div className="stat-label">Active (register now)</div></div></div>
+        <div className="stat-card warning"><div className="stat-icon"><i className="bi bi-pencil-square"></i></div><div><div className="stat-value">{counts.registered}</div><div className="stat-label">Registered</div></div></div>
+        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div><div className="stat-value">{counts.cleared}</div><div className="stat-label">Cleared</div></div></div>
       </div>
 
       <div className="card col-12">
@@ -107,7 +111,7 @@ export default function Backlogs() {
         </div>
       </div>
 
-      <Modal isOpen={!!active} onClose={() => setActive(null)} title="📝 Register for Re-exam">
+      <Modal isOpen={!!active} onClose={() => setActive(null)} title={<><i className="bi bi-pencil-square me-2"></i>Register for Re-exam</>}>
         {active && (
           <form onSubmit={submitRegister}>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>

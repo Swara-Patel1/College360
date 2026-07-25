@@ -173,12 +173,12 @@ export default function FeeManagement() {
       </div>
 
       {isPayOpen && paying && (
-        <Modal onClose={() => setIsPayOpen(false)} title="✅ Mark Fee as Paid">
+        <Modal onClose={() => setIsPayOpen(false)} title={<><i className="bi bi-check-circle me-2"></i>Mark Fee as Paid</>}>
           <div style={{ padding: '10px 0' }}>
             <p>Mark <strong>{paying.component_name}</strong> ({Utils.formatCurrency(paying.amount)}) for <strong>{paying.student_name}</strong> as paid?</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
               <button className="btn btn-ghost" onClick={() => setIsPayOpen(false)} disabled={submitting}>Cancel</button>
-              <button className="btn btn-primary" onClick={handlePayConfirm} disabled={submitting}>{submitting ? '⏳ Saving...' : '✅ Confirm Payment'}</button>
+              <button className="btn btn-primary" onClick={handlePayConfirm} disabled={submitting}>{submitting ? 'Saving...' : <><i className="bi bi-check-lg me-1"></i>Confirm Payment</>}</button>
             </div>
           </div>
         </Modal>

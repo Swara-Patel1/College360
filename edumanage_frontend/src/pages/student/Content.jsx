@@ -48,11 +48,11 @@ export default function Content() {
 
   const getTypeConfig = (type) => {
     return {
-      notes:      { icon: '📄', label: 'Note',       cls: 'type-note',  action: 'Download' },
-      video:      { icon: '▶️', label: 'Video',      cls: 'type-video', action: 'Watch' },
-      reference:  { icon: '🔗', label: 'Reference',  cls: 'type-link',  action: 'Open' },
-      assignment: { icon: '📝', label: 'Assignment', cls: 'type-ppt',   action: 'View' },
-    }[type] || { icon: '📎', label: type || 'Resource', cls: 'type-link', action: 'Open' };
+      notes:      { icon: <i className="bi bi-file-earmark-text" />, label: 'Note',       cls: 'type-note',  action: 'Download' },
+      video:      { icon: <i className="bi bi-play-circle" />, label: 'Video',      cls: 'type-video', action: 'Watch' },
+      reference:  { icon: <i className="bi bi-link-45deg" />, label: 'Reference',  cls: 'type-link',  action: 'Open' },
+      assignment: { icon: <i className="bi bi-file-earmark-code" />, label: 'Assignment', cls: 'type-ppt',   action: 'View' },
+    }[type] || { icon: <i className="bi bi-paperclip" />, label: type || 'Resource', cls: 'type-link', action: 'Open' };
   };
 
   // Build subject map — for students, only enrolled subjects
@@ -106,8 +106,13 @@ export default function Content() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1><i className="bi bi-journal-bookmark"></i> Study Materials</h1>
-          <p>Browse course materials, lectures, notes, and links.</p>
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-journal-bookmark"></i>
+          </div>
+          <div>
+            <h1>Study Materials</h1>
+            <p>Browse course materials, lectures, notes, and links.</p>
+          </div>
         </div>
       </div>
 

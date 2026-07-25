@@ -2,12 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 
 const FEATURES = [
-  { icon: '📊', title: 'Unified Dashboards', desc: 'Role-aware dashboards for students, faculty, HODs and admins — the right data, the moment you log in.' },
-  { icon: '✅', title: 'Smart Attendance', desc: 'Bulk-mark attendance, auto-computed percentages, and low-attendance alerts pushed straight to HODs.' },
-  { icon: '📝', title: 'Grades & Analytics', desc: 'Server-computed grades on the Indian scale, class rankings, and performance insights in real time.' },
-  { icon: '🎓', title: 'Alumni Network', desc: 'A living directory of graduates — filter by batch, company and mentors open to guiding students.' },
-  { icon: '❓', title: 'Doubts with SLA', desc: 'Students raise conceptual doubts; faculty resolve them within a tracked 72-hour service window.' },
-  { icon: '💰', title: 'Fees & Finance', desc: 'Track collections, pending dues and payment history across every department from one console.' },
+  { icon: <i className="bi bi-speedometer2" />, title: 'Unified Dashboards', desc: 'Role-aware dashboards for students, faculty, HODs and admins — the right data, the moment you log in.' },
+  { icon: <i className="bi bi-check-circle" />, title: 'Smart Attendance', desc: 'Bulk-mark attendance, auto-computed percentages, and low-attendance alerts pushed straight to HODs.' },
+  { icon: <i className="bi bi-journal-text" />, title: 'Grades & Analytics', desc: 'Server-computed grades on the Indian scale, class rankings, and performance insights in real time.' },
+  { icon: <i className="bi bi-mortarboard" />, title: 'Alumni Network', desc: 'A living directory of graduates — filter by batch, company and mentors open to guiding students.' },
+  { icon: <i className="bi bi-question-circle" />, title: 'Doubts with SLA', desc: 'Students raise conceptual doubts; faculty resolve them within a tracked 72-hour service window.' },
+  { icon: <i className="bi bi-cash-stack" />, title: 'Fees & Finance', desc: 'Track collections, pending dues and payment history across every department from one console.' },
 ];
 
 const ROLES = [
@@ -50,7 +50,7 @@ export default function Landing() {
         <div className="lp-nav-inner">
           <a className="lp-brand" href="#top">
             <span className="lp-brand-icon"><i className="bi bi-mortarboard"></i></span>
-            <span className="lp-brand-text">EduPulse<span className="lp-brand-dim"> Pro</span></span>
+            <span className="lp-brand-text">College360<span className="lp-brand-dim"> Pro</span></span>
           </a>
           <nav className="lp-nav-links">
             <a href="#features">Features</a>
@@ -69,7 +69,7 @@ export default function Landing() {
           from <span className="lp-grad">one intelligent portal</span>
         </h1>
         <p className="lp-sub">
-          EduPulse Pro unifies attendance, grades, fees, timetables, doubts and alumni into a single
+          College360 Pro unifies attendance, grades, fees, timetables, doubts and alumni into a single
           fast, role-aware platform — powered by a Django backend and a modern React interface.
         </p>
         <div className="lp-hero-cta">
@@ -140,16 +140,16 @@ export default function Landing() {
       <section className="lp-cta">
         <h2 className="lp-h2">Ready to bring your campus online?</h2>
         <p className="lp-section-sub">Log in with your institute credentials and pick up right where your college left off.</p>
-        <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={goLogin}>Sign In to EduPulse</button>
+        <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={goLogin}>Sign In to College360</button>
       </section>
 
       {/* Footer */}
       <footer className="lp-footer">
         <div className="lp-brand">
           <span className="lp-brand-icon"><i className="bi bi-mortarboard"></i></span>
-          <span className="lp-brand-text">EduPulse<span className="lp-brand-dim"> Pro</span></span>
+          <span className="lp-brand-text">College360<span className="lp-brand-dim"> Pro</span></span>
         </div>
-        <p>© {new Date().getFullYear()} EduPulse Pro — College Management System. Built with Django + React.</p>
+        <p>© {new Date().getFullYear()} College360 Pro — College Management System. Built with Django + React.</p>
       </footer>
     </div>
   );

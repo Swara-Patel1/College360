@@ -67,9 +67,14 @@ export default function Timetable() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1><i className="bi bi-calendar3"></i> Weekly Timetable</h1>
-          <p>All class schedules set by the Head of Department.</p>
-          <div className="today-badge" id="todayBadge"><i className="bi bi-star-fill"></i> Today is {todayName}</div>
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-calendar3"></i>
+          </div>
+          <div>
+            <h1>Weekly Timetable</h1>
+            <p>All class schedules set by the Head of Department.</p>
+            <div className="today-badge" id="todayBadge" style={{ marginTop: '6px' }}><i className="bi bi-star-fill"></i> Today is {todayName}</div>
+          </div>
         </div>
       </div>
 

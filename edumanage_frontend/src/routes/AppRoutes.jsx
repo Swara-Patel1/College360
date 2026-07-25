@@ -15,9 +15,7 @@ import Courses from '../pages/Courses.jsx';
 import StudentContent from '../pages/student/Content.jsx';
 import StudentDoubts from '../pages/student/Doubts.jsx';
 import StudentComplaints from '../pages/student/Complaints.jsx';
-import StudentPlacement from '../pages/student/Placement.jsx';
 import Notices from '../pages/Notices.jsx';
-import Alumni from '../pages/Alumni.jsx';
 import StudentFeedback from '../pages/student/Feedback.jsx';
 import StudentBacklogs from '../pages/student/Backlogs.jsx';
 import ExamSchedule from '../pages/ExamSchedule.jsx';
@@ -25,6 +23,7 @@ import ExamScheduling from '../pages/admin/ExamScheduling.jsx';
 import LibraryManagement from '../pages/admin/LibraryManagement.jsx';
 import StudentLibrary from '../pages/student/Library.jsx';
 import StudentPortfolio from '../pages/student/Portfolio.jsx';
+import StudentPlacement from '../pages/student/Placement.jsx';
 import StudentFees from '../pages/student/Fees.jsx';
 import StudentRecords from '../pages/admin/StudentRecords.jsx';
 import HODFeedback from '../pages/hod/Feedback.jsx';
@@ -41,6 +40,7 @@ import FacultyTimetable from '../pages/faculty/Timetable.jsx';
 import FacultyLeaves from '../pages/faculty/Leaves.jsx';
 import FacultyInterchange from '../pages/faculty/Interchange.jsx';
 import ManageStudents from '../pages/ManageStudents.jsx';
+import HODDashboard from '../pages/hod/Dashboard.jsx';
 import HODComplaints from '../pages/hod/Complaints.jsx';
 import HODPerformance from '../pages/hod/Performance.jsx';
 import HODFees from '../pages/hod/Fees.jsx';
@@ -92,7 +92,8 @@ export const AppRoutes = () => {
     if (!isLoggedIn) return '/login';
     const role = user?.role?.toLowerCase();
     if (role === 'admin') return '/dashboard/admin';
-    if (role === 'faculty' || role === 'hod') return '/dashboard/faculty';
+    if (role === 'hod') return '/hod/dashboard';
+    if (role === 'faculty') return '/dashboard/faculty';
     if (role === 'student') return '/dashboard/student';
     if (role === 'parent') return '/dashboard/parent';
     return '/login';
@@ -118,18 +119,19 @@ export const AppRoutes = () => {
         <Route path="/student/doubts" element={<MainLayout><StudentDoubts /></MainLayout>} />
         <Route path="/student/complaints" element={<MainLayout><StudentComplaints /></MainLayout>} />
         <Route path="/student/notices" element={<MainLayout><Notices /></MainLayout>} />
-        <Route path="/student/placement" element={<MainLayout><StudentPlacement /></MainLayout>} />
-        <Route path="/student/alumni" element={<MainLayout><Alumni /></MainLayout>} />
         <Route path="/student/feedback" element={<MainLayout><StudentFeedback /></MainLayout>} />
         <Route path="/student/backlogs" element={<MainLayout><StudentBacklogs /></MainLayout>} />
         <Route path="/student/exams" element={<MainLayout><ExamSchedule /></MainLayout>} />
         <Route path="/student/library" element={<MainLayout><StudentLibrary /></MainLayout>} />
         <Route path="/student/portfolio" element={<MainLayout><StudentPortfolio /></MainLayout>} />
+        <Route path="/student/placement" element={<MainLayout><StudentPlacement /></MainLayout>} />
         <Route path="/student/fees" element={<MainLayout><StudentFees /></MainLayout>} />
       </Route>
 
       {/* Faculty & HOD Protected Routes */}
       <Route element={<ProtectedRoute allowedRoles={['faculty', 'hod']} />}>
+        <Route path="/hod/dashboard" element={<MainLayout title="HOD Dashboard"><HODDashboard /></MainLayout>} />
+        <Route path="/dashboard/hod" element={<Navigate to="/hod/dashboard" replace />} />
         <Route path="/dashboard/faculty" element={<MainLayout><FacultyDashboard /></MainLayout>} />
         <Route path="/faculty/attendance" element={<MainLayout><AttendanceMarking /></MainLayout>} />
         <Route path="/faculty/grades" element={<MainLayout><GradesEntry /></MainLayout>} />
@@ -154,10 +156,10 @@ export const AppRoutes = () => {
       </Route>
 
       {/* Delegatable HOD duties — reachable by the HOD or a deputy with the matching delegation */}
-      <Route element={<ProtectedRoute allowedRoles={['hod']} delegationScope="leaves" />}>
+      <Route element={<ProtectedRoute allowedRoles={['hod', 'faculty']} delegationScope="leaves" />}>
         <Route path="/hod/leaves" element={<MainLayout><HODLeaves /></MainLayout>} />
       </Route>
-      <Route element={<ProtectedRoute allowedRoles={['hod']} delegationScope="timetable" />}>
+      <Route element={<ProtectedRoute allowedRoles={['hod', 'faculty']} delegationScope="timetable" />}>
         <Route path="/hod/timetable" element={<MainLayout><TimetableManagement /></MainLayout>} />
       </Route>
 
@@ -184,7 +186,6 @@ export const AppRoutes = () => {
         <Route path="/admin/timetable" element={<MainLayout><TimetableManagement /></MainLayout>} />
         <Route path="/admin/fees" element={<MainLayout><FeeManagement /></MainLayout>} />
         <Route path="/admin/notices" element={<MainLayout><Notices /></MainLayout>} />
-        <Route path="/admin/alumni" element={<MainLayout><Alumni /></MainLayout>} />
         <Route path="/admin/exams" element={<MainLayout><ExamScheduling /></MainLayout>} />
         <Route path="/admin/library" element={<MainLayout><LibraryManagement /></MainLayout>} />
         <Route path="/admin/student-records" element={<MainLayout><StudentRecords /></MainLayout>} />

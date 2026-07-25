@@ -117,7 +117,7 @@ with transaction.atomic():
     ROLE_MAP = {
         'admin': 'admin',
         'faculty': 'faculty',
-        'hod': 'faculty',
+        'hod': 'hod',
         'student': 'student',
     }
 
@@ -206,26 +206,34 @@ with transaction.atomic():
 
     print(f"  ✅ {len(faculty_map)} faculty")
 
-    # Ensure every department has exactly one HOD (the legacy hod.json ids don't
-    # line up with the imported users, so promote a faculty member per department).
+    # Ensure every department has an HOD and process HOD users
     print("\n🏷️  Assigning HODs per department...")
-    hod_login = None
-    for dept in Department.objects.all():
-        dept_fac = list(Faculty.objects.filter(department=dept, is_active=True).select_related('user'))
-        if not dept_fac:
-            continue
-        existing = next((f for f in dept_fac if f.designation == 'hod'), None)
-        hod = existing or dept_fac[0]
-        # Exactly one HOD per department.
-        Faculty.objects.filter(department=dept, designation='hod').exclude(pk=hod.pk) \
-            .update(designation='assistant_professor')
-        hod.designation = 'hod'
-        hod.save()
-        hod.user.role = 'hod'
-        if hod_login is None:  # give the primary HOD a known password for demos
-            hod.user.set_password('hod123')
-            hod_login = hod.user.email
-        hod.user.save()
+    depts = list(Department.objects.all())
+    hod_users = list(User.objects.filter(role='hod'))
+    for idx, h_user in enumerate(hod_users):
+        dept = depts[idx % len(depts)] if depts else default_dept
+        h_user.role = 'hod'
+        h_user.set_password('hod123')
+        h_user.save()
+        fac, created = Faculty.objects.get_or_create(
+            user=h_user,
+            defaults={
+                'faculty_id': f"HOD{h_user.id:03d}",
+                'department': dept,
+                'designation': 'hod',
+                'qualification': 'Ph.D',
+                'experience_years': 12,
+                'joining_date': date(2018, 1, 1),
+                'salary': 95000,
+                'is_active': True,
+            }
+        )
+        if not created:
+            fac.designation = 'hod'
+            fac.department = dept
+            fac.save()
+
+    hod_login = hod_users[0].email if hod_users else None
     print(f"  ✅ HODs assigned" + (f" — primary HOD login: {hod_login} / hod123" if hod_login else ""))
 
     # ── 4. STUDENTS ───────────────────────────────────────────────

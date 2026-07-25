@@ -905,7 +905,7 @@ export const API = {
             await SupaFetch.request('notices', 'POST', {
               author_id: loggedInUser.id,
               author_role: 'FACULTY',
-              title: `📅 Lecture Interchange: ${req.requester_slot?.course_name || 'Course'}`,
+              title: `Lecture Interchange: ${req.requester_slot?.course_name || 'Course'}`,
               content: `Dear Students,\n\nPlease note that there will be a lecture interchange on ${req.requester_slot?.date || 'the scheduled date'}.\n\n• ${req.requester_faculty_name}'s ${req.requester_slot?.course_name} lecture (${req.requester_slot?.start_time?.substring(0,5)} – ${req.requester_slot?.end_time?.substring(0,5)}) will be taken by ${req.target_faculty_name}.\n• ${req.target_faculty_name}'s ${req.target_slot?.course_name} lecture will be taken by ${req.requester_faculty_name}.\n\nKindly plan accordingly.`,
               target_audience: 'students',
               priority: 'NORMAL'
@@ -917,7 +917,7 @@ export const API = {
             await SupaFetch.request('notices', 'POST', {
               author_id: loggedInUser.id,
               author_role: 'FACULTY',
-              title: `🔄 Lecture Interchange Approved — ${req.requester_slot?.course_name}`,
+              title: `Lecture Interchange Approved — ${req.requester_slot?.course_name}`,
               content: `For HOD Information:\n\n${req.requester_faculty_name} and ${req.target_faculty_name} have agreed to interchange their lectures on ${req.requester_slot?.date || 'the scheduled date'}.\n\nDetails:\n• ${req.requester_faculty_name}: ${req.requester_slot?.course_name} → ${req.requester_slot?.day} ${req.requester_slot?.start_time?.substring(0,5)}\n• ${req.target_faculty_name}: ${req.target_slot?.course_name} → ${req.target_slot?.day} ${req.target_slot?.start_time?.substring(0,5)}`,
               target_audience: 'faculty',
               priority: 'NORMAL'
@@ -978,7 +978,7 @@ export const API = {
             await SupaFetch.request('notices', 'POST', {
               author_id: loggedInUser.id,
               author_role: 'HOD',
-              title: `📢 Lecture Change: ${facultyName} on Leave`,
+              title: `Lecture Change: ${facultyName} on Leave`,
               content: `Dear Students,\n\nPlease be informed that ${facultyName} will be on leave from ${leave?.from_date || 'N/A'} to ${leave?.to_date || 'N/A'}.\n\n${substituteMsg}\n\nKindly check the updated timetable for any changes. Apologies for any inconvenience.`,
               target_audience: 'students',
               priority: 'HIGH'

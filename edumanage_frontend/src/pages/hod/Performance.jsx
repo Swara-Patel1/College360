@@ -133,7 +133,7 @@ export default function HODPerformance() {
       
       // Also post an urgent notice alerting the student about the extra lecture
       await API.post('notices', {
-        title: `📢 Extra Lecture Alert: ${subjects.find(s => s.subject_id === selectedSubject)?.name || 'Course'}`,
+        title: `Extra Lecture Alert: ${subjects.find(s => s.subject_id === selectedSubject)?.name || 'Course'}`,
         content: `HOD has scheduled an extra lecture for the subject. Time: ${dayOfWeek} from ${startTime} to ${endTime} in Room ${roomNo}. Attendance is mandatory for academic review.`,
         audience: 'students',
         notice_type: 'urgent'
@@ -239,7 +239,7 @@ export default function HODPerformance() {
 
       {/* ======================== EMAIL PARENT MODAL ======================== */}
       {isEmailOpen && emailTarget && (
-        <Modal isOpen={isEmailOpen} onClose={() => setIsEmailOpen(false)} title={`✉️ Contact Parent of ${emailTarget.student_name}`}>
+        <Modal isOpen={isEmailOpen} onClose={() => setIsEmailOpen(false)} title={<><i className="bi bi-envelope me-2"></i>Contact Parent of {emailTarget.student_name}</>}>
           <form onSubmit={handleSendEmail}>
             <div className="form-group" style={{ marginBottom: '15px' }}>
               <label className="form-label">Parent Email Address</label>
@@ -263,7 +263,7 @@ export default function HODPerformance() {
 
       {/* ======================== EXTRA LECTURE MODAL ======================== */}
       {isLectureOpen && targetStudent && (
-        <Modal isOpen={isLectureOpen} onClose={() => setIsLectureOpen(false)} title="🗓️ Set Remedial Extra Lecture">
+        <Modal isOpen={isLectureOpen} onClose={() => setIsLectureOpen(false)} title={<><i className="bi bi-calendar-event me-2"></i>Set Remedial Extra Lecture</>}>
           <form onSubmit={handleLectureSubmit}>
             <div className="form-group" style={{ marginBottom: '15px' }}>
               <label className="form-label">Remedial Course</label>

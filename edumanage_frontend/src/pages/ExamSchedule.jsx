@@ -50,15 +50,20 @@ export default function ExamSchedule() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1><i className="bi bi-calendar-week"></i> Exam Schedule</h1>
-          <p>{isFaculty ? 'Examinations for the courses you teach.' : 'Your upcoming examinations.'}</p>
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-calendar-week"></i>
+          </div>
+          <div>
+            <h1>Exam Schedule</h1>
+            <p>{isFaculty ? 'Examinations for the courses you teach.' : 'Your upcoming examinations.'}</p>
+          </div>
         </div>
       </div>
 
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-clipboard"></i></div><div className="stat-value">{exams.length}</div><div className="stat-label">Total Exams</div></div>
-        <div className="stat-card warning"><div className="stat-icon"><i className="bi bi-hourglass-split"></i></div><div className="stat-value">{upcoming.length}</div><div className="stat-label">Upcoming</div></div>
-        <div className="stat-card info"><div className="stat-icon"><i className="bi bi-calendar3"></i></div><div className="stat-value" style={{ fontSize: '1.1rem' }}>{nextExam ? Utils.formatDate(nextExam.date) : '—'}</div><div className="stat-label">Next Exam</div></div>
+        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-clipboard"></i></div><div><div className="stat-value">{exams.length}</div><div className="stat-label">Total Exams</div></div></div>
+        <div className="stat-card warning"><div className="stat-icon"><i className="bi bi-hourglass-split"></i></div><div><div className="stat-value">{upcoming.length}</div><div className="stat-label">Upcoming</div></div></div>
+        <div className="stat-card info"><div className="stat-icon"><i className="bi bi-calendar3"></i></div><div><div className="stat-value" style={{ fontSize: '1.1rem' }}>{nextExam ? Utils.formatDate(nextExam.date) : '—'}</div><div className="stat-label">Next Exam</div></div></div>
       </div>
 
       <div className="card col-12">
@@ -98,7 +103,7 @@ export default function ExamSchedule() {
         </div>
       </div>
 
-      <Modal isOpen={!!seatPlan} onClose={() => setSeatPlan(null)} title="🪑 Seat Plan">
+      <Modal isOpen={!!seatPlan} onClose={() => setSeatPlan(null)} title={<><i className="bi bi-grid-3x3-gap me-2"></i>Seat Plan</>}>
         {seatPlan?.loading ? (
           <div style={{ textAlign: 'center', padding: '30px' }}><div className="loading-spinner" /></div>
         ) : seatPlan ? (

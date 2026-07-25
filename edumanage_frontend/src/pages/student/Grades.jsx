@@ -77,12 +77,17 @@ export default function Grades() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>My Grades & transcripts</h1>
-          <p id="reportSubtitle">
-            {allGrades.length > 0 
-              ? `${sortedGrades.length} grade record${sortedGrades.length > 1 ? 's' : ''} found.`
-              : 'No grades published yet.'}
-          </p>
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-journal-check"></i>
+          </div>
+          <div>
+            <h1>My Grades & Transcripts</h1>
+            <p id="reportSubtitle">
+              {allGrades.length > 0 
+                ? `${sortedGrades.length} grade record${sortedGrades.length > 1 ? 's' : ''} found.`
+                : 'No grades published yet.'}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -90,23 +95,31 @@ export default function Grades() {
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
         <div className="stat-card primary">
           <div className="stat-icon"><i className="bi bi-book"></i></div>
-          <div className="stat-value" id="sumTotal">{totalCount || '—'}</div>
-          <div className="stat-label">Total Courses</div>
+          <div>
+            <div className="stat-value" id="sumTotal">{totalCount || '—'}</div>
+            <div className="stat-label">Total Courses</div>
+          </div>
         </div>
         <div className="stat-card success">
           <div className="stat-icon"><i className="bi bi-graph-up-arrow"></i></div>
-          <div className="stat-value" id="sumAvg">{totalCount ? `${averagePercentage}%` : '—'}</div>
-          <div className="stat-label">Average Marks</div>
+          <div>
+            <div className="stat-value" id="sumAvg">{totalCount ? `${averagePercentage}%` : '—'}</div>
+            <div className="stat-label">Average Marks</div>
+          </div>
         </div>
         <div className="stat-card info">
           <div className="stat-icon"><i className="bi bi-trophy"></i></div>
-          <div className="stat-value" id="sumBest">{bestGrade}</div>
-          <div className="stat-label">Best Grade</div>
+          <div>
+            <div className="stat-value" id="sumBest">{bestGrade}</div>
+            <div className="stat-label">Best Grade</div>
+          </div>
         </div>
         <div className="stat-card danger">
           <div className="stat-icon"><i className="bi bi-x-circle"></i></div>
-          <div className="stat-value" id="sumFailed">{totalCount ? failedCount : '—'}</div>
-          <div className="stat-label">Failed Courses</div>
+          <div>
+            <div className="stat-value" id="sumFailed">{totalCount ? failedCount : '—'}</div>
+            <div className="stat-label">Failed Courses</div>
+          </div>
         </div>
       </div>
 

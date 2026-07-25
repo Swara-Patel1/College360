@@ -152,7 +152,7 @@ export default function ManageHOD() {
             <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}><i className="bi bi-exclamation-triangle"></i> Departments without an HOD:</span>
             {departmentsWithoutHod.map(d => (
               <button key={d.id} className="btn btn-ghost btn-sm" onClick={() => openAssign(d.id)}>
-                {d.name} ➕
+                {d.name} <i className="bi bi-plus-lg ms-1"></i>
               </button>
             ))}
           </div>
@@ -214,7 +214,7 @@ export default function ManageHOD() {
       </div>
 
       {isAssignOpen && (
-        <Modal onClose={() => setIsAssignOpen(false)} title="➕ Assign Head of Department">
+        <Modal onClose={() => setIsAssignOpen(false)} title={<><i className="bi bi-plus-circle me-2"></i>Assign Head of Department</>}>
           <form onSubmit={handleAssignSubmit}>
             <div className="form-group" style={{ marginBottom: '15px' }}>
               <label className="form-label">Department *</label>
@@ -238,24 +238,24 @@ export default function ManageHOD() {
               )}
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>
-              ℹ️ The selected faculty will be promoted to HOD. Any existing HOD for this department will be reverted to faculty.
+              <i className="bi bi-info-circle me-1"></i> The selected faculty will be promoted to HOD. Any existing HOD for this department will be reverted to faculty.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setIsAssignOpen(false)} disabled={submitting}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? '⏳ Assigning...' : '➕ Assign HOD'}</button>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Assigning...' : <><i className="bi bi-person-check me-1"></i>Assign HOD</>}</button>
             </div>
           </form>
         </Modal>
       )}
 
       {isRemoveOpen && (
-        <Modal onClose={() => setIsRemoveOpen(false)} title="🗑️ Remove HOD">
+        <Modal onClose={() => setIsRemoveOpen(false)} title={<><i className="bi bi-trash me-2"></i>Remove HOD</>}>
           <div style={{ padding: '10px 0' }}>
             <h3 style={{ marginBottom: '10px' }}>{`${removing?.first_name || ''} ${removing?.last_name || ''}`.trim() || removing?.email}</h3>
             <p>Remove this person as HOD of <strong>{removing?.department_name}</strong>? They will revert to a regular faculty member.</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
               <button className="btn btn-ghost" onClick={() => setIsRemoveOpen(false)} disabled={submitting}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleRemoveConfirm} disabled={submitting}>{submitting ? '⏳ Removing...' : '🗑️ Remove HOD'}</button>
+              <button className="btn btn-danger" onClick={handleRemoveConfirm} disabled={submitting}>{submitting ? 'Removing...' : <><i className="bi bi-trash me-1"></i>Remove HOD</>}</button>
             </div>
           </div>
         </Modal>

@@ -157,7 +157,7 @@ export default function LibraryManagement() {
         <div className="card col-12">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div className="card-title"><i className="bi bi-book"></i> Book Inventory</div>
-            <input className="form-control" style={{ maxWidth: '320px' }} placeholder="🔎 Search title, author, ISBN or barcode…"
+            <input className="form-control" style={{ maxWidth: '320px' }} placeholder="Search title, author, ISBN or barcode…"
               value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="card-body" style={{ padding: 0 }}>
@@ -216,7 +216,7 @@ export default function LibraryManagement() {
                           <td>{Utils.formatDate(l.issued_at)}</td>
                           <td>{Utils.formatDate(l.due_date)}{overdue && <span className="badge badge-danger" style={{ marginLeft: 6 }}>{l.overdue_days}d late</span>}</td>
                           <td><span className={`badge ${l.status === 'returned' ? 'badge-success' : l.status === 'lost' ? 'badge-danger' : 'badge-warning'}`} style={{ textTransform: 'capitalize' }}>{l.status}</span></td>
-                          <td>{l.fine > 0 ? <span style={{ color: l.fine_paid ? 'var(--text-muted)' : 'var(--accent, #FF6B6B)' }}>{Utils.formatCurrency(l.fine)}{l.fine_paid ? ' ✓' : ''}</span> : '—'}</td>
+                          <td>{l.fine > 0 ? <span style={{ color: l.fine_paid ? 'var(--text-muted)' : 'var(--accent, #FF6B6B)' }}>{Utils.formatCurrency(l.fine)}{l.fine_paid ? <i className="bi bi-check-lg ms-1"></i> : ''}</span> : '—'}</td>
                           <td style={{ display: 'flex', gap: '6px' }}>
                             {l.status === 'issued' && <button className="btn btn-primary btn-sm" onClick={() => returnLoan(l)}><i className="bi bi-box-arrow-in-down"></i> Return</button>}
                             {l.fine > 0 && !l.fine_paid && <button className="btn btn-ghost btn-sm" onClick={() => collectFine(l)}><i className="bi bi-cash-coin"></i> Collect</button>}
@@ -238,7 +238,7 @@ export default function LibraryManagement() {
       )}
 
       {/* Add / edit book */}
-      <Modal isOpen={bookModal} onClose={() => setBookModal(false)} title={editing ? '✏️ Edit Book' : '➕ Add Book'}>
+      <Modal isOpen={bookModal} onClose={() => setBookModal(false)} title={editing ? <><i className="bi bi-pencil-square me-2"></i>Edit Book</> : <><i className="bi bi-plus-circle me-2"></i>Add Book</>}>
         <form onSubmit={saveBook}>
           <div className="form-group" style={{ marginBottom: '12px' }}>
             <label className="form-label">Title *</label>
@@ -269,7 +269,7 @@ export default function LibraryManagement() {
       </Modal>
 
       {/* Issue book */}
-      <Modal isOpen={!!issueFor} onClose={() => setIssueFor(null)} title="📤 Issue Book">
+      <Modal isOpen={!!issueFor} onClose={() => setIssueFor(null)} title={<><i className="bi bi-box-arrow-up me-2"></i>Issue Book</>}>
         {issueFor && (
           <form onSubmit={submitIssue}>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>

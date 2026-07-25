@@ -4,7 +4,7 @@
  */
 
 export async function setupIndexes(db) {
-  console.log('⚡ Initializing Collection Index Optimization...');
+  console.log('Initializing Collection Index Optimization...');
 
   const studentsColl = db.collection('students');
   const feePaymentsColl = db.collection('fee_payments');
@@ -34,7 +34,7 @@ export async function setupIndexes(db) {
   const studentIndexes = await studentsColl.getIndexes();
   const feeIndexes = await feePaymentsColl.getIndexes();
 
-  console.log('✓ MongoDB Indexes Created Successfully:');
+  console.log('MongoDB Indexes Created Successfully:');
   console.log('  - students collection indexes:', studentIndexes.map(i => i.name).join(', '));
   console.log('  - fee_payments collection indexes:', feeIndexes.map(i => i.name).join(', '));
 
@@ -48,7 +48,7 @@ export async function profileQueries(db) {
   const explanation = await studentsColl.find({ enrollment_no: '22ME030' }).explain('executionStats');
   const stats = explanation.executionStats || {};
   
-  console.log('📊 Query Performance Profiling (.explain("executionStats")):');
+  console.log('Query Performance Profiling (.explain("executionStats")):');
   console.log(`  - Winning Plan Stage: ${explanation.queryPlanner?.winningPlan?.stage || 'IXSCAN'}`);
   console.log(`  - Total Docs Examined: ${stats.totalDocsExamined ?? 0}`);
   console.log(`  - Returned Docs: ${stats.nReturned ?? 0}`);

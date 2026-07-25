@@ -3,16 +3,16 @@ import { API, Utils } from '../../api/client.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
 
 const STATUS_STYLES = {
-  pending:  { bg: 'rgba(255,159,67,0.15)',  color: '#FF9F43', label: 'Pending',  icon: '⏳' },
-  approved: { bg: 'rgba(0,212,170,0.15)',   color: '#00D4AA', label: 'Approved', icon: '✅' },
-  rejected: { bg: 'rgba(255,107,107,0.15)', color: '#FF6B6B', label: 'Rejected', icon: '❌' },
+  pending:  { bg: 'rgba(255,159,67,0.15)',  color: '#FF9F43', label: 'Pending',  icon: <i className="bi bi-clock-history" /> },
+  approved: { bg: 'rgba(0,212,170,0.15)',   color: '#00D4AA', label: 'Approved', icon: <i className="bi bi-check-circle" /> },
+  rejected: { bg: 'rgba(255,107,107,0.15)', color: '#FF6B6B', label: 'Rejected', icon: <i className="bi bi-x-circle" /> },
 };
 
 const LEAVE_TYPE_LABELS = {
-  casual: { label: 'Casual Leave',  icon: '🌴' },
-  medical: { label: 'Medical Leave', icon: '🏥' },
-  earned:  { label: 'Earned Leave',  icon: '⭐' },
-  special: { label: 'Special Leave', icon: '✨' },
+  casual: { label: 'Casual Leave',  icon: <i className="bi bi-sun" /> },
+  medical: { label: 'Medical Leave', icon: <i className="bi bi-hospital" /> },
+  earned:  { label: 'Earned Leave',  icon: <i className="bi bi-star" /> },
+  special: { label: 'Special Leave', icon: <i className="bi bi-sparkles" /> },
 };
 
 function getDays(from, to) {
@@ -58,8 +58,8 @@ export default function HODLeaves() {
     try {
       await API.post(`hod/leaves/${leaveId}/${action}`, { remarks });
       const actionMsg = action === 'approve'
-        ? 'Leave approved! Students have been notified about the lecture change. ✅'
-        : 'Leave request rejected and faculty has been notified. ❌';
+        ? 'Leave approved! Students have been notified about the lecture change.'
+        : 'Leave request rejected and faculty has been notified.';
       showToast(actionMsg, action === 'approve' ? 'success' : 'info');
       setActionModal(null);
       setRemarks('');
@@ -104,10 +104,10 @@ export default function HODLeaves() {
       {/* Stats row */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:'16px',marginBottom:'24px'}}>
         {[
-          { label:'Pending Review', val: tabCounts.pending, icon:'⏳', color:'#FF9F43' },
-          { label:'Approved', val: tabCounts.approved, icon:'✅', color:'#00D4AA' },
-          { label:'Rejected', val: tabCounts.rejected, icon:'❌', color:'#FF6B6B' },
-          { label:'Total Requests', val: tabCounts.all, icon:'📊', color:'#54A0FF' },
+          { label:'Pending Review', val: tabCounts.pending, icon:<i className="bi bi-clock-history" />, color:'#FF9F43' },
+          { label:'Approved', val: tabCounts.approved, icon:<i className="bi bi-check-circle" />, color:'#00D4AA' },
+          { label:'Rejected', val: tabCounts.rejected, icon:<i className="bi bi-x-circle" />, color:'#FF6B6B' },
+          { label:'Total Requests', val: tabCounts.all, icon:<i className="bi bi-bar-chart-line" />, color:'#54A0FF' },
         ].map(s => (
           <div key={s.label} style={{background:'var(--card-bg)',border:'1px solid var(--border)',borderRadius:'14px',padding:'18px'}}>
             <div style={{fontSize:'1.6rem',marginBottom:'6px'}}>{s.icon}</div>
@@ -168,7 +168,7 @@ export default function HODLeaves() {
             <div style={{display:'flex',flexDirection:'column',gap:'14px'}}>
               {filteredLeaves.map((leave) => {
                 const st = STATUS_STYLES[leave.status] || STATUS_STYLES.pending;
-                const lt = LEAVE_TYPE_LABELS[leave.leave_type] || { label: 'Leave', icon: '🏖️' };
+                const lt = LEAVE_TYPE_LABELS[leave.leave_type] || { label: 'Leave', icon: <i className="bi bi-sun" /> };
                 const days = getDays(leave.from_date, leave.to_date);
                 const facultyName = getFacultyName(leave);
 
@@ -280,7 +280,7 @@ export default function HODLeaves() {
           }}>
             <div style={{textAlign:'center',marginBottom:'24px'}}>
               <div style={{fontSize:'3rem',marginBottom:'12px'}}>
-                {actionModal.action === 'approve' ? '✅' : '❌'}
+                {actionModal.action === 'approve' ? <i className="bi bi-check-circle-fill text-success" /> : <i className="bi bi-x-circle-fill text-danger" />}
               </div>
               <h2 style={{margin:0,fontSize:'1.4rem'}}>
                 {actionModal.action === 'approve' ? 'Approve Leave Request' : 'Reject Leave Request'}
@@ -335,10 +335,10 @@ export default function HODLeaves() {
                 disabled={processing}
               >
                 {processing
-                  ? '⏳ Processing...'
+                  ? 'Processing...'
                   : actionModal.action === 'approve'
-                    ? '✅ Confirm Approval'
-                    : '❌ Confirm Rejection'
+                    ? <><i className="bi bi-check-lg me-1"></i>Confirm Approval</>
+                    : <><i className="bi bi-x-lg me-1"></i>Confirm Rejection</>
                 }
               </button>
             </div>

@@ -12,12 +12,12 @@ export default function Attendance() {
   const [students, setStudents] = useState([]);
   const [attendanceStatuses, setAttendanceStatuses] = useState({});
   const [history, setHistory] = useState([]);
-  
+
   // Filter States for View Records
   const [filterCourse, setFilterCourse] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isMarkingMode, setIsMarkingMode] = useState(false);
@@ -39,12 +39,12 @@ export default function Attendance() {
 
       const myCoursesList = (allCourses || []).filter(c => c.faculty_id === prof.id);
       setCourses(myCoursesList);
-      
+
       // Filter attendance history to only display records for courses taught by this faculty member
       const myCourseIds = myCoursesList.map(c => c.subject_id);
       const myAttendance = (allAttendance || []).filter(r => myCourseIds.includes(r.subject_id));
       setHistory(myAttendance);
-      
+
       calculateStats(myAttendance);
     } catch (e) {
       console.error('Failed to load initial attendance data:', e);
@@ -81,7 +81,7 @@ export default function Attendance() {
       setLoading(true);
       const enrolled = await API.get(`enrollments?course=${courseId}`);
       setStudents(enrolled || []);
-      
+
       // Default all statuses to 'present'
       const initialStatuses = {};
       (enrolled || []).forEach(s => {
@@ -166,11 +166,11 @@ export default function Attendance() {
           <p>Mark attendance for courses, view stats, and track trends.</p>
         </div>
         <div className="page-header-right">
-          <button 
-            className="btn btn-primary" 
+          <button
+            className="btn btn-primary"
             onClick={() => setIsMarkingMode(!isMarkingMode)}
           >
-            {isMarkingMode ? '📋 View Records' : '✅ Mark Attendance'}
+            {isMarkingMode ? <><i className="bi bi-clipboard me-1"></i>View Records</> : <><i className="bi bi-check-circle me-1"></i>Mark Attendance</>}
           </button>
         </div>
       </div>
@@ -179,23 +179,31 @@ export default function Attendance() {
       <div className="stats-grid">
         <div className="stat-card success">
           <div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div>
-          <div className="stat-value">{stats.present}</div>
-          <div className="stat-label">Present Records</div>
+          <div>
+            <div className="stat-value">{stats.present}</div>
+            <div className="stat-label">Present Records</div>
+          </div>
         </div>
         <div className="stat-card danger">
           <div className="stat-icon"><i className="bi bi-x-circle"></i></div>
-          <div className="stat-value">{stats.absent}</div>
-          <div className="stat-label">Absent Records</div>
+          <div>
+            <div className="stat-value">{stats.absent}</div>
+            <div className="stat-label">Absent Records</div>
+          </div>
         </div>
         <div className="stat-card warning">
           <div className="stat-icon"><i className="bi bi-alarm"></i></div>
-          <div className="stat-value">{stats.late}</div>
-          <div className="stat-label">Late Records</div>
+          <div>
+            <div className="stat-value">{stats.late}</div>
+            <div className="stat-label">Late Records</div>
+          </div>
         </div>
         <div className="stat-card primary">
           <div className="stat-icon"><i className="bi bi-bar-chart"></i></div>
-          <div className="stat-value">{stats.percentage}%</div>
-          <div className="stat-label">Avg Attendance Rate</div>
+          <div>
+            <div className="stat-value">{stats.percentage}%</div>
+            <div className="stat-label">Avg Attendance Rate</div>
+          </div>
         </div>
       </div>
 
@@ -218,11 +226,11 @@ export default function Attendance() {
               </div>
               <div className="form-group" style={{ flex: 1 }}>
                 <label className="form-label">Date</label>
-                <input 
-                  type="date" 
-                  className="form-input" 
-                  value={attendanceDate} 
-                  onChange={(e) => setAttendanceDate(e.target.value)} 
+                <input
+                  type="date"
+                  className="form-input"
+                  value={attendanceDate}
+                  onChange={(e) => setAttendanceDate(e.target.value)}
                 />
               </div>
             </div>
@@ -247,27 +255,27 @@ export default function Attendance() {
                         <td>{s.current_rollno || '—'}</td>
                         <td style={{ fontWeight: 600 }}>{s.student_name}</td>
                         <td style={{ textAlign: 'center' }}>
-                          <input 
-                            type="radio" 
-                            name={`status-${s.student}`} 
-                            checked={attendanceStatuses[s.student] === 'present'} 
-                            onChange={() => handleStatusChange(s.student, 'present')} 
+                          <input
+                            type="radio"
+                            name={`status-${s.student}`}
+                            checked={attendanceStatuses[s.student] === 'present'}
+                            onChange={() => handleStatusChange(s.student, 'present')}
                           />
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input 
-                            type="radio" 
-                            name={`status-${s.student}`} 
-                            checked={attendanceStatuses[s.student] === 'absent'} 
-                            onChange={() => handleStatusChange(s.student, 'absent')} 
+                          <input
+                            type="radio"
+                            name={`status-${s.student}`}
+                            checked={attendanceStatuses[s.student] === 'absent'}
+                            onChange={() => handleStatusChange(s.student, 'absent')}
                           />
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input 
-                            type="radio" 
-                            name={`status-${s.student}`} 
-                            checked={attendanceStatuses[s.student] === 'late'} 
-                            onChange={() => handleStatusChange(s.student, 'late')} 
+                          <input
+                            type="radio"
+                            name={`status-${s.student}`}
+                            checked={attendanceStatuses[s.student] === 'late'}
+                            onChange={() => handleStatusChange(s.student, 'late')}
                           />
                         </td>
                       </tr>
@@ -277,7 +285,7 @@ export default function Attendance() {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', gap: '10px' }}>
                   <button className="btn btn-ghost" onClick={() => setIsMarkingMode(false)}>Cancel</button>
                   <button className="btn btn-primary" onClick={submitBulkAttendance} disabled={submitting}>
-                    {submitting ? 'Saving...' : '✅ Save Attendance'}
+                    {submitting ? 'Saving...' : <><i className="bi bi-check-lg me-1"></i>Save Attendance</>}
                   </button>
                 </div>
               </>
@@ -301,12 +309,12 @@ export default function Attendance() {
                   <option key={c.subject_id} value={c.subject_id}>{c.code}</option>
                 ))}
               </select>
-              <input 
-                type="date" 
-                className="form-input" 
-                style={{ width: 'auto', padding: '6px 10px', fontSize: '0.8rem' }} 
-                value={filterDate} 
-                onChange={e => setFilterDate(e.target.value)} 
+              <input
+                type="date"
+                className="form-input"
+                style={{ width: 'auto', padding: '6px 10px', fontSize: '0.8rem' }}
+                value={filterDate}
+                onChange={e => setFilterDate(e.target.value)}
               />
               <select className="form-input" style={{ width: '120px', padding: '6px 10px', fontSize: '0.8rem' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                 <option value="">All Statuses</option>

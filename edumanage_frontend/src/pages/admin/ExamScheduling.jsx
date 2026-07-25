@@ -157,7 +157,7 @@ export default function ExamScheduling() {
       </div>
 
       {/* Create / edit modal */}
-      <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} title={editing ? '✏️ Edit Exam' : '➕ Schedule Exam'}>
+      <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} title={editing ? <><i className="bi bi-pencil-square me-2"></i>Edit Exam</> : <><i className="bi bi-plus-circle me-2"></i>Schedule Exam</>}>
         <form onSubmit={save}>
           <div className="form-group" style={{ marginBottom: '12px' }}>
             <label className="form-label">Course *</label>
@@ -202,7 +202,7 @@ export default function ExamScheduling() {
       </Modal>
 
       {/* Seat plan modal */}
-      <Modal isOpen={!!seatPlan} onClose={() => setSeatPlan(null)} title="🪑 Seat Plan">
+      <Modal isOpen={!!seatPlan} onClose={() => setSeatPlan(null)} title={<><i className="bi bi-grid-3x3-gap me-2"></i>Seat Plan</>}>
         {seatLoading || seatPlan?.loading ? (
           <div style={{ textAlign: 'center', padding: '30px' }}><div className="loading-spinner" /></div>
         ) : seatPlan ? (

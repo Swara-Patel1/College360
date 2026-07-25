@@ -6,10 +6,10 @@ import Modal from '../../components/Modal.jsx';
 
 const STATUS_BADGE = { paid: 'badge badge-success', pending: 'badge badge-warning', overdue: 'badge badge-danger', waived: 'badge badge-muted' };
 const METHODS = [
-  { value: 'card', label: '💳 Card' },
-  { value: 'upi', label: '📱 UPI' },
-  { value: 'netbanking', label: '🏦 Net Banking' },
-  { value: 'wallet', label: '👛 Wallet' },
+  { value: 'card', label: 'Card', icon: <i className="bi bi-credit-card me-1" /> },
+  { value: 'upi', label: 'UPI', icon: <i className="bi bi-qr-code me-1" /> },
+  { value: 'netbanking', label: 'Net Banking', icon: <i className="bi bi-bank me-1" /> },
+  { value: 'wallet', label: 'Wallet', icon: <i className="bi bi-wallet2 me-1" /> },
 ];
 
 export default function Fees() {
@@ -86,7 +86,7 @@ export default function Fees() {
         method,
       });
       if (res?.success) {
-        Toast.success(`Payment successful — ${payFee.fee_type} fee paid ✅`);
+        Toast.success(`Payment successful — ${payFee.fee_type} fee paid`);
         closeCheckout();
         load();
       } else {
@@ -105,18 +105,22 @@ export default function Fees() {
 
   return (
     <>
-      <div className="stat-card primary" style={{ marginBottom: '20px' }}>
-        <div className="stat-icon"><i className="bi bi-credit-card"></i></div>
-        <div className="stat-value">Fee Payment</div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-          View your fee dues and pay securely online via the payment gateway.
-        </p>
+      <div className="page-header">
+        <div className="page-header-left">
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-credit-card"></i>
+          </div>
+          <div>
+            <h1>Fee Payment</h1>
+            <p>View your fee dues and pay securely online via the payment gateway.</p>
+          </div>
+        </div>
       </div>
 
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-hourglass-split"></i></div><div className="stat-value">{Utils.formatCurrency(totalDue)}</div><div className="stat-label">Total Due</div></div>
-        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div className="stat-value">{Utils.formatCurrency(totalPaid)}</div><div className="stat-label">Total Paid</div></div>
-        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-receipt"></i></div><div className="stat-value">{pending.length}</div><div className="stat-label">Pending Bills</div></div>
+        <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-hourglass-split"></i></div><div><div className="stat-value">{Utils.formatCurrency(totalDue)}</div><div className="stat-label">Total Due</div></div></div>
+        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div><div className="stat-value">{Utils.formatCurrency(totalPaid)}</div><div className="stat-label">Total Paid</div></div></div>
+        <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-receipt"></i></div><div><div className="stat-value">{pending.length}</div><div className="stat-label">Pending Bills</div></div></div>
       </div>
 
       <div className="card col-12" style={{ marginBottom: '20px' }}>
@@ -179,7 +183,7 @@ export default function Fees() {
       )}
 
       {/* Razorpay-style checkout modal */}
-      <Modal isOpen={!!order} onClose={closeCheckout} title="🔒 Secure Checkout">
+      <Modal isOpen={!!order} onClose={closeCheckout} title={<><i className="bi bi-lock me-2"></i>Secure Checkout</>}>
         {order && payFee && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'linear-gradient(135deg,#6C63FF,#C084FC)', borderRadius: '12px', color: '#fff', marginBottom: '18px' }}>
@@ -202,7 +206,7 @@ export default function Fees() {
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {METHODS.map(m => (
                   <button key={m.value} type="button" onClick={() => setMethod(m.value)}
-                    className={`btn btn-sm ${method === m.value ? 'btn-primary' : 'btn-ghost'}`}>{m.label}</button>
+                    className={`btn btn-sm ${method === m.value ? 'btn-primary' : 'btn-ghost'}`}>{m.icon} {m.label}</button>
                 ))}
               </div>
             </div>

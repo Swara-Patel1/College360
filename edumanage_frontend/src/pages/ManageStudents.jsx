@@ -358,47 +358,47 @@ export default function ManageStudents() {
 
       {/* ======================== ADD STUDENT MODAL ======================== */}
       {isAddOpen && (
-        <Modal onClose={() => setIsAddOpen(false)} title="➕ Add New Student">
+        <Modal onClose={() => setIsAddOpen(false)} title={<><i className="bi bi-person-plus me-2"></i>Add New Student</>}>
           <form onSubmit={handleAddSubmit}>
             <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
               <div className="form-group" style={{ flex: 1 }}>
                 <label className="form-label">First Name *</label>
-                <input type="text" className="form-input" required value={firstName} onChange={e => setFirstName(e.target.value)} />
+                <input type="text" className="form-input" required value={firstName} onChange={(e) => setFirstName(e.target.value)} />
               </div>
               <div className="form-group" style={{ flex: 1 }}>
                 <label className="form-label">Last Name *</label>
-                <input type="text" className="form-input" required value={lastName} onChange={e => setLastName(e.target.value)} />
+                <input type="text" className="form-input" required value={lastName} onChange={(e) => setLastName(e.target.value)} />
               </div>
             </div>
             <div className="form-group" style={{ marginBottom: '15px' }}>
               <label className="form-label">Email Address *</label>
-              <input type="email" className="form-input" required value={email} onChange={e => setEmail(e.target.value)} />
+              <input type="email" className="form-input" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
               <div className="form-group" style={{ flex: 1 }}>
                 <label className="form-label">Roll Number *</label>
-                <input type="text" className="form-input" required value={rollNumber} onChange={e => setRollNumber(e.target.value)} />
+                <input type="text" className="form-input" required value={rollNumber} onChange={(e) => setRollNumber(e.target.value)} />
               </div>
               <div className="form-group" style={{ flex: 1 }}>
                 <label className="form-label">Temporary Password</label>
-                <input type="password" className="form-input" placeholder="student123" value={password} onChange={e => setPassword(e.target.value)} />
+                <input type="password" className="form-input" placeholder="student123" value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
             </div>
             <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
               <div className="form-group" style={{ flex: 1 }}>
                 <label className="form-label">Department *</label>
-                <select className="form-input" required value={deptId} onChange={e => setDeptId(e.target.value)}>
+                <select className="form-input" required value={deptId} onChange={(e) => setDeptId(e.target.value)}>
                   <option value="">Select Department</option>
-                  {departments.map(d => (
+                  {departments.map((d) => (
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
               </div>
               <div className="form-group" style={{ flex: 1 }}>
                 <label className="form-label">Current Semester</label>
-                <select className="form-input" value={semId} onChange={e => setSemId(e.target.value)}>
+                <select className="form-input" value={semId} onChange={(e) => setSemId(e.target.value)}>
                   <option value="">Select Semester</option>
-                  {semesters.map(s => (
+                  {semesters.map((s) => (
                     <option key={s.semester_id} value={s.semester_id}>Semester {s.number}</option>
                   ))}
                 </select>
@@ -406,7 +406,7 @@ export default function ManageStudents() {
             </div>
             <div className="form-group" style={{ marginBottom: '20px' }}>
               <label className="form-label">Status</label>
-              <select className="form-input" value={status} onChange={e => setStatus(e.target.value)}>
+              <select className="form-input" value={status} onChange={(e) => setStatus(e.target.value)}>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
                 <option value="graduated">Graduated</option>
@@ -415,7 +415,7 @@ export default function ManageStudents() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setIsAddOpen(false)} disabled={submitting}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? '⏳ Saving...' : '➕ Save Student'}
+                {submitting ? 'Saving...' : <><i className="bi bi-person-plus me-1"></i>Save Student</>}
               </button>
             </div>
           </form>
@@ -424,7 +424,7 @@ export default function ManageStudents() {
 
       {/* ======================== EDIT STUDENT MODAL ======================== */}
       {isEditOpen && (
-        <Modal onClose={() => setIsEditOpen(false)} title="📝 Edit Student Profile">
+        <Modal onClose={() => setIsEditOpen(false)} title={<><i className="bi bi-pencil-square me-2"></i>Edit Student Profile</>}>
           <form onSubmit={handleEditSubmit}>
             <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
               <div className="form-group" style={{ flex: 1 }}>
@@ -475,7 +475,7 @@ export default function ManageStudents() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setIsEditOpen(false)} disabled={submitting}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? '⏳ Saving...' : '💾 Save Changes'}
+                {submitting ? 'Saving...' : <><i className="bi bi-save me-1"></i>Save Changes</>}
               </button>
             </div>
           </form>
@@ -484,14 +484,14 @@ export default function ManageStudents() {
 
       {/* ======================== DELETE STUDENT MODAL ======================== */}
       {isDeleteOpen && (
-        <Modal onClose={() => setIsDeleteOpen(false)} title="🗑️ Delete Student">
+        <Modal onClose={() => setIsDeleteOpen(false)} title={<><i className="bi bi-trash me-2"></i>Delete Student</>}>
           <div style={{ textalign: 'center', padding: '10px 0' }}>
             <h3 style={{ marginBottom: '10px' }}>{deletingStudent?.first_name} {deletingStudent?.last_name}</h3>
             <p>Are you sure you want to delete this student profile? This action will permanently remove their records from the portal.</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
               <button className="btn btn-ghost" onClick={() => setIsDeleteOpen(false)} disabled={submitting}>Cancel</button>
               <button className="btn btn-danger" onClick={handleDeleteConfirm} disabled={submitting}>
-                {submitting ? '⏳ Deleting...' : '🗑️ Delete Student'}
+                {submitting ? 'Deleting...' : <><i className="bi bi-trash me-1"></i>Delete Student</>}
               </button>
             </div>
           </div>
@@ -500,7 +500,7 @@ export default function ManageStudents() {
 
       {/* ======================== VIEW DETAILS MODAL ======================== */}
       {isViewOpen && viewingStudent && (
-        <Modal onClose={() => setIsViewOpen(false)} title="🔍 Student Details">
+        <Modal onClose={() => setIsViewOpen(false)} title={<><i className="bi bi-search me-2"></i>Student Details</>}>
           <div className="student-details-view" style={{ display: 'grid', gap: '20px', padding: '10px 0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px', borderBottom: '1px solid var(--border)', paddingBottom: '15px' }}>
               <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(108,99,255,0.15)', color: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 700 }}>

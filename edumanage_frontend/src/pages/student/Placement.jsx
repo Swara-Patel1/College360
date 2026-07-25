@@ -71,7 +71,7 @@ export default function Placement() {
 
   const getCategoryMessage = (cat, score) => {
     return {
-      high: `Excellent! You're placement-ready with a score of ${Math.round(score)}/100. 🎉`,
+      high: `Excellent! You're placement-ready with a score of ${Math.round(score)}/100.`,
       medium: `Good standing! Score ${Math.round(score)}/100 — a few improvements needed.`,
       low: `Score ${Math.round(score)}/100 — action required to improve eligibility.`,
       critical: `Critical: ${Math.round(score)}/100 — urgent intervention needed. Meet your HOD.`,
@@ -105,11 +105,11 @@ export default function Placement() {
   };
 
   const sectorEmoji = {
-    IT: '💻',
-    Finance: '💰',
-    Core: '⚙️',
-    Marketing: '📣',
-    Consulting: '📊'
+    IT: <i className="bi bi-laptop" />,
+    Finance: <i className="bi bi-cash-stack" />,
+    Core: <i className="bi bi-gear" />,
+    Marketing: <i className="bi bi-megaphone" />,
+    Consulting: <i className="bi bi-bar-chart" />
   };
 
   if (loading) {
@@ -235,7 +235,7 @@ export default function Placement() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                     <span style={{ fontWeight: 600 }}>Extracurriculars & Skills</span>
-                    <span id="fb-extra">{scoreData.extra_activities ? 'Activities ✓' : 'None'} → {scoreData.extra_score?.toFixed(1)} pts</span>
+                    <span id="fb-extra">{scoreData.extra_activities ? <><i className="bi bi-check-lg me-1"></i>Activities</> : 'None'} → {scoreData.extra_score?.toFixed(1)} pts</span>
                   </div>
                   <div className="progress-bar-container" style={{ height: '8px' }}>
                     <div 
@@ -267,7 +267,7 @@ export default function Placement() {
               {scoreData.improvement_tips.map((t, idx) => (
                 <div className="tip-item" key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
                   <span className="tip-icon" style={{ fontSize: '1.2rem' }}>
-                    {['💡', '🎯', '📈', '⚠️', '🚀'][idx % 5]}
+                    {[<i key={1} className="bi bi-lightbulb" />, <i key={2} className="bi bi-bullseye" />, <i key={3} className="bi bi-graph-up-arrow" />, <i key={4} className="bi bi-exclamation-triangle" />, <i key={5} className="bi bi-rocket-takeoff" />][idx % 5]}
                   </span>
                   <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{t}</span>
                 </div>
@@ -310,14 +310,14 @@ export default function Placement() {
                   <div className={`company-card ${isEligible ? '' : 'locked'}`} key={idx}>
                     <div className="company-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                       <div className="company-logo" style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
-                        {sectorEmoji[c.sector] || '🏢'}
+                        {sectorEmoji[c.sector] || <i className="bi bi-building" />}
                       </div>
                       <div>
                         <div className="company-name" style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{c.name}</div>
                         <div className="company-sector" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.sector || 'General'}</div>
                       </div>
                       <span className={`eligible-badge ${isEligible ? 'eligible-yes' : 'eligible-no'}`} style={{ marginLeft: 'auto', fontSize: '0.7rem', padding: '4px 8px', borderRadius: '6px', fontWeight: 600 }}>
-                        {isEligible ? '✅ Eligible' : '🔒 Locked'}
+                        {isEligible ? <><i className="bi bi-check-circle me-1"></i>Eligible</> : <><i className="bi bi-lock me-1"></i>Locked</>}
                       </span>
                     </div>
                     <div className="company-meta" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>

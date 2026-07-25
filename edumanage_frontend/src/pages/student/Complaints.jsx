@@ -49,10 +49,10 @@ export default function Complaints() {
 
   const getStatusLabel = (status) => {
     return {
-      pending: '⏳ Pending',
-      in_review: '🔍 In Review',
-      resolved: '✅ Resolved',
-      dismissed: '❌ Dismissed'
+      pending: 'Pending',
+      in_review: 'In Review',
+      resolved: 'Resolved',
+      dismissed: 'Dismissed'
     }[status] || status;
   };
 
@@ -109,10 +109,15 @@ export default function Complaints() {
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1><i className="bi bi-megaphone"></i> Support & Complaints</h1>
-          <p id="pageSubtitle">
-            {complaints.length} complaint{complaints.length !== 1 ? 's' : ''} raised by you.
-          </p>
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-megaphone"></i>
+          </div>
+          <div>
+            <h1>Support & Complaints</h1>
+            <p id="pageSubtitle">
+              {complaints.length} complaint{complaints.length !== 1 ? 's' : ''} raised by you.
+            </p>
+          </div>
         </div>
         <div className="page-header-right">
           <button className="btn btn-primary" onClick={handleOpenModal}><i className="bi bi-megaphone"></i> Raise New Complaint</button>
@@ -183,7 +188,7 @@ export default function Complaints() {
       </div>
 
       {/* ======================== NEW COMPLAINT MODAL ======================== */}
-      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="📣 Raise New Complaint">
+      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={<><i className="bi bi-megaphone me-2"></i>Raise New Complaint</>}>
         <form onSubmit={handleSubmit}>
           <div className="form-group" style={{ marginBottom: '16px' }}>
             <label className="form-label">Category *</label>

@@ -14,11 +14,11 @@ export default function Attendance() {
   const [courseStats, setCourseStats] = useState([]);
   const [logs, setLogs] = useState([]);
   const [filteredLogs, setFilteredLogs] = useState([]);
-  
+
   // Filters state
   const [selectedCourse, setSelectedCourse] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
-  
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -97,20 +97,20 @@ export default function Attendance() {
   // Handle local logs filtering
   useEffect(() => {
     let result = [...logs];
-    
+
     if (selectedCourse) {
       result = result.filter(log => log.course == selectedCourse);
     }
-    
+
     if (selectedStatus) {
       result = result.filter(log => log.status === selectedStatus);
     }
-    
+
     setFilteredLogs(result);
   }, [selectedCourse, selectedStatus, logs]);
 
   const rate = parseFloat(stats.percentage) || 0;
-  
+
   // Rate style classes
   let rateCardClass = 'stat-card';
   if (rate >= 80) rateCardClass += ' success';
@@ -121,7 +121,7 @@ export default function Attendance() {
   const getPolicyAdvice = () => {
     if (rate >= 80) {
       return {
-        emoji: '🏆',
+        icon: <i className="bi bi-trophy-fill" />,
         bg: 'rgba(0,212,170,0.15)',
         color: '#00D4AA',
         title: 'Excellent Standing!',
@@ -129,7 +129,7 @@ export default function Attendance() {
       };
     } else if (rate >= 75) {
       return {
-        emoji: '⚠️',
+        icon: <i className="bi bi-exclamation-triangle-fill" />,
         bg: 'rgba(255,159,67,0.15)',
         color: '#FF9F43',
         title: 'Warning Status',
@@ -137,7 +137,7 @@ export default function Attendance() {
       };
     } else {
       return {
-        emoji: '🚨',
+        icon: <i className="bi bi-exclamation-octagon-fill" />,
         bg: 'rgba(255,107,107,0.15)',
         color: '#FF6B6B',
         title: 'Critical Status: Risk of Shortage',
@@ -198,38 +198,52 @@ export default function Attendance() {
 
   return (
     <>
-      {/* Row 1: Attendance Tracker full width */}
-      <div className="stat-card primary" style={{ marginBottom: '20px' }}>
-        <div className="stat-icon"><i className="bi bi-clipboard"></i></div>
-        <div className="stat-value">Attendance Tracker</div>
-        <p id="attSubtitle" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-          {profile 
-            ? `${profile.student_id} · ${profile.department_name || 'N/A'} · Year ${profile.year_of_study} · Sem ${profile.semester}`
-            : 'Loading...'}
-        </p>
+      {/* Row 1: Attendance Tracker header card */}
+      <div className="page-header">
+        <div className="page-header-left">
+          <div className="stat-icon" style={{ background: 'rgba(108, 99, 255, 0.2)', color: '#6C63FF' }}>
+            <i className="bi bi-clipboard-check"></i>
+          </div>
+          <div>
+            <h1>Attendance Tracker</h1>
+            <p id="attSubtitle">
+              {profile
+                ? `${profile.student_id} · ${profile.department_name || 'N/A'} · Year ${profile.year_of_study} · Sem ${profile.semester}`
+                : 'Loading...'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Row 2: 4 stat cards */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className={rateCardClass}>
-          <div className="stat-icon"><i className="bi bi-graph-up-arrow"></i></div>
-          <div className="stat-value" id="overallRate">{rate}%</div>
-          <div className="stat-label">Overall Rate</div>
+          <div className="stat-icon"><i className="bi bi-person-check"></i></div>
+          <div>
+            <div className="stat-value" id="overallRate">{rate}%</div>
+            <div className="stat-label">Overall Rate</div>
+          </div>
         </div>
         <div className="stat-card success">
-          <div className="stat-icon">Present</div>
-          <div className="stat-value" id="statPresent">{stats.present}</div>
-          <div className="stat-label">Sessions</div>
+          <div className="stat-icon">P</div>
+          <div>
+            <div className="stat-value" id="statPresent">{stats.present}</div>
+            <div className="stat-label">PRESENT</div>
+          </div>
         </div>
         <div className="stat-card warning">
-          <div className="stat-icon">Late</div>
-          <div className="stat-value" id="statLate">{stats.late}</div>
-          <div className="stat-label">Sessions</div>
+          <div className="stat-icon">L</div>
+          <div>
+            <div className="stat-value" id="statLate">{stats.late}</div>
+            <div className="stat-label">LATE</div>
+          </div>
         </div>
         <div className="stat-card danger">
-          <div className="stat-icon">Absent</div>
-          <div className="stat-value" id="statAbsent">{stats.absent}</div>
-          <div className="stat-label">Sessions</div>
+          <div className="stat-icon">A</div>
+          <div>
+            <div className="stat-value" id="statAbsent">{stats.absent}</div>
+            <div className="stat-label">ABSENT</div>
+          </div>
         </div>
       </div>
 
@@ -252,8 +266,8 @@ export default function Attendance() {
             <div className="card-title"><i className="bi bi-file-text"></i> Attendance Policy</div>
           </div>
           <div className="card-body" style={{ display: 'flex', gap: '20px', alignItems: 'center', height: '100%' }}>
-            <div 
-              id="adviceIcon" 
+            <div
+              id="adviceIcon"
               style={{
                 width: '64px',
                 height: '64px',
@@ -267,7 +281,7 @@ export default function Attendance() {
                 color: advice.color
               }}
             >
-              {advice.emoji}
+              {advice.icon}
             </div>
             <div>
               <h3 id="adviceTitle" style={{ color: advice.color, fontWeight: 700, marginBottom: '6px', fontSize: '1.1rem' }}>
@@ -335,8 +349,8 @@ export default function Attendance() {
           <div className="card-header" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
             <div className="card-title"><i className="bi bi-calendar3"></i> Daily Attendance Log</div>
             <div className="header-actions" style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
-              <select 
-                className="form-control" 
+              <select
+                className="form-control"
                 id="logFilterCourse"
                 value={selectedCourse}
                 onChange={(e) => setSelectedCourse(e.target.value)}
@@ -347,8 +361,8 @@ export default function Attendance() {
                   <option value={e.course} key={idx}>{e.course_code}</option>
                 ))}
               </select>
-              <select 
-                className="form-control" 
+              <select
+                className="form-control"
                 id="logFilterStatus"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}

@@ -28,8 +28,8 @@ export default function Login() {
       const role = userRole.toLowerCase();
       const destinations = {
         admin: '/dashboard/admin',
+        hod: '/hod/dashboard',
         faculty: '/dashboard/faculty',
-        hod: '/dashboard/faculty',
         student: '/dashboard/student',
         parent: '/dashboard/parent',
       };
@@ -43,12 +43,12 @@ export default function Login() {
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
-    
+
     const handleResize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
-    
+
     handleResize();
     window.addEventListener('resize', handleResize);
 
@@ -120,7 +120,7 @@ export default function Login() {
       <div className="left-panel">
         <div className="brand-logo">
           <div className="brand-icon"><i className="bi bi-mortarboard"></i></div>
-          <div className="brand-name">EduPulse</div>
+          <div className="brand-name">College360</div>
         </div>
 
         <div className="left-content">
@@ -174,7 +174,7 @@ export default function Login() {
       {/* Right Panel — Login */}
       <div className="right-panel">
         <div className="login-header">
-          <h2>Welcome Back 👋</h2>
+          <h2>Welcome Back</h2>
           <p>Sign in to your account to continue</p>
         </div>
 
@@ -224,7 +224,7 @@ export default function Login() {
                 onClick={togglePasswordVisibility}
                 id="togglePwdBtn"
               >
-                {showPassword ? '🙈' : '👁️'}
+                {showPassword ? <i className="bi bi-eye-slash"></i> : <i className="bi bi-eye"></i>}
               </button>
             </div>
           </div>

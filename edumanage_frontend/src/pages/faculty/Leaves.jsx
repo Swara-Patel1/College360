@@ -3,16 +3,16 @@ import { API, Utils } from '../../api/client.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
 
 const LEAVE_TYPES = [
-  { value: 'casual', label: 'Casual Leave',  icon: '🌴', total: 12 },
-  { value: 'medical', label: 'Medical Leave', icon: '🏥', total: 10 },
-  { value: 'earned',  label: 'Earned Leave',  icon: '⭐', total: 15 },
-  { value: 'special', label: 'Special Leave', icon: '✨', total: 5  },
+  { value: 'casual', label: 'Casual Leave',  icon: <i className="bi bi-sun" />, total: 12 },
+  { value: 'medical', label: 'Medical Leave', icon: <i className="bi bi-hospital" />, total: 10 },
+  { value: 'earned',  label: 'Earned Leave',  icon: <i className="bi bi-star" />, total: 15 },
+  { value: 'special', label: 'Special Leave', icon: <i className="bi bi-sparkles" />, total: 5  },
 ];
 
 const STATUS_STYLES = {
-  pending:  { bg: 'rgba(255,159,67,0.15)',  color: '#FF9F43', label: 'Pending HOD Review', icon: '⏳' },
-  approved: { bg: 'rgba(0,212,170,0.15)',   color: '#00D4AA', label: 'Approved',            icon: '✅' },
-  rejected: { bg: 'rgba(255,107,107,0.15)', color: '#FF6B6B', label: 'Rejected',            icon: '❌' },
+  pending:  { bg: 'rgba(255,159,67,0.15)',  color: '#FF9F43', label: 'Pending HOD Review', icon: <i className="bi bi-clock-history" /> },
+  approved: { bg: 'rgba(0,212,170,0.15)',   color: '#00D4AA', label: 'Approved',            icon: <i className="bi bi-check-circle" /> },
+  rejected: { bg: 'rgba(255,107,107,0.15)', color: '#FF6B6B', label: 'Rejected',            icon: <i className="bi bi-x-circle" /> },
 };
 
 function getDays(from, to) {
@@ -56,7 +56,7 @@ export default function FacultyLeaves() {
     setSubmitting(true);
     try {
       await API.post('faculty/leave', form);
-      showToast('Leave request submitted! Awaiting HOD approval. 🎉');
+      showToast('Leave request submitted! Awaiting HOD approval.');
       setShowForm(false);
       setForm({ leaveType: 'casual', fromDate: '', toDate: '', reason: '' });
       await loadLeaves();
@@ -293,7 +293,7 @@ export default function FacultyLeaves() {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" style={{flex:2}} disabled={submitting}>
-                  {submitting ? '⏳ Submitting...' : '📨 Submit Request to HOD'}
+                  {submitting ? 'Submitting...' : <><i className="bi bi-send me-1"></i>Submit Request to HOD</>}
                 </button>
               </div>
             </form>

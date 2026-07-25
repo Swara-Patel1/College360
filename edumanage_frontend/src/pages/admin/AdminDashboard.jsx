@@ -39,20 +39,11 @@ export default function AdminDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const fmt     = (n) => n == null ? '0' : Number(n).toLocaleString('en-IN');
+  const fmt = (n) => n == null ? '0' : Number(n).toLocaleString('en-IN');
   const fmtCurr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
   return (
     <div className="admin-dashboard">
-      <div className="admin-dash-header">
-        <div>
-          <h1 className="admin-dash-title">Admin Dashboard</h1>
-          <p className="admin-dash-subtitle">Real-time overview of College360</p>
-        </div>
-        <div className="admin-dash-badge">
-          <span className="live-dot" /> Live
-        </div>
-      </div>
 
       {error && (
         <div style={{ background: '#450a0a', border: '1px solid #ef4444', color: '#fca5a5', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.8rem' }}>
@@ -64,19 +55,19 @@ export default function AdminDashboard() {
       <section className="admin-dash-section">
         <h2 className="admin-section-heading"><i className="bi bi-people"></i> People</h2>
         <div className="admin-stat-grid">
-          <StatCard icon="🎓" label="Total Students"
+          <StatCard icon={<i className="bi bi-mortarboard-fill" />} label="Total Students"
             value={fmt(stats?.total_students)}
             sub={stats ? `${fmt(stats.active_users)} active · ${fmt(stats.inactive_users)} inactive` : null}
             color="#6366f1" loading={loading} onClick={() => navigate('/admin/students')} />
-          <StatCard icon="🧑‍🏫" label="Total Faculty"
+          <StatCard icon={<i className="bi bi-person-video3" />} label="Total Faculty"
             value={fmt(stats?.total_faculty)}
             sub="Teaching staff"
             color="#0ea5e9" loading={loading} onClick={() => navigate('/admin/faculty')} />
-          <StatCard icon="🏛️" label="HOD"
+          <StatCard icon={<i className="bi bi-building" />} label="HOD"
             value={fmt(stats?.total_hod)}
             sub="Heads of Department"
             color="#8b5cf6" loading={loading} onClick={() => navigate('/admin/hod')} />
-          <StatCard icon="📚" label="Total Courses"
+          <StatCard icon={<i className="bi bi-book-fill" />} label="Total Courses"
             value={fmt(stats?.total_courses)}
             sub={`Across ${fmt(stats?.total_departments)} departments`}
             color="#06b6d4" loading={loading} onClick={() => navigate('/admin/courses')} />
@@ -87,13 +78,13 @@ export default function AdminDashboard() {
       <section className="admin-dash-section">
         <h2 className="admin-section-heading"><i className="bi bi-cash-coin"></i> Fees Overview</h2>
         <div className="admin-stat-grid">
-          <StatCard icon="✅" label="Fees Collected"
+          <StatCard icon={<i className="bi bi-check-circle-fill" />} label="Fees Collected"
             value={fmtCurr(stats?.total_fees_collected)}
             sub="Paid by students" color="#22c55e" loading={loading} />
-          <StatCard icon="⏳" label="Fees Pending Amount"
+          <StatCard icon={<i className="bi bi-clock-history" />} label="Fees Pending Amount"
             value={fmtCurr(stats?.total_fees_pending)}
             sub="Pending payments" color="#f59e0b" loading={loading} />
-          <StatCard icon="🚨" label="Students with Fees Due"
+          <StatCard icon={<i className="bi bi-exclamation-octagon-fill" />} label="Students with Fees Due"
             value={fmt(stats?.fees_pending_students)}
             sub="No payment received yet" color="#ef4444" loading={loading}
             onClick={() => navigate('/admin/fees')} />
@@ -105,15 +96,15 @@ export default function AdminDashboard() {
         <h2 className="admin-section-heading"><i className="bi bi-lightning-charge"></i> Quick Actions</h2>
         <div className="admin-quick-grid">
           {[
-            { icon: '🎓', label: 'Students',    path: '/admin/students',    color: '#6366f1' },
-            { icon: '🧑‍🏫', label: 'Faculty',     path: '/admin/faculty',     color: '#0ea5e9' },
-            { icon: '🏷️', label: 'HODs',        path: '/admin/hod',         color: '#a855f7' },
-            { icon: '📚', label: 'Courses',     path: '/admin/courses',     color: '#06b6d4' },
-            { icon: '🏛️', label: 'Departments', path: '/admin/departments', color: '#8b5cf6' },
-            { icon: '📝', label: 'Notices',     path: '/admin/notices',     color: '#f59e0b' },
-            { icon: '💰', label: 'Fees',        path: '/admin/fees',        color: '#22c55e' },
-            { icon: '📅', label: 'Timetable',   path: '/admin/timetable',   color: '#ec4899' },
-            { icon: '📊', label: 'Grades',      path: '/admin/grades',      color: '#14b8a6' },
+            { icon: <i className="bi bi-mortarboard-fill" />, label: 'Students', path: '/admin/students', color: '#6366f1' },
+            { icon: <i className="bi bi-person-video3" />, label: 'Faculty', path: '/admin/faculty', color: '#0ea5e9' },
+            { icon: <i className="bi bi-person-badge-fill" />, label: 'HODs', path: '/admin/hod', color: '#a855f7' },
+            { icon: <i className="bi bi-book-fill" />, label: 'Courses', path: '/admin/courses', color: '#06b6d4' },
+            { icon: <i className="bi bi-building" />, label: 'Departments', path: '/admin/departments', color: '#8b5cf6' },
+            { icon: <i className="bi bi-journal-text" />, label: 'Notices', path: '/admin/notices', color: '#f59e0b' },
+            { icon: <i className="bi bi-cash-stack" />, label: 'Fees', path: '/admin/fees', color: '#22c55e' },
+            { icon: <i className="bi bi-calendar3" />, label: 'Timetable', path: '/admin/timetable', color: '#ec4899' },
+            { icon: <i className="bi bi-bar-chart-line-fill" />, label: 'Grades', path: '/admin/grades', color: '#14b8a6' },
           ].map(({ icon, label, path, color }) => (
             <button key={path} className="admin-quick-btn" style={{ '--btn-color': color }} onClick={() => navigate(path)}>
               <span className="quick-btn-icon">{icon}</span>

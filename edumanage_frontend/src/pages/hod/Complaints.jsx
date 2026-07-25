@@ -240,7 +240,7 @@ export default function HODComplaints() {
 
       {/* ======================== RESOLVE COMPLAINT MODAL ======================== */}
       {isResolveOpen && selectedComplaint && (
-        <Modal isOpen={isResolveOpen} onClose={() => setIsResolveOpen(false)} title="✏️ Resolve Student Grievance">
+        <Modal isOpen={isResolveOpen} onClose={() => setIsResolveOpen(false)} title={<><i className="bi bi-pencil-square me-2"></i>Resolve Student Grievance</>}>
           <form onSubmit={handleResolveSubmit}>
             <div style={{ marginBottom: '15px' }}>
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>

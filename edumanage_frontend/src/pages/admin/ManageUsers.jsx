@@ -102,7 +102,7 @@ export default function ManageUsers() {
 
       <div className="card col-12">
         <div className="card-body" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-          <input className="form-control" style={{ flex: '1 1 240px' }} placeholder="🔍 Search name, email or username…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="form-control" style={{ flex: '1 1 240px' }} placeholder="Search name, email or username…" value={search} onChange={(e) => setSearch(e.target.value)} />
           <select className="form-control" style={{ maxWidth: '180px' }} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
             <option value="all">All Roles</option>
             {ROLES.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
@@ -133,7 +133,7 @@ export default function ManageUsers() {
                     <td style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{u.last_login ? Utils.formatDate(u.last_login) : 'Never'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                        <button className="btn btn-ghost btn-sm" title={u.is_active === false ? 'Activate' : 'Deactivate'} disabled={isMe} onClick={() => toggleActive(u)}>{u.is_active === false ? '🔓' : '🔒'}</button>
+                        <button className="btn btn-ghost btn-sm" title={u.is_active === false ? 'Activate' : 'Deactivate'} disabled={isMe} onClick={() => toggleActive(u)}>{u.is_active === false ? <i className="bi bi-unlock"></i> : <i className="bi bi-lock"></i>}</button>
                         <button className="btn btn-ghost btn-sm" title="Reset password" onClick={() => { setPwUser(u); setNewPw(''); }}><i className="bi bi-key"></i></button>
                         <button className="btn btn-ghost btn-sm" title="Delete" style={{ color: 'var(--accent, #FF6B6B)' }} disabled={isMe} onClick={() => removeUser(u)}><i className="bi bi-trash"></i></button>
                       </div>
@@ -147,7 +147,7 @@ export default function ManageUsers() {
         </div>
       </div>
 
-      <Modal isOpen={!!pwUser} onClose={() => setPwUser(null)} title="🔑 Reset Password">
+      <Modal isOpen={!!pwUser} onClose={() => setPwUser(null)} title={<><i className="bi bi-key me-2"></i>Reset Password</>}>
         {pwUser && (
           <form onSubmit={submitReset}>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
