@@ -21,5 +21,7 @@ class AttendanceRecord(models.Model):
     class Meta:
         unique_together = ('student', 'course', 'date')
 
+
+
     def __str__(self):
         return f"{self.student} - {self.course} - {self.date} - {self.status}"

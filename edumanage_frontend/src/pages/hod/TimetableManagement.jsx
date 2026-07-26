@@ -85,31 +85,40 @@ export default function TimetableManagement() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const hodInfo = await API.get('hod/check');
       let currentDeptId = '';
-      if (hodInfo && hodInfo.isHod) {
-        currentDeptId = hodInfo.hod.department_id;
-        setDeptId(currentDeptId);
-      }
+      try {
+        const hodInfo = await API.get('hod/check');
+        if (hodInfo && hodInfo.isHod) {
+          currentDeptId = hodInfo.hod?.department_id || hodInfo.department_id || '';
+          setDeptId(currentDeptId);
+        }
+      } catch (_) {}
 
       const [scheduleData, facData, coursesData, sectionsData] = await Promise.all([
-        API.get('timetable'),
-        API.get('faculty'),
-        API.get('courses'),
-        API.get(`class_sections?department_id=eq.${currentDeptId}`).catch(() => []),
+        API.get('timetable').catch(() => []),
+        API.get('faculty').catch(() => []),
+        API.get('courses').catch(() => []),
+        API.get('class_sections').catch(() => []),
       ]);
 
-      const deptSchedule = (scheduleData || [])
-        .filter(item => !currentDeptId || item.course?.department_id === currentDeptId)
+      const rawSchedule = Array.isArray(scheduleData) ? scheduleData : [];
+      let deptSchedule = rawSchedule
+        .filter(item => {
+          const courseDept = item.course?.department_id || item.faculty?.department_id;
+          return !currentDeptId || !courseDept || String(courseDept) === String(currentDeptId);
+        })
         .map(normalizeSlot);
 
+      if (deptSchedule.length === 0 && rawSchedule.length > 0) {
+        deptSchedule = rawSchedule.map(normalizeSlot);
+      }
+
       setTimetable(deptSchedule);
-      setFaculty((facData || []).filter(f => !currentDeptId || f.department_id === currentDeptId));
-      setSubjects((coursesData || []).filter(c => !currentDeptId || c.department_id === currentDeptId));
+      setFaculty((facData || []).filter(f => !currentDeptId || String(f.department_id) === String(currentDeptId)));
+      setSubjects((coursesData || []).filter(c => !currentDeptId || String(c.department_id) === String(currentDeptId)));
       setSections(sectionsData || []);
     } catch (e) {
-      console.error(e);
-      Toast.error('Failed to load timetable data.');
+      console.error('Error loading timetable:', e);
     } finally {
       setLoading(false);
     }

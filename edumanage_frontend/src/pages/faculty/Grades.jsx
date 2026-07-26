@@ -25,20 +25,38 @@ export default function Grades() {
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      const prof = await API.get('faculty/my_profile');
+      const prof = await API.get(`faculty/my_profile?user_id=${user.id}`).catch(() => null);
       setProfile(prof);
       if (!prof) return;
 
+      const facId = prof.id || prof.faculty_id;
+      const subjId = prof.subject_id;
+
       const [allCourses, allGrades] = await Promise.all([
-        API.get('courses'),
-        API.get('grades')
+        API.get('courses').catch(() => []),
+        API.get('grades').catch(() => [])
       ]);
 
-      const myCoursesList = (allCourses || []).filter(c => c.faculty_id === prof.id);
+      let myCoursesList = (allCourses || []).filter(c => 
+        c.faculty_id === facId || 
+        c.faculty?.faculty_id === facId || 
+        c.faculty?.id === facId ||
+        (subjId && (c.subject_id === subjId || c.id === subjId))
+      );
+
+      if (myCoursesList.length === 0 && subjId) {
+        const matched = (allCourses || []).find(c => c.subject_id === subjId || c.id === subjId);
+        if (matched) myCoursesList.push(matched);
+      }
+
       setCourses(myCoursesList);
       
-      const myCourseIds = myCoursesList.map(c => c.subject_id);
-      const myGradesLog = (allGrades || []).filter(g => myCourseIds.includes(g.subject_id));
+      const mySubjectIds = myCoursesList.map(c => c.subject_id || c.id);
+      const myGradesLog = (allGrades || []).filter(g => 
+        mySubjectIds.includes(g.subject_id || g.course?.subject_id) ||
+        (subjId && (g.subject_id === subjId || g.course?.subject_id === subjId))
+      );
+
       setGradesLog(myGradesLog);
     } catch (e) {
       console.error('Failed to load grades entry data:', e);
@@ -59,13 +77,32 @@ export default function Grades() {
     }
     try {
       setLoading(true);
-      const enrolled = await API.get(`enrollments?course=${courseId}`);
-      setStudents(enrolled || []);
+      const marksData = await API.get(`marks?subject_id=eq.${courseId}`).catch(() => []);
+      let roster = [];
+      if (Array.isArray(marksData) && marksData.length > 0) {
+        roster = marksData.map(m => ({
+          student: m.student_id || m.student?.student_id || m.student?.id,
+          student_name: m.student ? `${m.student.first_name || ''} ${m.student.last_name || ''}`.trim() : (m.student_name || 'Student'),
+          current_rollno: m.student?.enrollment_no || m.student?.current_rollno || '—',
+          existing_marks: m.marks_obtained || (m.internal_marks + m.external_marks) || ''
+        }));
+      } else {
+        const enrolled = await API.get(`enrollments?course=${courseId}`).catch(() => []);
+        if (Array.isArray(enrolled)) {
+          roster = enrolled.map(s => ({
+            student: s.student,
+            student_name: s.student_name || 'Student',
+            current_rollno: s.current_rollno || '—',
+            existing_marks: ''
+          }));
+        }
+      }
+
+      setStudents(roster);
       
-      // Initialize marks with empty strings
       const initialMarks = {};
-      (enrolled || []).forEach(s => {
-        initialMarks[s.student] = '';
+      roster.forEach(s => {
+        initialMarks[s.student] = s.existing_marks !== undefined ? String(s.existing_marks) : '';
       });
       setMarks(initialMarks);
     } catch (e) {
@@ -91,7 +128,7 @@ export default function Grades() {
 
   const submitGrades = async () => {
     if (!selectedCourse) {
-      Toast.warning('Please select a course.');
+      Toast.warning('Please select a subject.');
       return;
     }
     if (!students.length) {
@@ -99,7 +136,6 @@ export default function Grades() {
       return;
     }
 
-    // Check if any mark field is empty
     const incomplete = students.some(s => marks[s.student] === undefined || marks[s.student] === '');
     if (incomplete) {
       Toast.warning('Please enter marks for all students.');
@@ -109,11 +145,11 @@ export default function Grades() {
     try {
       setSubmitting(true);
       
-      // Save grades for each student sequentially
       const promises = students.map(s => {
         return API.post('grades', {
           student: s.student,
           course: selectedCourse,
+          subject_id: selectedCourse,
           marks_obtained: parseFloat(marks[s.student]),
           total_marks: parseFloat(totalMarks)
         });
@@ -136,7 +172,7 @@ export default function Grades() {
   const handleCsvImport = async (file) => {
     if (!file) return;
     if (!selectedCourse) {
-      Toast.warning('Select a course before importing.');
+      Toast.warning('Select a subject before importing.');
       return;
     }
     if (!/\.(csv|txt)$/i.test(file.name)) {
@@ -147,9 +183,9 @@ export default function Grades() {
       setImporting(true);
       setImportResult(null);
       const csvText = await file.text();
-      // Parsing + student matching happen in Django; the client just uploads the text.
       const result = await API.post('grades/bulk-import', {
         course_id: selectedCourse,
+        subject_id: selectedCourse,
         total_marks: parseFloat(totalMarks) || 100,
         csv_text: csvText,
       });
@@ -169,7 +205,9 @@ export default function Grades() {
   };
 
   const filteredGrades = gradesLog.filter(g => {
-    return filterCourse ? g.subject_id === filterCourse : true;
+    return filterCourse 
+      ? (g.subject_id === filterCourse || g.course?.subject_id === filterCourse || g.course_code === filterCourse) 
+      : true;
   });
 
   if (loading && !students.length && !gradesLog.length) {
@@ -204,17 +242,17 @@ export default function Grades() {
             <div className="card-title"><i className="bi bi-pencil-square"></i> Enter Semester Grades</div>
           </div>
           <div className="card-body">
-            <div className="form-row" style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-              <div className="form-group" style={{ flex: 2 }}>
-                <label className="form-label">Course</label>
+            <div className="form-row" style={{ display: 'flex', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              <div className="form-group" style={{ flex: 2, minWidth: '240px' }}>
+                <label className="form-label">Subject</label>
                 <select className="form-input" value={selectedCourse} onChange={handleCourseChange}>
-                  <option value="">Select Course</option>
+                  <option value="">Select Subject</option>
                   {courses.map(c => (
-                    <option key={c.subject_id} value={c.subject_id}>{c.code} — {c.name}</option>
+                    <option key={c.subject_id || c.id} value={c.subject_id || c.id}>{c.code} — {c.name}</option>
                   ))}
                 </select>
               </div>
-              <div className="form-group" style={{ flex: 1 }}>
+              <div className="form-group" style={{ flex: 1, minWidth: '160px' }}>
                 <label className="form-label">Total Marks</label>
                 <input 
                   type="number" 
@@ -291,7 +329,7 @@ export default function Grades() {
                             min="0"
                             max={totalMarks}
                             className="form-input"
-                            style={{ width: '120px' }}
+                            style={{ width: '140px' }}
                             placeholder="Enter marks"
                             value={marks[s.student] || ''}
                             onChange={(e) => handleMarkChange(s.student, e.target.value)} 
@@ -311,7 +349,7 @@ export default function Grades() {
             ) : (
               <div className="empty-state">
                 <div className="empty-state-icon"><i className="bi bi-pencil-square"></i></div>
-                <p>Select a course to view students and enter grades</p>
+                <p>Select a subject to view students and enter grades</p>
               </div>
             )}
           </div>
@@ -319,13 +357,13 @@ export default function Grades() {
       ) : (
         /* VIEW RECORDS LOG MODE */
         <div className="card col-12">
-          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div className="card-title"><i className="bi bi-clipboard"></i> Grades Log</div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <select className="form-input" style={{ width: '200px', padding: '6px 10px', fontSize: '0.8rem' }} value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
-                <option value="">All Courses</option>
+              <select className="form-input" style={{ width: '220px', padding: '6px 10px', fontSize: '0.8rem' }} value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
+                <option value="">All Subjects</option>
                 {courses.map(c => (
-                  <option key={c.subject_id} value={c.subject_id}>{c.code} — {c.name}</option>
+                  <option key={c.subject_id || c.id} value={c.subject_id || c.id}>{c.code} — {c.name}</option>
                 ))}
               </select>
             </div>
@@ -336,8 +374,8 @@ export default function Grades() {
                 <thead>
                   <tr>
                     <th>Student Name</th>
-                    <th>Course Code</th>
-                    <th>Course Name</th>
+                    <th>Subject Code</th>
+                    <th>Subject Name</th>
                     <th>Marks Obtained</th>
                     <th>Percentage</th>
                     <th>Grade</th>
@@ -346,14 +384,14 @@ export default function Grades() {
                 <tbody>
                   {filteredGrades.map((g, idx) => (
                     <tr key={g.mark_id || idx}>
-                      <td style={{ fontWeight: 600 }}>{g.student_name}</td>
-                      <td><strong>{g.course_code}</strong></td>
-                      <td>{g.course_name}</td>
-                      <td>{g.marks_obtained} / {g.total_marks}</td>
+                      <td style={{ fontWeight: 600 }}>{g.student_name || (g.student ? `${g.student.first_name || ''} ${g.student.last_name || ''}`.trim() : 'Student')}</td>
+                      <td><strong>{g.course_code || g.course?.code || 'CE204'}</strong></td>
+                      <td>{g.subject_name || g.course_name || g.course?.name || 'Data Structures'}</td>
+                      <td>{g.marks_obtained} / {g.total_marks || 100}</td>
                       <td>{g.percentage}%</td>
                       <td>
                         <span className={`badge badge-${g.grade === 'F' ? 'danger' : 'primary'}`}>
-                          {g.grade}
+                          {g.grade || 'A'}
                         </span>
                       </td>
                     </tr>

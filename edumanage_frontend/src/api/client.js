@@ -11,9 +11,10 @@ export const Auth = {
 
 const SupaFetch = {
   headers(token) {
+    const userToken = token || Auth.getToken();
     return {
       'apikey':        SUPABASE_ANON,
-      'Authorization': `Bearer ${token || SUPABASE_ANON}`,
+      'Authorization': `Bearer ${userToken || SUPABASE_ANON}`,
       'Content-Type':  'application/json',
       'Prefer':        'return=representation',
     };
@@ -132,7 +133,12 @@ export const API = {
         const cached = localStorage.getItem('student_profile');
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed && parsed.semester && parsed.year_of_study) {
+          // Validate cache belongs to this user and has real data
+          const cacheUserId = parsed?.user_id || parsed?.user?.id;
+          const cacheValid = parsed && parsed.semester && parsed.year_of_study &&
+                             parsed.department_name && parsed.department_name !== '—' &&
+                             cacheUserId === loggedInUser.id;
+          if (cacheValid) {
             // Refresh in background
             SupaFetch.request(`students?select=*,user:users(*),department:departments(*),current_semester:semesters(*)&user_id=eq.${loggedInUser.id}`)
               .then(rows => {
@@ -142,15 +148,18 @@ export const API = {
                     ...s,
                     id: s.student_id,
                     student_id: s.enrollment_no,
+                    user_id: loggedInUser.id,
                     department_name: s.department?.name || '—',
-                    semester: s.current_semester?.number || '—',
-                    year_of_study: s.current_semester?.number ? Math.ceil(s.current_semester.number / 2) : '—',
+                    semester: s.current_semester?.number || s.semester || '—',
+                    year_of_study: s.current_semester?.number ? Math.ceil(s.current_semester.number / 2) : (s.year_of_study || '—'),
                     user: s.user
                   }));
                 }
               }).catch(() => {});
             return parsed;
           }
+          // Cache is stale or wrong user — clear it
+          localStorage.removeItem('student_profile');
         }
         const rows = await SupaFetch.request(`students?select=*,user:users(*),department:departments(*),current_semester:semesters(*)&user_id=eq.${loggedInUser.id}`);
         if (!rows || rows.length === 0) return null;
@@ -159,6 +168,7 @@ export const API = {
           ...s,
           id: s.student_id || s.id,
           student_id: s.enrollment_no || s.student_id,
+          user_id: loggedInUser.id,
           department_name: s.department?.name || s.department_name || '—',
           semester: s.current_semester?.number || s.semester || '—',
           year_of_study: s.year_of_study || (s.current_semester?.number ? Math.ceil(s.current_semester.number / 2) : '—'),
@@ -171,24 +181,42 @@ export const API = {
 
       // 4. FACULTY PROFILE
       if (path === 'faculty/my_profile') {
-        const rows = await SupaFetch.request(`faculty?select=*,user:users(*),department:departments(*)&user_id=eq.${loggedInUser.id}`);
-        if (!rows || rows.length === 0) return null;
+        const uid = params.get('user_id') || loggedInUser?.id;
+        if (!uid) return null;
+        const rows = await SupaFetch.request(`faculty?select=*,user:users(*),department:departments(*)&user_id=eq.${uid}`);
+        if (!rows || !rows.length) return null;
+        const f = rows[0];
         return {
-          ...rows[0],
-          id: rows[0].faculty_id,
-          department_name: rows[0].department?.name || '—',
-          user: rows[0].user
+          ...f,
+          id: f.faculty_id || f.id,
+          faculty_id: f.faculty_id || f.id,
+          department_name: f.department_name || f.department?.name || '—',
+          user: f.user
         };
+      }
+
+      // 4b. COURSES / SUBJECTS LIST
+      if (path === 'courses' || path === 'subjects') {
+        const rows = await SupaFetch.request('courses');
+        return (Array.isArray(rows) ? rows : []).map(c => ({
+          ...c,
+          id: c.subject_id || c.id,
+          faculty_id: c.faculty_id || c.faculty?.faculty_id || c.faculty?.id,
+          subject_id: c.subject_id || c.id,
+        }));
       }
 
       // 5. ALL STUDENTS LIST
       if (path === 'students') {
         if (method === 'GET') {
-          const rows = await SupaFetch.request('students?select=*,user:users(*),department:departments(*),current_semester:semesters(*)&order=enrollment_no.asc');
-          return rows.map(s => ({
+          const qStr = queryStr || '';
+          const reqUrl = `students?select=*,user:users(*),department:departments(*),current_semester:semesters(*)&order=enrollment_no.asc${qStr ? '&' + qStr : ''}`;
+          const rows = await SupaFetch.request(reqUrl);
+          return (Array.isArray(rows) ? rows : []).map(s => ({
             ...s,
             id: s.student_id || s.id,
             student_id: s.enrollment_no || s.student_id,
+            enrollment_no: s.enrollment_no || s.student_id || '',
             department_name: s.department?.name || s.department_name || '—',
             semester: s.current_semester?.number || s.semester || '—',
             year_of_study: s.year_of_study || (s.current_semester?.number ? Math.ceil(s.current_semester.number / 2) : '—'),
@@ -199,7 +227,17 @@ export const API = {
             },
             roll_number: s.current_rollno || s.roll_number || '',
             email: s.user?.email || s.email || '',
-            status: s.status || (s.user?.is_active === false ? 'inactive' : 'active')
+            status: s.status || (s.user?.is_active === false ? 'inactive' : 'active'),
+            parent_email: s.parent_email || '',
+            parent_phone: s.parent_phone || s.guardian_phone || '',
+            guardian_name: s.guardian_name || (s.first_name ? `Parent of ${s.first_name} ${s.last_name || ''}`.trim() : 'Parent / Guardian'),
+            guardian_phone: s.guardian_phone || s.parent_phone || '',
+            address: s.address || '',
+            date_of_birth: s.date_of_birth || null,
+            attendance_percentage: s.attendance_percentage != null ? Number(s.attendance_percentage) : null,
+            cgpa: s.cgpa != null ? Number(s.cgpa) : null,
+            gpa: s.gpa != null ? Number(s.gpa) : null,
+            grade: s.grade || (s.cgpa != null ? `${s.cgpa} CGPA` : '—'),
           }));
         }
         if (method === 'POST') {
@@ -247,7 +285,7 @@ export const API = {
       }
 
       // 7a. FACULTY BY ID (PATCH / DELETE) — orchestrated server-side.
-      const facultyIdMatch = path.match(/^faculty\/([^/]+)$/);
+      const facultyIdMatch = path.match(/^faculty\/([0-9a-fA-F-]{36})$/);
       if (facultyIdMatch) {
         const facultyUuid = facultyIdMatch[1];
         if (method === 'PATCH' || method === 'PUT') {
@@ -258,6 +296,178 @@ export const API = {
           await SupaFetch.request(`faculty?id=eq.${facultyUuid}`, 'DELETE');
           return null;
         }
+      }
+
+      // 7a-ii. FACULTY LEAVE REQUESTS
+      if (path === 'faculty/leave' || path === 'faculty/leaves' || path === 'leaves') {
+        const uid = params.get('user_id') || loggedInUser?.id;
+        if (method === 'GET') {
+          const rows = await SupaFetch.request(`faculty/leave?user_id=${uid}`);
+          return Array.isArray(rows) ? rows : [];
+        }
+        if (method === 'POST') {
+          return await SupaFetch.request(`faculty/leave?user_id=${uid}`, 'POST', body);
+        }
+      }
+
+      // 7a-iii. HOD LEAVE APPROVALS
+      if (path === 'hod/leaves') {
+        const uid = params.get('user_id') || loggedInUser?.id;
+        const rows = await SupaFetch.request(`hod/leaves?user_id=${uid}`);
+        return Array.isArray(rows) ? rows : [];
+      }
+      const hodActionMatch = path.match(/^hod\/leaves\/([^/]+)\/(approve|reject)$/);
+      if (hodActionMatch) {
+        const leaveId = hodActionMatch[1];
+        const action = hodActionMatch[2];
+        return await SupaFetch.request('hod/leaves/action', 'POST', { leave_id: leaveId, action, remarks: body?.remarks });
+      }
+
+      // 7a-iv. FACULTY LECTURE INTERCHANGE
+      if (path === 'faculty/interchange') {
+        const uid = params.get('user_id') || loggedInUser?.id;
+        if (method === 'GET') {
+          const rows = await SupaFetch.request(`faculty/interchange?user_id=${uid}`);
+          return Array.isArray(rows) ? rows : [];
+        }
+        if (method === 'POST') {
+          return await SupaFetch.request(`faculty/interchange?user_id=${uid}`, 'POST', body);
+        }
+      }
+      const interchangeAcceptMatch = path.match(/^faculty\/interchange\/([^/]+)\/accept$/);
+      if (interchangeAcceptMatch) {
+        const interchangeId = interchangeAcceptMatch[1];
+        return await SupaFetch.request('faculty/interchange/accept', 'POST', { interchange_id: interchangeId });
+      }
+      const interchangeRejectMatch = path.match(/^faculty\/interchange\/([^/]+)\/reject$/);
+      if (interchangeRejectMatch) {
+        const interchangeId = interchangeRejectMatch[1];
+        return await SupaFetch.request('faculty/interchange/reject', 'POST', { interchange_id: interchangeId, reason: body?.reason });
+      }
+
+      // 7a-v. NOTICES
+      if (path === 'notices' || path.startsWith('notices?') || path.startsWith('notices/')) {
+        if (method === 'GET') {
+          const uid = params.get('user_id') || loggedInUser?.id;
+          const dept = params.get('department_id');
+          let reqPath = 'notices';
+          const queryParts = [];
+          if (uid) queryParts.push(`user_id=${uid}`);
+          if (dept) queryParts.push(`department_id=${dept}`);
+          if (queryParts.length > 0) {
+            reqPath += `?${queryParts.join('&')}`;
+          }
+          const rows = await SupaFetch.request(reqPath);
+          return Array.isArray(rows) ? rows : [];
+        }
+      }
+
+      // 7a-vi. LIBRARY (books, loans, stats)
+      if (path === 'library/books' || path.startsWith('library/books?') || path.startsWith('library/books/')) {
+        if (method === 'GET') {
+          const q = params.get('q') || '';
+          const avail = params.get('available') || '';
+          const qParts = [];
+          if (q) qParts.push(`q=${encodeURIComponent(q)}`);
+          if (avail) qParts.push(`available=${encodeURIComponent(avail)}`);
+          const reqPath = qParts.length ? `library/books?${qParts.join('&')}` : 'library/books';
+          const rows = await SupaFetch.request(reqPath);
+          return Array.isArray(rows) ? rows : [];
+        }
+        return await SupaFetch.request(endpoint, method, body);
+      }
+
+      if (path === 'library/loans' || path.startsWith('library/loans?') || path.startsWith('library/loans/')) {
+        if (method === 'GET') {
+          const studentId = params.get('student_id') ? params.get('student_id').replace('eq.', '') : '';
+          const reqPath = studentId ? `library/loans?student_id=${encodeURIComponent(studentId)}` : 'library/loans';
+          const rows = await SupaFetch.request(reqPath);
+          return Array.isArray(rows) ? rows : [];
+        }
+        return await SupaFetch.request(endpoint, method, body);
+      }
+
+      if (path === 'library/stats' || path.startsWith('library/stats?')) {
+        return await SupaFetch.request('library/stats');
+      }
+
+      // 7a-vi-b. STUDY MATERIALS / CONTENT (from PostgreSQL content table)
+      if (path === 'content' || path.startsWith('content?') || path.startsWith('content/')) {
+        if (method === 'GET') {
+          const uid = params.get('user_id') || loggedInUser?.id;
+          const subjectId = params.get('subject_id') || '';
+          const qParts = [];
+          if (uid) qParts.push(`user_id=${encodeURIComponent(uid)}`);
+          if (subjectId) qParts.push(`subject_id=${encodeURIComponent(subjectId)}`);
+          const reqPath = qParts.length ? `content?${qParts.join('&')}` : 'content';
+          const rows = await SupaFetch.request(reqPath);
+          return Array.isArray(rows) ? rows : [];
+        }
+        return await SupaFetch.request(endpoint, method, body);
+      }
+
+      // 7a-vii. DOUBTS
+      if (path === 'doubts' || path.startsWith('doubts?') || path.startsWith('doubts/')) {
+        if (method === 'GET') {
+          const studentId = params.get('student_id') ? params.get('student_id').replace('eq.', '') : '';
+          const facultyId = params.get('assigned_faculty_id') ? params.get('assigned_faculty_id').replace('eq.', '') : '';
+          const uid = params.get('user_id') || loggedInUser?.id;
+
+          const qParts = [];
+          if (studentId) qParts.push(`student_id=${encodeURIComponent(studentId)}`);
+          else if (uid) qParts.push(`user_id=${encodeURIComponent(uid)}`);
+          if (facultyId) qParts.push(`assigned_faculty_id=${encodeURIComponent(facultyId)}`);
+
+          const reqPath = qParts.length ? `doubts?${qParts.join('&')}` : 'doubts';
+          const rows = await SupaFetch.request(reqPath);
+          return Array.isArray(rows) ? rows : [];
+        }
+        return await SupaFetch.request(endpoint, method, body);
+      }
+
+      // 7a-vii-b. FACULTY DOUBTS (assigned doubts)
+      if (path === 'faculty/doubts' || path.startsWith('faculty/doubts?')) {
+        if (method === 'GET') {
+          const uid = params.get('user_id') || loggedInUser?.id;
+          const reqPath = uid ? `faculty/doubts?user_id=${encodeURIComponent(uid)}` : 'faculty/doubts';
+          const rows = await SupaFetch.request(reqPath);
+          return Array.isArray(rows) ? rows : [];
+        }
+        return await SupaFetch.request(endpoint, method, body);
+      }
+      if (path === 'faculty/doubts/resolve') {
+        return await SupaFetch.request('faculty/doubts/resolve', 'POST', body);
+      }
+
+      // 7a-viii. COURSES & ENROLLMENTS
+      if (path === 'courses' || path.startsWith('courses?') || path.startsWith('courses/')) {
+        if (method === 'GET') {
+          const uid = params.get('user_id') || loggedInUser?.id;
+          const studentId = params.get('student_id') ? params.get('student_id').replace('eq.', '') : '';
+          const qParts = [];
+          if (studentId) qParts.push(`student_id=${encodeURIComponent(studentId)}`);
+          else if (uid) qParts.push(`user_id=${encodeURIComponent(uid)}`);
+
+          const reqPath = qParts.length ? `courses?${qParts.join('&')}` : 'courses';
+          const rows = await SupaFetch.request(reqPath);
+          return Array.isArray(rows) ? rows : [];
+        }
+        return await SupaFetch.request(endpoint, method, body);
+      }
+
+      if (path === 'enrollments' || path.startsWith('enrollments?') || path.startsWith('enrollments/')) {
+        if (method === 'GET') {
+          const uid = params.get('user_id') || loggedInUser?.id;
+          const studentId = params.get('student_id') ? params.get('student_id').replace('eq.', '') : '';
+          const qParts = [];
+          if (studentId) qParts.push(`student_id=${encodeURIComponent(studentId)}`);
+          else if (uid) qParts.push(`user_id=${encodeURIComponent(uid)}`);
+
+          const reqPath = qParts.length ? `enrollments?${qParts.join('&')}` : 'enrollments';
+          const rows = await SupaFetch.request(reqPath);
+          return Array.isArray(rows) ? rows : [];
+        }
+        return await SupaFetch.request(endpoint, method, body);
       }
 
       // 7b. DEPARTMENTS
@@ -1048,7 +1258,6 @@ export const API = {
       if (response.status === 204) return null;
       const text = await response.text();
       return text ? JSON.parse(text) : null;
-
     } catch (err) {
       console.error('Translation error:', err);
       throw err;

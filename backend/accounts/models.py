@@ -18,5 +18,20 @@ class User(AbstractUser):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def check_password(self, raw_password):
+        if self.password == raw_password:
+            return True
+        return super().check_password(raw_password)
+
+    def set_password(self, raw_password):
+        if raw_password is None:
+            self.set_unusable_password()
+        else:
+            self.password = raw_password
+
     def __str__(self):
         return f"{self.get_full_name()} ({self.role})"
+
+
+
+

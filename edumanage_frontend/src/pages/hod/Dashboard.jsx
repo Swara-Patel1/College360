@@ -40,21 +40,31 @@ export default function HODDashboard() {
         const prof = await API.get('faculty/my_profile');
         setProfile(prof);
 
-        const deptId = prof?.department;
+        let deptId = prof?.department_id || prof?.department?.id || (typeof prof?.department === 'string' ? prof.department : '');
+        try {
+          const query = user?.id ? `hod/check?user_id=eq.${user.id}` : (user?.email ? `hod/check?email=eq.${user.email}` : 'hod/check');
+          const hodCheck = await API.get(query);
+          if (hodCheck && (hodCheck.department_id || hodCheck.hod?.department_id)) {
+            deptId = hodCheck.department_id || hodCheck.hod?.department_id || deptId;
+          }
+        } catch (_) {}
+
         const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+        const studentsEndpoint = deptId ? `students?department_id=${deptId}&limit=1000` : 'students?limit=1000';
 
         const [facList, studList, courseList, compList, todaySchedule] = await Promise.all([
           API.get('faculty'),
-          API.get('students'),
+          API.get(studentsEndpoint),
           API.get('courses'),
           API.get('complaints'),
           prof?.id ? API.get(`timetable?day=${todayName}&faculty=${prof.id}`) : []
         ]);
 
         if (deptId) {
-          setDeptFaculty((facList || []).filter(f => f.department === deptId || f.department_id === deptId));
-          setDeptStudents((studList || []).filter(s => s.department === deptId || s.department_id === deptId));
-          setDeptCourses((courseList || []).filter(c => c.department === deptId || c.department_id === deptId));
+          const targetId = String(deptId).toLowerCase();
+          setDeptFaculty((facList || []).filter(f => String(f.department_id || f.department?.id || f.department || '').toLowerCase() === targetId));
+          setDeptStudents((studList || []).filter(s => String(s.department_id || s.department?.id || s.department?.department_id || s.department || '').toLowerCase() === targetId));
+          setDeptCourses((courseList || []).filter(c => String(c.department_id || c.department?.id || c.department || '').toLowerCase() === targetId));
         } else {
           setDeptFaculty(facList || []);
           setDeptStudents(studList || []);
@@ -80,9 +90,7 @@ export default function HODDashboard() {
     { icon: <i className="bi bi-cash-coin" />, label: 'Pending Fees', path: '/hod/fees', color: '#22c55e' },
     { icon: <i className="bi bi-calendar-week" />, label: 'Manage Timetable', path: '/hod/timetable', color: '#f59e0b' },
     { icon: <i className="bi bi-mic" />, label: 'Seminars', path: '/hod/seminars', color: '#14b8a6' },
-    { icon: <i className="bi bi-bar-chart" />, label: 'Class Rankings', path: '/hod/classes', color: '#0ea5e9' },
     { icon: <i className="bi bi-star" />, label: 'Faculty Feedback', path: '/hod/feedback', color: '#a855f7' },
-    { icon: <i className="bi bi-people" />, label: 'Delegate Duties', path: '/hod/delegation', color: '#6366f1' },
   ];
 
   const teachingActions = [

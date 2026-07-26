@@ -37,6 +37,8 @@ class Fee(models.Model):
             models.Index(fields=['due_date'], name='idx_fee_due_date'),
         ]
 
+
+
     def __str__(self):
         return f"{self.student} - {self.fee_type} - {self.status}"
 

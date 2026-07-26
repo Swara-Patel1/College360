@@ -5,7 +5,7 @@ import { useNotifStore } from '../store/useNotifStore.js';
 import { API, Utils } from '../api/client.js';
 
 export default function Header({ title = 'College360', showSearch = false, onSearchChange = null }) {
-  const { user, logout } = useAuthStore();
+  const { user, logout, studentProfile } = useAuthStore();
   const navigate = useNavigate();
 
   const notifications = useNotifStore((state) => state.notifications);
@@ -42,6 +42,15 @@ export default function Header({ title = 'College360', showSearch = false, onSea
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Auto-load studentProfile if logged in as student but profile not yet in store
+  const { refreshStudentProfile } = useAuthStore();
+  useEffect(() => {
+    const role = (user?.role || '').toLowerCase();
+    if (role === 'student' && !studentProfile) {
+      refreshStudentProfile();
+    }
+  }, [user, studentProfile, refreshStudentProfile]);
 
   const handleThemeChange = (theme) => {
     setCurrentTheme(theme);
@@ -122,11 +131,13 @@ export default function Header({ title = 'College360', showSearch = false, onSea
 
   let detailsSubtitle = currentDateStr;
   if (role === 'student') {
-    const code = user?.enrollment_no || user?.student_code || user?.username || '22IT016';
-    const dept = user?.department || user?.branch || 'Information Technology';
-    const yr = user?.year ? `Year ${user.year}` : 'Year 4';
-    const sem = user?.semester ? `Semester ${user.semester}` : 'Semester 8';
-    detailsSubtitle = `${code} · ${dept} · ${yr} · ${sem}`;
+    const prof = studentProfile || JSON.parse(localStorage.getItem('student_profile') || 'null');
+    const code = prof?.enrollment_no || user?.enrollment_no || user?.username || '';
+    const dept = prof?.department_name || prof?.department?.name || '';
+    const semNum = prof?.semester || prof?.current_semester?.number || '';
+    const yr = prof?.year_of_study || (semNum ? Math.ceil(Number(semNum) / 2) : '');
+    const parts = [user?.email, dept, yr ? `Year ${yr}` : null, semNum ? `Semester ${semNum}` : null].filter(Boolean);
+    detailsSubtitle = parts.join(' · ');
   } else if (role === 'faculty' || role === 'hod') {
     const desig = user?.designation || (role === 'hod' ? 'Head of Department' : 'Faculty');
     const dept = user?.department || 'Department';

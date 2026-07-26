@@ -164,7 +164,7 @@ export default function LibraryManagement() {
             {filteredBooks.length ? (
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">
-                  <thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Barcode / ISBN</th><th>Shelf</th><th>Copies</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Barcode / ISBN</th><th>Availability</th><th>Actions</th></tr></thead>
                   <tbody>
                     {filteredBooks.map(b => (
                       <tr key={b.id}>
@@ -172,14 +172,13 @@ export default function LibraryManagement() {
                         <td>{b.author || '—'}</td>
                         <td>{b.category || '—'}</td>
                         <td style={{ fontVariantNumeric: 'tabular-nums', fontSize: '0.8rem' }}>{b.barcode}<br /><span style={{ color: 'var(--text-muted)' }}>{b.isbn || '—'}</span></td>
-                        <td>{b.shelf || '—'}</td>
                         <td>
-                          <span className={`badge ${b.available_copies > 0 ? 'badge-success' : 'badge-danger'}`}>
-                            {b.available_copies}/{b.total_copies}
+                          <span className={`badge ${b.is_available ? 'badge-success' : 'badge-danger'}`}>
+                            {b.is_available ? 'Available' : 'Not Available'}
                           </span>
                         </td>
                         <td style={{ display: 'flex', gap: '6px' }}>
-                          <button className="btn btn-primary btn-sm" disabled={b.available_copies < 1} onClick={() => openIssue(b)}><i className="bi bi-box-arrow-up"></i> Issue</button>
+                          <button className="btn btn-primary btn-sm" disabled={!b.is_available} onClick={() => openIssue(b)}><i className="bi bi-box-arrow-up"></i> Issue</button>
                           <button className="btn btn-ghost btn-sm" onClick={() => openEdit(b)}><i className="bi bi-pencil"></i></button>
                           <button className="btn btn-ghost btn-sm" style={{ color: 'var(--accent, #FF6B6B)' }} onClick={() => removeBook(b)}><i className="bi bi-trash"></i></button>
                         </td>

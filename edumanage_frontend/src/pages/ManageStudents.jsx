@@ -42,8 +42,46 @@ export default function ManageStudents() {
   const loadData = async () => {
     try {
       setLoading(true);
+
+      let filterDeptId = user?.department_id || user?.department?.id || user?.department?.department_id || '';
+      let filterDeptName = user?.department_name || user?.department?.name || '';
+
+      if (user?.role !== 'admin') {
+        try {
+          const hodInfo = await API.get('hod/check');
+          if (hodInfo && (hodInfo.isHod || hodInfo.hod)) {
+            filterDeptId = hodInfo.hod?.department_id || hodInfo.department_id || filterDeptId;
+            filterDeptName = hodInfo.hod?.dept_name || hodInfo.dept_name || filterDeptName;
+          }
+        } catch (_) {}
+
+        if (!filterDeptId && user?.id) {
+          try {
+            const hodInfo = await API.get(`hod/check?user_id=eq.${user.id}`);
+            if (hodInfo && (hodInfo.isHod || hodInfo.hod)) {
+              filterDeptId = hodInfo.hod?.department_id || hodInfo.department_id || filterDeptId;
+              filterDeptName = hodInfo.hod?.dept_name || hodInfo.dept_name || filterDeptName;
+            }
+          } catch (_) {}
+        }
+
+        if (!filterDeptId) {
+          try {
+            const prof = await API.get('faculty/my_profile');
+            if (prof) {
+              filterDeptId = prof.department_id || prof.department?.id || (typeof prof.department === 'string' ? prof.department : '') || filterDeptId;
+              filterDeptName = prof.department_name || prof.department?.name || filterDeptName;
+            }
+          } catch (_) {}
+        }
+      }
+
+      const studentsEndpoint = (user?.role !== 'admin' && filterDeptId)
+        ? `students?department_id=${filterDeptId}&limit=1000`
+        : 'students?limit=1000';
+
       const [studentsData, deptsData, semsData] = await Promise.all([
-        API.get('students'),
+        API.get(studentsEndpoint),
         API.get('departments'),
         API.get('semesters')
       ]);
@@ -52,26 +90,26 @@ export default function ManageStudents() {
       const deptsList = Array.isArray(deptsData) ? deptsData : [];
       const semsList = Array.isArray(semsData) ? semsData : [];
 
-      if (user?.role === 'faculty') {
-        const prof = await API.get('faculty/my_profile');
-        if (prof) {
-          const allCourses = await API.get('courses');
-          const myCourses = (allCourses || []).filter(c => c.faculty_id === prof.id);
-          
-          const allEnrolled = [];
-          for (const course of myCourses) {
-            const enrolls = await API.get(`enrollments?course=${course.subject_id}`);
-            allEnrolled.push(...(enrolls || []));
-          }
-          
-          const studentIds = [...new Set(allEnrolled.map(e => e.student))];
-          allowedStudents = allowedStudents.filter(s => studentIds.includes(s.id));
-        }
+      if (user?.role !== 'admin' && (filterDeptId || filterDeptName)) {
+        const targetId = String(filterDeptId || '').toLowerCase();
+        const targetName = String(filterDeptName || '').toLowerCase();
+
+        allowedStudents = allowedStudents.filter(s => {
+          const sDeptId = String(s.department_id || s.department?.department_id || s.department?.id || s.department || '').toLowerCase();
+          const sDeptName = String(s.department_name || s.department?.name || s.dept_name || '').toLowerCase();
+
+          if (targetId && sDeptId && sDeptId === targetId) return true;
+          if (targetName && sDeptName && sDeptName === targetName) return true;
+          return false;
+        });
       }
 
       setStudents(allowedStudents);
       setDepartments(deptsList);
       setSemesters(semsList);
+      if (user?.role !== 'admin' && filterDeptId) {
+        setSelectedDept(filterDeptId);
+      }
     } catch (e) {
       console.error('Failed to load students data:', e);
       Toast.error('Failed to load students data.');
@@ -204,7 +242,7 @@ export default function ManageStudents() {
     const query = searchQuery.toLowerCase();
 
     const matchesSearch = name.includes(query) || email.includes(query) || roll.includes(query);
-    const matchesDept = selectedDept ? s.department_id === selectedDept : true;
+    const matchesDept = selectedDept ? (String(s.department_id || s.department?.department_id || s.department?.id || s.department || '').toLowerCase() === String(selectedDept).toLowerCase()) : true;
     const matchesSem = selectedSem ? s.current_semester_id === selectedSem : true;
     const matchesStatus = selectedStatus ? s.status === selectedStatus : true;
 
@@ -286,12 +324,14 @@ export default function ManageStudents() {
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
-          <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
-            <option value="">All Departments</option>
-            {departments.map(d => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+          {isAdmin && (
+            <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
+              <option value="">All Departments</option>
+              {departments.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          )}
           <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedSem} onChange={e => setSelectedSem(e.target.value)}>
             <option value="">All Semesters</option>
             {semesters.map(s => (
@@ -500,64 +540,223 @@ export default function ManageStudents() {
 
       {/* ======================== VIEW DETAILS MODAL ======================== */}
       {isViewOpen && viewingStudent && (
-        <Modal onClose={() => setIsViewOpen(false)} title={<><i className="bi bi-search me-2"></i>Student Details</>}>
-          <div className="student-details-view" style={{ display: 'grid', gap: '20px', padding: '10px 0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', borderBottom: '1px solid var(--border)', paddingBottom: '15px' }}>
-              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(108,99,255,0.15)', color: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 700 }}>
-                {`${(viewingStudent.first_name || '')[0] || ''}${(viewingStudent.last_name || '')[0] || ''}`.toUpperCase()}
-              </div>
-              <div>
-                <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>{viewingStudent.first_name} {viewingStudent.last_name}</h3>
-                <span className={`badge badge-${viewingStudent.status === 'active' ? 'success' : viewingStudent.status === 'graduated' ? 'primary' : 'danger'}`} style={{ marginTop: '5px', display: 'inline-block' }}>
-                  {viewingStudent.status?.toUpperCase()}
-                </span>
-              </div>
-            </div>
+        <Modal onClose={() => setIsViewOpen(false)} title={<><i className="bi bi-person-badge me-2"></i>Student Profile</>}>
+          <div style={{ padding: '4px 0' }}>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
-              <div>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Enrollment Number</span>
-                <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.enrollment_no || viewingStudent.student_id || '—'}</strong>
+            {/* ── Header: Avatar + Name + Badge ── */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '16px',
+              padding: '16px 20px', marginBottom: '20px',
+              background: 'linear-gradient(135deg, rgba(108,99,255,0.12) 0%, rgba(108,99,255,0.04) 100%)',
+              borderRadius: '12px', border: '1px solid rgba(108,99,255,0.2)',
+            }}>
+              <div style={{
+                width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0,
+                background: 'linear-gradient(135deg, #6C63FF 0%, #a78bfa 100%)',
+                color: '#fff', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontSize: '1.5rem', fontWeight: 800,
+                boxShadow: '0 4px 14px rgba(108,99,255,0.4)',
+              }}>
+                {`${(viewingStudent.first_name || '')[0] || ''}${(viewingStudent.last_name || '')[0] || ''}`.toUpperCase() || '?'}
               </div>
-              <div>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Roll Number</span>
-                <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.roll_number || '—'}</strong>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Email Address</span>
-                <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.email || '—'}</strong>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Department</span>
-                <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.department_name || '—'}</strong>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Current Semester</span>
-                <strong style={{ color: 'var(--text-primary)' }}>Semester {viewingStudent.semester || '—'}</strong>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Date of Birth</span>
-                <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.date_of_birth ? new Date(viewingStudent.date_of_birth).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</strong>
-              </div>
-            </div>
-
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '15px', marginTop: '10px' }}>
-              <h4 style={{ margin: '0 0 10px 0', color: 'var(--primary-light)' }}>Parent/Guardian Details</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
-                <div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Parent Email</span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.parent_email || '—'}</strong>
-                </div>
-                <div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Parent Phone</span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{viewingStudent.parent_phone || '—'}</strong>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ margin: '0 0 4px', fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {viewingStudent.first_name} {viewingStudent.last_name}
+                </h3>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span className={`badge badge-${viewingStudent.status === 'active' ? 'success' : viewingStudent.status === 'graduated' ? 'primary' : 'danger'}`}>
+                    {(viewingStudent.status || 'active').toUpperCase()}
+                  </span>
+                  {viewingStudent.department_name && (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      <i className="bi bi-building" style={{ marginRight: '4px' }}></i>
+                      {viewingStudent.department_name}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '15px' }}>
-              <button className="btn btn-primary" onClick={() => setIsViewOpen(false)}>Close</button>
+            {/* ── Two-column body ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+
+              {/* ────── LEFT: Student Details ────── */}
+              <div style={{
+                background: 'var(--surface)', borderRadius: '12px',
+                border: '1px solid var(--border)', overflow: 'hidden',
+              }}>
+                <div style={{
+                  padding: '10px 16px', background: 'rgba(108,99,255,0.08)',
+                  borderBottom: '1px solid var(--border)',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                }}>
+                  <i className="bi bi-person-vcard" style={{ color: '#6C63FF', fontSize: '1rem' }}></i>
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>Student Information</span>
+                </div>
+                <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+                  {/* Enrollment */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Enrollment No.</div>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#6C63FF', fontFamily: 'monospace' }}>
+                      {viewingStudent.enrollment_no || viewingStudent.student_id || '—'}
+                    </div>
+                  </div>
+
+                  {/* Roll Number */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Roll Number</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {viewingStudent.roll_number || '—'}
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</div>
+                    <div style={{ fontWeight: 500, fontSize: '0.83rem', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
+                      {viewingStudent.email || '—'}
+                    </div>
+                  </div>
+
+                  {/* Semester */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Semester</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {viewingStudent.semester ? `Semester ${viewingStudent.semester}` : '—'}
+                    </div>
+                  </div>
+
+                  {/* DOB */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date of Birth</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {viewingStudent.date_of_birth
+                        ? new Date(viewingStudent.date_of_birth).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+                        : '—'}
+                    </div>
+                  </div>
+
+                  {/* Attendance */}
+                  <div style={{ paddingTop: '6px', borderTop: '1px dashed var(--border)' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attendance</div>
+                    {viewingStudent.attendance_percentage != null ? (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: viewingStudent.attendance_percentage >= 75 ? '#22c55e' : '#f59e0b' }}>
+                            {viewingStudent.attendance_percentage}%
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            {viewingStudent.attendance_percentage >= 75 ? 'Good' : 'Low'}
+                          </span>
+                        </div>
+                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%', borderRadius: '3px',
+                            width: `${Math.min(viewingStudent.attendance_percentage, 100)}%`,
+                            background: viewingStudent.attendance_percentage >= 75
+                              ? 'linear-gradient(90deg, #22c55e, #4ade80)'
+                              : 'linear-gradient(90deg, #f59e0b, #fbbf24)',
+                          }} />
+                        </div>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>—</span>
+                    )}
+                  </div>
+
+                  {/* CGPA / Grade */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CGPA / Grade</div>
+                    <div style={{ fontWeight: 700, fontSize: '1rem', color: '#a78bfa' }}>
+                      {viewingStudent.cgpa || viewingStudent.gpa || viewingStudent.grade || '—'}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* ────── RIGHT: Parent Details ────── */}
+              <div style={{
+                background: 'var(--surface)', borderRadius: '12px',
+                border: '1px solid var(--border)', overflow: 'hidden',
+              }}>
+                <div style={{
+                  padding: '10px 16px', background: 'rgba(34,197,94,0.08)',
+                  borderBottom: '1px solid var(--border)',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                }}>
+                  <i className="bi bi-people-fill" style={{ color: '#22c55e', fontSize: '1rem' }}></i>
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>Parent / Guardian</span>
+                </div>
+                <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+                  {/* Guardian Name */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Guardian Name</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <i className="bi bi-person" style={{ color: '#22c55e' }}></i>
+                      {viewingStudent.guardian_name || viewingStudent.parent_name || '—'}
+                    </div>
+                  </div>
+
+                  {/* Parent Phone */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Phone Number</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <i className="bi bi-telephone-fill" style={{ color: '#22c55e', fontSize: '0.8rem' }}></i>
+                      {viewingStudent.parent_phone || viewingStudent.guardian_phone || '—'}
+                    </div>
+                  </div>
+
+                  {/* Parent Email */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Address</div>
+                    <div style={{ fontWeight: 500, fontSize: '0.83rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: '6px', wordBreak: 'break-all' }}>
+                      <i className="bi bi-envelope-fill" style={{ color: '#22c55e', fontSize: '0.8rem', marginTop: '2px', flexShrink: 0 }}></i>
+                      {viewingStudent.parent_email || '—'}
+                    </div>
+                  </div>
+
+                  {/* Home Address */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Home Address</div>
+                    <div style={{ fontWeight: 500, fontSize: '0.83rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: '6px', lineHeight: 1.5 }}>
+                      <i className="bi bi-geo-alt-fill" style={{ color: '#22c55e', fontSize: '0.8rem', marginTop: '2px', flexShrink: 0 }}></i>
+                      {viewingStudent.address || viewingStudent.home_address || '—'}
+                    </div>
+                  </div>
+
+                  {/* Emergency Contact separator */}
+                  <div style={{ paddingTop: '6px', borderTop: '1px dashed var(--border)' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Relation</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {viewingStudent.guardian_relation || 'Parent'}
+                    </div>
+                  </div>
+
+                  {/* Admission Date */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Admission Date</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {viewingStudent.admission_date
+                        ? new Date(viewingStudent.admission_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+                        : '—'}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
             </div>
+
+            {/* ── Footer Button ── */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <button className="btn btn-primary" onClick={() => setIsViewOpen(false)}>
+                <i className="bi bi-x-circle me-1"></i>Close
+              </button>
+            </div>
+
           </div>
         </Modal>
       )}

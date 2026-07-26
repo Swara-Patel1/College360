@@ -40,10 +40,10 @@ export default function FacultyLeaves() {
   const loadLeaves = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await API.get('faculty/leave');
+      const data = await API.get(`faculty/leave?user_id=${user?.id}`);
       setLeaves(Array.isArray(data) ? data : []);
     } catch { setLeaves([]); } finally { setLoading(false); }
-  }, []);
+  }, [user]);
 
   useEffect(() => { if (user) loadLeaves(); }, [user, loadLeaves]);
 
@@ -55,13 +55,16 @@ export default function FacultyLeaves() {
     if (!form.reason.trim()) return setFormError('Please enter a reason for your leave.');
     setSubmitting(true);
     try {
-      await API.post('faculty/leave', form);
+      const res = await API.post(`faculty/leave?user_id=${user?.id}`, form);
+      if (res && (res.error || res.message) && !res.leave_id && !res.id) {
+        throw new Error(res.error || res.message || 'Failed to submit leave request.');
+      }
       showToast('Leave request submitted! Awaiting HOD approval.');
       setShowForm(false);
       setForm({ leaveType: 'casual', fromDate: '', toDate: '', reason: '' });
       await loadLeaves();
     } catch (e) {
-      setFormError(e?.message || e?.detail || 'Failed to submit. Please try again.');
+      setFormError(e?.message || e?.detail || e?.error || 'Failed to submit. Please try again.');
     } finally { setSubmitting(false); }
   };
 

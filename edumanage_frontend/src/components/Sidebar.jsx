@@ -19,7 +19,7 @@ export default function Sidebar() {
       { type: 'link', label: 'Backlogs / KT', icon: 'bi-graph-down-arrow', to: '/student/backlogs' },
       { type: 'link', label: 'Timetable', icon: 'bi-calendar3', to: '/student/timetable' },
       { type: 'link', label: 'Exam Schedule', icon: 'bi-calendar-week', to: '/student/exams' },
-      { type: 'link', label: 'Courses', icon: 'bi-book', to: '/student/courses' },
+      { type: 'link', label: 'Subjects', icon: 'bi-book', to: '/student/courses' },
       { type: 'link', label: 'Study Materials', icon: 'bi-journal-bookmark', to: '/student/content' },
       { type: 'link', label: 'Library', icon: 'bi-book-half', to: '/student/library' },
       { type: 'link', label: 'My Doubts Q&A', icon: 'bi-question-circle', to: '/student/doubts' },
@@ -42,6 +42,7 @@ export default function Sidebar() {
       { type: 'link', label: 'Enter Grades', icon: 'bi-journal-text', to: '/faculty/grades' },
       { type: 'link', label: 'My Timetable', icon: 'bi-calendar3', to: '/faculty/timetable' },
       { type: 'link', label: 'Exam Schedule', icon: 'bi-calendar-week', to: '/faculty/exams' },
+      { type: 'link', label: 'Solve Doubts', icon: 'bi-patch-question-fill', to: '/faculty/doubts' },
       { type: 'section', label: 'Leave & Schedule' },
       { type: 'link', label: 'Apply Leave', icon: 'bi-airplane', to: '/faculty/leaves' },
       { type: 'link', label: 'Lecture Interchange', icon: 'bi-arrow-repeat', to: '/faculty/interchange' }
@@ -56,23 +57,13 @@ export default function Sidebar() {
         { type: 'link', label: 'Pending Fees', icon: 'bi-cash-coin', to: '/hod/fees' },
         { type: 'link', label: 'Manage Timetable', icon: 'bi-calendar-week', to: '/hod/timetable' },
         { type: 'link', label: 'Seminars', icon: 'bi-mic', to: '/hod/seminars' },
-        { type: 'link', label: 'Class Rankings', icon: 'bi-bar-chart', to: '/hod/classes' },
-        { type: 'link', label: 'Faculty Feedback', icon: 'bi-star', to: '/hod/feedback' },
-        { type: 'link', label: 'Delegate Duties', icon: 'bi-people', to: '/hod/delegation' }
+        { type: 'link', label: 'Faculty Feedback', icon: 'bi-star', to: '/hod/feedback' }
       );
-    }
-
-    const scopes = delegatedAccess || [];
-    if (role === 'faculty' && scopes.length) {
-      navItems.push({ type: 'section', label: 'Acting HOD (Delegated)' });
-      if (scopes.includes('leaves')) navItems.push({ type: 'link', label: 'Leave Requests', icon: 'bi-clipboard-check', to: '/hod/leaves' });
-      if (scopes.includes('timetable')) navItems.push({ type: 'link', label: 'Manage Timetable', icon: 'bi-calendar-week', to: '/hod/timetable' });
     }
 
     navItems.push(
       { type: 'section', label: 'Information' },
       { type: 'link', label: 'View Students', icon: 'bi-mortarboard', to: '/faculty/students' },
-      { type: 'link', label: 'Courses', icon: 'bi-book', to: '/faculty/courses' },
       { type: 'link', label: 'Notices', icon: 'bi-broadcast', to: '/faculty/notices' }
     );
   } else if (role === 'parent') {
@@ -95,7 +86,7 @@ export default function Sidebar() {
       { type: 'link', label: 'Students', icon: 'bi-mortarboard', to: '/admin/students' },
       { type: 'link', label: 'Faculty', icon: 'bi-person-video3', to: '/admin/faculty' },
       { type: 'link', label: 'HODs', icon: 'bi-person-badge', to: '/admin/hod' },
-      { type: 'link', label: 'Courses', icon: 'bi-book', to: '/admin/courses' },
+      { type: 'link', label: 'Subjects', icon: 'bi-book', to: '/admin/courses' },
       { type: 'link', label: 'Departments', icon: 'bi-building', to: '/admin/departments' },
       { type: 'link', label: 'Student Records', icon: 'bi-trophy', to: '/admin/student-records' },
       { type: 'section', label: 'Academic' },

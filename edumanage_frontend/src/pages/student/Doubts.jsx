@@ -169,7 +169,7 @@ export default function Doubts() {
           </div>
           <div>
             <h1>Doubts Q&A</h1>
-            <p>Get an <strong>instant AI answer</strong> from your course syllabus — escalate to faculty experts if you need more.</p>
+            <p>Ask conceptual doubts and get responses from your faculty experts.</p>
           </div>
         </div>
         <div className="page-header-right">
@@ -183,11 +183,6 @@ export default function Doubts() {
           <div className="stat-icon"><i className="bi bi-question-circle"></i></div>
           <div className="stat-value" id="st-total">{totalCount}</div>
           <div className="stat-label">Total Doubts</div>
-        </div>
-        <div className="stat-card warning">
-          <div className="stat-icon"><i className="bi bi-robot"></i></div>
-          <div className="stat-value" id="st-ai">{aiCount}</div>
-          <div className="stat-label">AI Answered</div>
         </div>
         <div className="stat-card success">
           <div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div>
@@ -211,12 +206,6 @@ export default function Doubts() {
               onClick={() => setSelectedFilter('all')}
             >
               All
-            </button>
-            <button
-              className={`btn ${selectedFilter === 'ai_answered' ? 'btn-primary' : 'btn-ghost'} btn-sm`}
-              onClick={() => setSelectedFilter('ai_answered')}
-            >
-              <i className="bi bi-robot"></i> AI Answered
             </button>
             <button
               className={`btn ${selectedFilter === 'open' ? 'btn-primary' : 'btn-ghost'} btn-sm`}
@@ -274,33 +263,10 @@ export default function Doubts() {
                   {d.resolved_at && <span><i className="bi bi-check-circle-fill"></i> Resolved {new Date(d.resolved_at).toLocaleDateString('en-IN')}</span>}
                 </div>
 
-                {/* AI syllabus-assistant answer — instant first response, pending student's call */}
-                {d.status === 'ai_answered' && d.ai_answer && (
-                  <div style={{ background: 'rgba(108,99,255,0.05)', border: '1px solid rgba(108,99,255,0.25)', borderRadius: '10px', padding: '14px 16px', marginTop: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                      <h4 style={{ color: 'var(--primary-light, #6C63FF)', margin: 0, fontSize: '0.85rem', fontWeight: 700 }}><i className="bi bi-robot"></i> AI Syllabus Assistant</h4>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: d.ai_confidence >= 60 ? '#00D4AA' : '#FF9F43', background: d.ai_confidence >= 60 ? 'rgba(0,212,170,0.12)' : 'rgba(255,159,67,0.12)', padding: '2px 8px', borderRadius: '10px' }}>
-                        {d.ai_confidence}% confidence
-                      </span>
-                    </div>
-                    <div>{renderRich(d.ai_answer)}</div>
-                    {d.ai_sources && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' }}><i className="bi bi-book"></i> Sources: {d.ai_sources}</div>
-                    )}
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
-                      <button className="btn btn-success btn-sm" disabled={busyId === d.id} onClick={() => handleAcceptAI(d)}><i className="bi bi-check-circle-fill"></i> This solved it</button>
-                      <button className="btn btn-ghost btn-sm" disabled={busyId === d.id} onClick={() => handleEscalate(d)}><i className="bi bi-person-video3"></i> Ask a faculty member</button>
-                    </div>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-                      <i className="bi bi-lightbulb"></i> AI-generated from your course syllabus &amp; materials. Not sure? Escalate to a faculty expert.
-                    </div>
-                  </div>
-                )}
-
                 {d.resolution && (
                   <div className="resolution-box" style={{ background: 'rgba(0,212,170,0.04)', borderLeft: '3px solid #00D4AA', padding: '14px', borderRadius: '0 8px 8px 0', marginTop: '12px' }}>
                     <h4 style={{ color: '#00D4AA', margin: '0 0 6px 0', fontSize: '0.85rem', fontWeight: 700 }}>
-                      {d.ai_helpful === true && !d.assigned_faculty_name ? <><i className="bi bi-robot me-1"></i>Resolved by AI Assistant:</> : <><i className="bi bi-book me-1"></i>Faculty Answer:</>}
+                      <i className="bi bi-person-video3 me-1"></i>Faculty Answer:
                     </h4>
                     <div>{renderRich(d.resolution)}</div>
                   </div>

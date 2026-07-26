@@ -32,23 +32,21 @@ import ParentAttendance from '../pages/parent/Attendance.jsx';
 import ParentGrades from '../pages/parent/Grades.jsx';
 import ParentFees from '../pages/parent/Fees.jsx';
 
-
 import FacultyDashboard from '../pages/faculty/Dashboard.jsx';
 import AttendanceMarking from '../pages/faculty/Attendance.jsx';
 import GradesEntry from '../pages/faculty/Grades.jsx';
 import FacultyTimetable from '../pages/faculty/Timetable.jsx';
 import FacultyLeaves from '../pages/faculty/Leaves.jsx';
 import FacultyInterchange from '../pages/faculty/Interchange.jsx';
+import FacultyDoubts from '../pages/faculty/Doubts.jsx';
 import ManageStudents from '../pages/ManageStudents.jsx';
 import HODDashboard from '../pages/hod/Dashboard.jsx';
 import HODComplaints from '../pages/hod/Complaints.jsx';
 import HODPerformance from '../pages/hod/Performance.jsx';
 import HODFees from '../pages/hod/Fees.jsx';
 import HODSeminars from '../pages/hod/Seminars.jsx';
-import HODClasses from '../pages/hod/Classes.jsx';
 import HODLeaves from '../pages/hod/Leaves.jsx';
 import TimetableManagement from '../pages/hod/TimetableManagement.jsx';
-import HODDelegation from '../pages/hod/Delegation.jsx';
 
 import AdminDashboard from '../pages/admin/AdminDashboard.jsx';
 import ManageFaculty from '../pages/ManageFaculty.jsx';
@@ -58,13 +56,11 @@ import ManageHOD from '../pages/ManageHOD.jsx';
 import FeeManagement from '../pages/FeeManagement.jsx';
 
 const MainLayout = ({ children, title }) => {
-  const { isLoggedIn, user, refreshDelegatedAccess } = useAuthStore();
+  const { isLoggedIn, user } = useAuthStore();
 
   useEffect(() => {
     if (isLoggedIn) {
       initSocket();
-      const role = user?.role?.toLowerCase();
-      if (role === 'faculty' || role === 'hod') refreshDelegatedAccess();
     }
     return () => {
       disconnectSocket();
@@ -87,7 +83,6 @@ const MainLayout = ({ children, title }) => {
 export const AppRoutes = () => {
   const { user, isLoggedIn } = useAuthStore();
 
-  // Root redirect logic based on login status and role
   const getRootRedirect = () => {
     if (!isLoggedIn) return '/login';
     const role = user?.role?.toLowerCase();
@@ -138,6 +133,7 @@ export const AppRoutes = () => {
         <Route path="/faculty/timetable" element={<MainLayout><FacultyTimetable /></MainLayout>} />
         <Route path="/faculty/leaves" element={<MainLayout><FacultyLeaves /></MainLayout>} />
         <Route path="/faculty/interchange" element={<MainLayout><FacultyInterchange /></MainLayout>} />
+        <Route path="/faculty/doubts" element={<MainLayout><FacultyDoubts /></MainLayout>} />
         <Route path="/faculty/students" element={<MainLayout><ManageStudents /></MainLayout>} />
         <Route path="/faculty/courses" element={<MainLayout><Courses /></MainLayout>} />
         <Route path="/faculty/notices" element={<MainLayout><Notices /></MainLayout>} />
@@ -150,20 +146,12 @@ export const AppRoutes = () => {
         <Route path="/hod/performance" element={<MainLayout><HODPerformance /></MainLayout>} />
         <Route path="/hod/fees" element={<MainLayout><HODFees /></MainLayout>} />
         <Route path="/hod/seminars" element={<MainLayout><HODSeminars /></MainLayout>} />
-        <Route path="/hod/classes" element={<MainLayout><HODClasses /></MainLayout>} />
         <Route path="/hod/feedback" element={<MainLayout><HODFeedback /></MainLayout>} />
-        <Route path="/hod/delegation" element={<MainLayout><HODDelegation /></MainLayout>} />
-      </Route>
-
-      {/* Delegatable HOD duties — reachable by the HOD or a deputy with the matching delegation */}
-      <Route element={<ProtectedRoute allowedRoles={['hod', 'faculty']} delegationScope="leaves" />}>
         <Route path="/hod/leaves" element={<MainLayout><HODLeaves /></MainLayout>} />
-      </Route>
-      <Route element={<ProtectedRoute allowedRoles={['hod', 'faculty']} delegationScope="timetable" />}>
         <Route path="/hod/timetable" element={<MainLayout><TimetableManagement /></MainLayout>} />
       </Route>
 
-      {/* Parent Protected Routes (read-only) */}
+      {/* Parent Protected Routes */}
       <Route element={<ProtectedRoute allowedRoles={['parent']} />}>
         <Route path="/dashboard/parent" element={<MainLayout><ParentDashboard /></MainLayout>} />
         <Route path="/parent/attendance" element={<MainLayout><ParentAttendance /></MainLayout>} />
@@ -191,7 +179,7 @@ export const AppRoutes = () => {
         <Route path="/admin/student-records" element={<MainLayout><StudentRecords /></MainLayout>} />
       </Route>
 
-      {/* Fallback Redirect */}
+      {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

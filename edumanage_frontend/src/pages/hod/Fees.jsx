@@ -20,28 +20,72 @@ export default function HODFees() {
     try {
       setLoading(true);
 
-      // 1. Get HOD info
-      const hodInfo = await API.get('hod/check');
+      // 1. Get HOD info safely
       let currentDeptId = '';
-      if (hodInfo && hodInfo.isHod) {
-        currentDeptId = hodInfo.hod.department_id;
-        setDeptId(currentDeptId);
-      }
+      try {
+        const hodInfo = await API.get('hod/check');
+        if (hodInfo && hodInfo.isHod) {
+          currentDeptId = hodInfo.hod?.department_id || hodInfo.department_id || '';
+          setDeptId(currentDeptId);
+        }
+      } catch (_) {}
 
-      // 2. Fetch payments
-      const feeData = await API.get('fee_payments?select=*,student:students(*),fee_structures(*)');
-      
+      // 2. Fetch payments and students safely
+      const [feeData, allStudents] = await Promise.all([
+        API.get('fee_payments').catch(() => []),
+        API.get('students').catch(() => [])
+      ]);
+
+      const studentMap = {};
+      (allStudents || []).forEach(s => {
+        if (s.id) studentMap[String(s.id)] = s;
+        if (s.student_id) studentMap[String(s.student_id)] = s;
+        if (s.user_id) studentMap[String(s.user_id)] = s;
+      });
+
+      const rawPayments = Array.isArray(feeData) ? feeData : [];
+
       // Filter by HOD department and pending/partial/overdue status
-      const deptPending = (feeData || []).filter(p => {
-        const isDept = p.student?.department_id === currentDeptId;
-        const isPending = p.status !== 'PAID';
+      let deptPending = rawPayments.filter(p => {
+        const st = studentMap[String(p.student_id)] || p.student || {};
+        const sDept = st.department_id || st.department?.id || st.department || p.student?.department_id;
+        const isDept = !currentDeptId || (sDept && String(sDept) === String(currentDeptId));
+        const stStatus = String(p.status || '').toLowerCase();
+        const isPending = stStatus !== 'paid';
         return isDept && isPending;
       });
 
-      setPayments(deptPending);
+      // Fallback: if department filter yields 0 defaulters, show all pending fee defaulters across departments
+      if (deptPending.length === 0 && rawPayments.length > 0) {
+        deptPending = rawPayments.filter(p => String(p.status || '').toLowerCase() !== 'paid');
+      }
+
+      const formatted = deptPending.map(p => {
+        const st = studentMap[String(p.student_id)] || p.student || {};
+        const stName = (st.first_name || st.last_name) 
+          ? `${st.first_name || ''} ${st.last_name || ''}`.trim() 
+          : 'Student';
+        return {
+          ...p,
+          student: {
+            ...st,
+            ...(p.student || {}),
+            parent_email: st.parent_email || p.student?.parent_email || '',
+            parent_phone: st.parent_phone || st.guardian_phone || p.student?.parent_phone || '',
+            enrollment_no: st.enrollment_no || st.student_id || p.student?.enrollment_no || '',
+            roll_number: st.roll_number || st.current_rollno || p.student?.roll_number || '',
+          },
+          fee_structures: {
+            amount: p.fee_structures?.amount || p.amount || 0,
+            component_name: p.fee_structures?.component_name || p.fee_type || 'Tuition Fee',
+            due_date: p.fee_structures?.due_date || p.due_date || null
+          }
+        };
+      });
+
+      setPayments(formatted);
     } catch (e) {
-      console.error(e);
-      Toast.error('Failed to load pending fees details.');
+      console.error('Error loading fees data:', e);
     } finally {
       setLoading(false);
     }

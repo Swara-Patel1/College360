@@ -56,6 +56,7 @@ export default function Library() {
 
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
         <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-journal-bookmark"></i></div><div><div className="stat-value">{books.length}</div><div className="stat-label">Titles in Catalogue</div></div></div>
+        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div><div className="stat-value">{books.reduce((s, b) => s + (b.available_copies || 0), 0)}</div><div className="stat-label">Available Copies</div></div></div>
         <div className="stat-card warning"><div className="stat-icon"><i className="bi bi-box-arrow-up"></i></div><div><div className="stat-value">{activeLoans.length}</div><div className="stat-label">Currently Borrowed</div></div></div>
         <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-cash-coin"></i></div><div><div className="stat-value">{Utils.formatCurrency(outstanding)}</div><div className="stat-label">Fines Due</div></div></div>
       </div>
@@ -76,18 +77,17 @@ export default function Library() {
             {filtered.length ? (
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">
-                  <thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Shelf</th><th>Availability</th></tr></thead>
+                  <thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Availability</th></tr></thead>
                   <tbody>
                     {filtered.map(b => (
                       <tr key={b.id}>
                         <td><strong>{b.title}</strong>{b.edition && <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}> · {b.edition}</span>}</td>
                         <td>{b.author || '—'}</td>
                         <td>{b.category || '—'}</td>
-                        <td>{b.shelf || '—'}</td>
                         <td>
                           {b.available_copies > 0
-                            ? <span className="badge badge-success">{b.available_copies} available</span>
-                            : <span className="badge badge-danger">Out of stock</span>}
+                            ? <span className="badge badge-success">{b.available_copies} AVAILABLE</span>
+                            : <span className="badge badge-danger">OUT OF STOCK</span>}
                         </td>
                       </tr>
                     ))}

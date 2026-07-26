@@ -24,6 +24,8 @@ class Grade(models.Model):
     class Meta:
         unique_together = ('student', 'course', 'exam_type')
 
+
+
     # Single source of truth for grade/GPA thresholds (kept out of the React client).
     GRADE_POINTS = {'O': 10.0, 'A+': 9.0, 'A': 8.0, 'B+': 7.0, 'B': 6.0, 'C': 5.0, 'D': 4.0, 'F': 0.0}
 

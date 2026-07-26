@@ -78,9 +78,9 @@ export default function HODLeaves() {
   };
 
   const getFacultyName = (leave) => {
-    if (!leave.faculty) return 'Faculty';
+    if (!leave.faculty) return leave.faculty_name || 'Faculty';
     const f = leave.faculty;
-    return `${f.first_name || ''} ${f.last_name || ''}`.trim() || f.employee_id || 'Faculty';
+    return `${f.first_name || ''} ${f.last_name || ''}`.trim() || f.employee_id || leave.faculty_name || 'Faculty';
   };
 
   return (

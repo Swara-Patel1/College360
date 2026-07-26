@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import { API } from '../api/client.js';
 import { Toast } from './useNotifStore.js';
 
+// Invalidate stale student_profile cache that has no user_id (from before the fix)
+const _cachedProfile = JSON.parse(localStorage.getItem('student_profile') || 'null');
+const _cachedUser = JSON.parse(localStorage.getItem('user') || 'null');
+if (_cachedProfile && (!_cachedProfile.user_id || _cachedProfile.user_id !== _cachedUser?.id)) {
+  localStorage.removeItem('student_profile');
+}
+
 export const useAuthStore = create((set, get) => ({
   token: localStorage.getItem('access_token') || null,
   user: JSON.parse(localStorage.getItem('user') || 'null'),
@@ -11,6 +18,9 @@ export const useAuthStore = create((set, get) => ({
 
   login: async (usernameOrEmail, password) => {
     try {
+      localStorage.removeItem('student_profile');
+      localStorage.removeItem('delegated_access');
+
       const data = await API.post('auth/login', {
         email: usernameOrEmail,
         username: usernameOrEmail,
@@ -25,6 +35,7 @@ export const useAuthStore = create((set, get) => ({
         set({
           token: data.access,
           user: data.user,
+          studentProfile: null,
           isLoggedIn: true
         });
 
@@ -33,15 +44,11 @@ export const useAuthStore = create((set, get) => ({
           get().refreshDelegatedAccess();
         }
 
-        // Wait briefly for background student profile fetch to execute
+        // Refresh student profile for the newly logged in student
         if (data.user.role === 'student') {
-          setTimeout(() => {
-            const cachedProfile = localStorage.getItem('student_profile');
-            if (cachedProfile) {
-              set({ studentProfile: JSON.parse(cachedProfile) });
-            }
-          }, 800);
+          get().refreshStudentProfile();
         }
+
         
         Toast.success(`Welcome back, ${data.user.first_name}!`);
         return data.user;

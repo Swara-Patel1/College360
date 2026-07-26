@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 const FEATURES = [
   { icon: <i className="bi bi-speedometer2" />, title: 'Unified Dashboards', desc: 'Role-aware dashboards for students, faculty, HODs and admins — the right data, the moment you log in.' },
   { icon: <i className="bi bi-check-circle" />, title: 'Smart Attendance', desc: 'Bulk-mark attendance, auto-computed percentages, and low-attendance alerts pushed straight to HODs.' },
-  { icon: <i className="bi bi-journal-text" />, title: 'Grades & Analytics', desc: 'Server-computed grades on the Indian scale, class rankings, and performance insights in real time.' },
+  { icon: <i className="bi bi-journal-text" />, title: 'Grades & Analytics', desc: 'Server-computed grades on the Indian scale and performance insights in real time.' },
   { icon: <i className="bi bi-mortarboard" />, title: 'Alumni Network', desc: 'A living directory of graduates — filter by batch, company and mentors open to guiding students.' },
   { icon: <i className="bi bi-question-circle" />, title: 'Doubts with SLA', desc: 'Students raise conceptual doubts; faculty resolve them within a tracked 72-hour service window.' },
   { icon: <i className="bi bi-cash-stack" />, title: 'Fees & Finance', desc: 'Track collections, pending dues and payment history across every department from one console.' },
@@ -13,7 +13,7 @@ const FEATURES = [
 const ROLES = [
   { tag: 'Students', color: '#6C63FF', points: ['Attendance, grades & timetable at a glance', 'Ask doubts and get faculty answers', 'Placement score & alumni mentorship'] },
   { tag: 'Faculty', color: '#00D4AA', points: ['One-tap bulk attendance marking', 'Grade entry with instant analytics', 'Leave requests & lecture interchange'] },
-  { tag: 'HOD', color: '#FF9F43', points: ['Approve leaves & manage timetables', 'Academic alerts and class rankings', 'Resolve grievances department-wide'] },
+  { tag: 'HOD', color: '#FF9F43', points: ['Approve leaves & manage timetables', 'Academic alerts & department analytics', 'Resolve grievances department-wide'] },
   { tag: 'Admin', color: '#54A0FF', points: ['Master CRUD for the whole institute', 'Fee management & finance overview', 'Broadcast notices to any audience'] },
 ];
 
@@ -132,7 +132,7 @@ export default function Landing() {
         <div className="lp-steps">
           <div className="lp-step"><span className="lp-step-num">1</span><h3>Sign in by role</h3><p>Students, faculty, HODs and admins each get a secure, purpose-built workspace.</p></div>
           <div className="lp-step"><span className="lp-step-num">2</span><h3>Work in real time</h3><p>Mark attendance, enter grades, raise doubts and approve leaves — all instantly synced.</p></div>
-          <div className="lp-step"><span className="lp-step-num">3</span><h3>Decide with insight</h3><p>Dashboards turn everyday activity into rankings, alerts and finance overviews.</p></div>
+          <div className="lp-step"><span className="lp-step-num">3</span><h3>Decide with insight</h3><p>Dashboards turn everyday activity into actionable alerts and finance overviews.</p></div>
         </div>
       </section>
 

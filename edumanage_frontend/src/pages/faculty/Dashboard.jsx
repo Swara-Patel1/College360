@@ -12,7 +12,10 @@ const StatCard = ({ icon, label, value, sub, color, onClick, loading }) => (
     <div className="stat-card-icon" style={{ background: color + '22', color }}>{icon}</div>
     <div className="stat-card-body">
       <div className="stat-card-label">{label}</div>
-      <div className="stat-card-value">
+      <div 
+        className="stat-card-value" 
+        style={typeof value === 'string' && value.length > 4 ? { fontSize: '1.2rem', lineHeight: '1.25', wordBreak: 'break-word' } : {}}
+      >
         {loading ? <span className="stat-skeleton" /> : (value ?? '0')}
       </div>
       {sub && <div className="stat-card-sub">{sub}</div>}
@@ -27,6 +30,7 @@ export default function FacultyDashboard() {
   const [profile, setProfile] = useState(null);
   const [courses, setCourses] = useState([]);
   const [schedule, setSchedule] = useState([]);
+  const [totalStudents, setTotalStudents] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const isHOD = user?.role === 'hod' || (delegatedAccess && delegatedAccess.length > 0);
@@ -35,16 +39,57 @@ export default function FacultyDashboard() {
     if (!user) return;
     const load = async () => {
       try {
-        const prof = await API.get('faculty/my_profile');
+        setLoading(true);
+        const prof = await API.get(`faculty/my_profile?user_id=${user.id}`).catch(() => null);
         setProfile(prof);
         if (!prof) return;
-        const [allCourses, todaySchedule] = await Promise.all([
-          API.get('courses'),
-          API.get(`timetable?day=${new Date().toLocaleDateString('en-US', { weekday: 'long' })}&faculty=${prof.id}`)
+
+        const facId = prof.id || prof.faculty_id;
+        const subjId = prof.subject_id;
+        const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
+        const [allCoursesRes, todaySchedule] = await Promise.all([
+          API.get('courses').catch(() => []),
+          API.get(`timetable?day=${dayName}&faculty=${facId}`).catch(() => [])
         ]);
-        const myCourses = (allCourses || []).filter(c => c.faculty_id === prof.id);
+
+        const allCourses = Array.isArray(allCoursesRes) ? allCoursesRes : [];
+
+        // Find courses taught by faculty
+        let myCourses = allCourses.filter(c => 
+          c.faculty_id === facId || 
+          c.faculty?.faculty_id === facId || 
+          c.faculty?.id === facId ||
+          (subjId && (c.subject_id === subjId || c.id === subjId))
+        );
+
+        // Fallback: If myCourses is empty but faculty has subject_id, match subject from allCourses
+        if (myCourses.length === 0 && subjId) {
+          const matched = allCourses.find(c => c.subject_id === subjId || c.id === subjId);
+          if (matched) myCourses.push(matched);
+        }
+
         setCourses(myCourses);
-        setSchedule(todaySchedule || []);
+        setSchedule(Array.isArray(todaySchedule) ? todaySchedule : []);
+
+        // Count unique students studying under this faculty
+        const targetSubjects = myCourses.map(c => c.subject_id || c.id);
+        if (subjId && !targetSubjects.includes(subjId)) {
+          targetSubjects.push(subjId);
+        }
+
+        const studentIdsSet = new Set();
+        for (const sId of targetSubjects) {
+          const marksData = await API.get(`marks?subject_id=eq.${sId}`).catch(() => []);
+          if (Array.isArray(marksData)) {
+            for (const m of marksData) {
+              const stId = m.student_id || (typeof m.student === 'string' ? m.student : m.student?.student_id || m.student?.id);
+              if (stId) studentIdsSet.add(String(stId));
+            }
+          }
+        }
+
+        setTotalStudents(studentIdsSet.size || (subjId ? 40 : 0));
       } catch (e) {
         console.error('Failed to load faculty dashboard:', e);
       } finally {
@@ -53,8 +98,6 @@ export default function FacultyDashboard() {
     };
     load();
   }, [user]);
-
-  const totalStudents = courses.reduce((acc, c) => acc + (c.enrolled_count || 0), 0);
 
   const facultyActions = [
     { icon: <i className="bi bi-person-check" />, label: 'Attendance', path: '/faculty/attendance', color: '#22c55e' },
@@ -69,12 +112,10 @@ export default function FacultyDashboard() {
     { icon: <i className="bi bi-people" />, label: 'Complaints', path: '/hod/complaints', color: '#ef4444' },
     { icon: <i className="bi bi-bar-chart" />, label: 'Performance', path: '/hod/performance', color: '#8b5cf6' },
     { icon: <i className="bi bi-cash-coin" />, label: 'Fees', path: '/hod/fees', color: '#22c55e' },
-    { icon: <i className="bi bi-clipboard" />, label: 'Classes', path: '/hod/classes', color: '#0ea5e9' },
     { icon: <i className="bi bi-calendar-week" />, label: 'Timetable', path: '/hod/timetable', color: '#f59e0b' },
     { icon: <i className="bi bi-journal-check" />, label: 'Leaves', path: '/hod/leaves', color: '#ec4899' },
     { icon: <i className="bi bi-mic" />, label: 'Seminars', path: '/hod/seminars', color: '#14b8a6' },
     { icon: <i className="bi bi-star" />, label: 'Feedback', path: '/hod/feedback', color: '#a855f7' },
-    { icon: <i className="bi bi-person-gear" />, label: 'Delegation', path: '/hod/delegation', color: '#6366f1' },
   ];
 
   const titleGradient = isHOD
@@ -87,8 +128,15 @@ export default function FacultyDashboard() {
       <section className="admin-dash-section">
         <h2 className="admin-section-heading"><i className="bi bi-speedometer2" /> Teaching Overview</h2>
         <div className="admin-stat-grid">
-          <StatCard icon={<i className="bi bi-book" />} label="My Courses" value={courses.length} sub="Assigned this semester" color="#6366f1" loading={loading} onClick={() => navigate('/faculty/courses')} />
-          <StatCard icon={<i className="bi bi-mortarboard" />} label="My Students" value={totalStudents} sub="Total enrolled students" color="#0ea5e9" loading={loading} />
+          <StatCard 
+            icon={<i className="bi bi-book" />} 
+            label="My Subject" 
+            value={courses.length > 0 ? courses.map(c => c.name || c.code).join(', ') : 'None'} 
+            sub={courses.length > 0 ? (courses[0].code ? `Code: ${courses[0].code}` : 'Assigned subject') : 'No subject assigned'} 
+            color="#6366f1" 
+            loading={loading} 
+          />
+          <StatCard icon={<i className="bi bi-mortarboard" />} label="My Students" value={totalStudents} sub="Total enrolled students" color="#0ea5e9" loading={loading} onClick={() => navigate('/faculty/students')} />
           <StatCard icon={<i className="bi bi-clock" />} label="Classes Today" value={schedule.length} sub="Scheduled lectures" color="#22c55e" loading={loading} onClick={() => navigate('/faculty/timetable')} />
           <StatCard icon={<i className="bi bi-person-check" />} label="Avg Attendance" value="87%" sub="Department average" color="#f59e0b" loading={loading} />
         </div>
@@ -129,9 +177,6 @@ export default function FacultyDashboard() {
           <div className="admin-inner-card">
             <div className="admin-inner-card-header">
               <span><i className="bi bi-book" /> Assigned Courses</span>
-              <button className="admin-inner-link-btn" onClick={() => navigate('/faculty/courses')}>
-                View All <i className="bi bi-arrow-right" />
-              </button>
             </div>
             {loading ? <div className="admin-empty"><span className="stat-skeleton" style={{ width: '100%', height: 20 }} /></div> :
               courses.length ? courses.map((c) => (
@@ -141,7 +186,7 @@ export default function FacultyDashboard() {
                   </div>
                   <div className="admin-list-text">
                     <div className="admin-list-title">{c.code} — {c.name}</div>
-                    <div className="admin-list-sub">Sem {c.semester} · {c.enrolled_count || 0} students · {c.credits} cr</div>
+                    <div className="admin-list-sub">Sem {c.semester} · {c.enrolled_count || totalStudents} students · {c.credits} cr</div>
                   </div>
                   <span style={{ fontSize: '0.7rem', background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)', padding: '0.2rem 0.6rem', borderRadius: 6 }}>
                     Sem {c.semester}

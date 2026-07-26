@@ -24,7 +24,7 @@ export default function Notices() {
 
   const fetchNotices = async () => {
     try {
-      const data = await API.get('notices');
+      const data = await API.get(`notices?user_id=${user?.id}`);
       const list = data || [];
       setNotices(list);
       setFilteredNotices(list);
@@ -236,10 +236,15 @@ export default function Notices() {
                 </div>
                 
                 <div style={{ padding: '14px 24px', borderTop: '1px solid var(--border-light)', marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    <span>By <strong style={{ color: 'var(--text-secondary)' }}>{n.posted_by_name || 'Admin'}</strong></span>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>By <strong style={{ color: 'var(--text-secondary)' }}>{n.author || n.posted_by_name || 'Admin'}</strong></span>
+                    {n.department_name && (
+                      <span style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                        <i className="bi bi-building me-1"></i>{n.department_name}
+                      </span>
+                    )}
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{Utils.formatDate(n.created_at)}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{Utils.formatDate(n.created_at || n.published_at)}</div>
                 </div>
               </div>
             );

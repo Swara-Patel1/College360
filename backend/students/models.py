@@ -32,5 +32,7 @@ class Student(models.Model):
             models.Index(fields=['status'], name='idx_student_status'),
         ]
 
+
+
     def __str__(self):
         return f"{self.user.get_full_name()} ({self.student_id})"

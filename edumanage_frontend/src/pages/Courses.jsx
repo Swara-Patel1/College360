@@ -253,7 +253,7 @@ export default function Courses() {
     );
   }
 
-  const activeSemesterNumber = courses.length ? courses[0].semester : '—';
+  const activeSemesterNumber = courses.length ? (courses.find(c => c.is_active)?.semester || courses[courses.length - 1]?.semester || 3) : '3';
   const totalCredits = courses.reduce((sum, c) => sum + (c.credits || 0), 0);
 
   return (
@@ -264,19 +264,19 @@ export default function Courses() {
             <i className="bi bi-book"></i>
           </div>
           <div>
-            <h1>Course Catalog</h1>
+            <h1>Subject Catalog</h1>
             <p id="pageDesc">
               {isStudent 
-                ? `You are enrolled in ${courses.length} course${courses.length !== 1 ? 's' : ''} for your current semester (Semester ${activeSemesterNumber}).`
+                ? `You are enrolled in ${courses.length} subject${courses.length !== 1 ? 's' : ''} for your current semester (Semester ${activeSemesterNumber}).`
                 : isFaculty
-                  ? `You are teaching ${courses.length} course${courses.length !== 1 ? 's' : ''} in the current active semester (Semester ${activeSemesterNumber}).`
-                  : `Showing ${courses.length} course${courses.length !== 1 ? 's' : ''} for the current active semester (Semester ${activeSemesterNumber}).`}
+                  ? `You are teaching ${courses.length} subject${courses.length !== 1 ? 's' : ''} in the current active semester (Semester ${activeSemesterNumber}).`
+                  : `Showing ${courses.length} subject${courses.length !== 1 ? 's' : ''} for the current active semester (Semester ${activeSemesterNumber}).`}
             </p>
           </div>
         </div>
         {isAdmin && (
           <div className="page-header-right" id="addCourseWrap">
-            <button className="btn btn-primary" onClick={handleOpenAdd}><i className="bi bi-plus-lg"></i> Add Course</button>
+            <button className="btn btn-primary" onClick={handleOpenAdd}><i className="bi bi-plus-lg"></i> Add Subject</button>
           </div>
         )}
       </div>
@@ -287,7 +287,7 @@ export default function Courses() {
           <div className="stat-icon"><i className="bi bi-book"></i></div>
           <div>
             <div className="stat-value" id="totalCourses">{courses.length}</div>
-            <div className="stat-label">Total Courses</div>
+            <div className="stat-label">Total Subjects</div>
           </div>
         </div>
         <div className="stat-card success">
@@ -296,7 +296,7 @@ export default function Courses() {
             <div className="stat-value" id="activeCourses">
               {courses.filter(c => c.is_active !== false).length}
             </div>
-            <div className="stat-label">Active Courses</div>
+            <div className="stat-label">Active Subjects</div>
           </div>
         </div>
         <div className="stat-card info">
@@ -387,7 +387,7 @@ export default function Courses() {
               <table className="table" id="coursesTable">
                 <thead>
                   <tr>
-                    <th>Course</th>
+                    <th>Subject</th>
                     <th>Code</th>
                     <th>Department</th>
                     <th>Faculty</th>
@@ -442,13 +442,13 @@ export default function Courses() {
                       <td colSpan={isAdmin ? 8 : 7}>
                         <div className="empty-state" style={{ padding: '40px' }}>
                           <div className="empty-state-icon"><i className="bi bi-book"></i></div>
-                          <h3>No Courses Found</h3>
+                          <h3>No Subjects Found</h3>
                           <p>
                             {isAdmin 
-                              ? 'Try adjusting your filters, or add a new course.'
+                              ? 'Try adjusting your filters, or add a new subject.'
                               : isStudent
-                                ? 'You are not enrolled in any courses yet.'
-                                : 'No courses assigned to you yet.'}
+                                ? 'You are not enrolled in any subjects yet.'
+                                : 'No subjects assigned to you yet.'}
                           </p>
                         </div>
                       </td>

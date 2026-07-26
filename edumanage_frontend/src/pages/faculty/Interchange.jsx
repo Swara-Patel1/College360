@@ -51,7 +51,7 @@ export default function FacultyInterchange() {
       const [scheduleData, facData, reqData] = await Promise.all([
         API.get('timetable'),
         API.get('faculty'),
-        API.get('faculty/interchange'),
+        API.get(`faculty/interchange?user_id=${user?.id}`),
       ]);
 
       const mySlots = (scheduleData || []).filter(s => s.faculty_id === prof?.id || s.faculty_name?.toLowerCase().includes((prof?.user?.first_name || '').toLowerCase()));
@@ -61,7 +61,7 @@ export default function FacultyInterchange() {
     } catch (e) {
       console.error('Interchange load error:', e);
     } finally { setLoading(false); }
-  }, []);
+  }, [user]);
 
   useEffect(() => { if (user) loadData(); }, [user, loadData]);
 
@@ -173,12 +173,16 @@ export default function FacultyInterchange() {
 
   const SlotCard = ({ slot, selected, onClick, label }) => (
     <div onClick={onClick} style={{
-      padding:'14px',borderRadius:'12px',cursor:'pointer',transition:'all 0.2s',
+      padding:'16px',borderRadius:'12px',cursor:'pointer',transition:'all 0.2s',
       border:`2px solid ${selected ? 'var(--primary)' : 'var(--border)'}`,
-      background: selected ? 'rgba(108,99,255,0.1)' : 'var(--surface)',
+      background: selected ? 'rgba(108,99,255,0.18)' : 'var(--surface)',
+      boxShadow: selected ? '0 0 12px rgba(108,99,255,0.3)' : 'none'
     }}>
-      <div style={{fontSize:'0.78rem',color:'var(--text-muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'4px'}}>{label || slot.day}</div>
-      <div style={{fontWeight:700,color:'var(--text-primary)',fontSize:'0.95rem'}}>{slot.course_code} — {slot.course_name}</div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}}>
+        <span style={{fontSize:'0.78rem',color: selected ? 'var(--primary)' : 'var(--text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px'}}>{label || slot.day}</span>
+        {selected && <span style={{fontSize:'0.8rem',color:'var(--primary)',fontWeight:700}}>✓ Selected</span>}
+      </div>
+      <div style={{fontWeight:700,color:'var(--text-primary)',fontSize:'0.95rem'}}>{slot.course_code || slot.code || '—'} — {slot.course_name || slot.name || 'Subject'}</div>
       <div style={{color:'var(--text-muted)',fontSize:'0.82rem',marginTop:'4px'}}>
         <i className="bi bi-clock"></i> {slot.start_time?.substring(0,5)} – {slot.end_time?.substring(0,5)}
         {slot.room && <span>  •  <i className="bi bi-geo-alt"></i> Room {slot.room}</span>}
@@ -188,6 +192,9 @@ export default function FacultyInterchange() {
 
   const RequestCard = ({ req, isIncoming }) => {
     const st = STATUS_STYLES[req.status] || STATUS_STYLES.pending;
+    const otherName = isIncoming ? (req.requester_faculty_name || 'Faculty') : (req.target_faculty_name || 'Faculty');
+    const mySlot = isIncoming ? (req.target_slot || {}) : (req.requester_slot || {});
+    const theirSlot = isIncoming ? (req.requester_slot || {}) : (req.target_slot || {});
     return (
       <div style={{
         background:'var(--surface)',border:'1px solid var(--border)',
@@ -447,14 +454,22 @@ export default function FacultyInterchange() {
                     <div className="empty-state"><div className="empty-state-icon"><i className="bi bi-calendar3"></i></div><p>No timetable found for this faculty.</p></div>
                   ) : (
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'10px'}}>
-                      {targetSchedule.map((slot, i) => (
-                        <SlotCard key={i} slot={slot} selected={selectedTargetSlot===slot} onClick={() => setSelectedTargetSlot(slot)} label={`${slot.day} • ${slot.start_time?.substring(0,5)}`} />
-                      ))}
+                      {targetSchedule.map((slot, i) => {
+                        const isSel = selectedTargetSlot === slot || (selectedTargetSlot?.timetable_id && selectedTargetSlot?.timetable_id === slot?.timetable_id);
+                        return (
+                          <SlotCard key={i} slot={slot} selected={isSel} onClick={() => setSelectedTargetSlot(slot)} label={`${slot.day} • ${slot.start_time?.substring(0,5)}`} />
+                        );
+                      })}
                     </div>
                   )}
                   <div style={{display:'flex',justifyContent:'space-between',marginTop:'20px'}}>
                     <button className="btn btn-secondary" onClick={() => setModalStep(2)}><i className="bi bi-arrow-left"></i> Back</button>
-                    <button className="btn btn-primary" disabled={!selectedTargetSlot} onClick={() => setModalStep(4)}>
+                    <button className="btn btn-primary" onClick={() => {
+                      if (!selectedTargetSlot && targetSchedule.length > 0) {
+                        setSelectedTargetSlot(targetSchedule[0]);
+                      }
+                      setModalStep(4);
+                    }}>
                       Next: Review & Send →
                     </button>
                   </div>

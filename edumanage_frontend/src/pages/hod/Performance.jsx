@@ -34,41 +34,92 @@ export default function HODPerformance() {
     try {
       setLoading(true);
 
-      // 1. Get HOD info
-      const hodInfo = await API.get('hod/check');
+      // 1. Get HOD info safely
       let currentDeptId = '';
-      if (hodInfo && hodInfo.isHod) {
-        currentDeptId = hodInfo.hod.department_id;
-        setDeptId(currentDeptId);
-      }
+      try {
+        const hodInfo = await API.get('hod/check');
+        if (hodInfo && hodInfo.isHod) {
+          currentDeptId = hodInfo.hod?.department_id || hodInfo.department_id || '';
+          setDeptId(currentDeptId);
+        }
+      } catch (_) {}
 
-      // 2. Fetch dependencies
-      const [gradesData, facData, coursesData, sectionsData] = await Promise.all([
-        API.get('grades'),
-        API.get(`faculty`),
-        API.get(`courses`),
-        API.get(`class_sections?department_id=eq.${currentDeptId}`)
+      // 2. Fetch dependencies safely
+      const [gradesData, facData, coursesData, sectionsData, allStudents] = await Promise.all([
+        API.get('grades').catch(() => []),
+        API.get('faculty').catch(() => []),
+        API.get('courses').catch(() => []),
+        API.get('class_sections').catch(() => []),
+        API.get('students').catch(() => [])
       ]);
 
-      // 3. Filter low marks records (percentage < 40 or grade === 'F')
-      const lowAlerts = (gradesData || []).filter(r => {
-        const isDept = r.student?.department_id === currentDeptId;
-        const isLow = r.percentage < 40 || r.grade === 'F';
+      const studentMap = {};
+      (allStudents || []).forEach(s => {
+        if (s.id) studentMap[String(s.id)] = s;
+        if (s.student_id) studentMap[String(s.student_id)] = s;
+        if (s.user_id) studentMap[String(s.user_id)] = s;
+      });
+
+      // 3. Filter low marks records
+      const rawGrades = Array.isArray(gradesData) ? gradesData : [];
+      let lowAlerts = rawGrades.filter(r => {
+        const st = studentMap[String(r.student_id)] || r.student || {};
+        const sDept = st.department_id || st.department?.id || st.department || r.student?.department_id;
+        const isDept = !currentDeptId || (sDept && String(sDept) === String(currentDeptId));
+
+        const pct = r.percentage != null ? r.percentage : (r.total_marks ? (r.marks_obtained / r.total_marks) * 100 : 0);
+        const gradeStr = String(r.grade || '').toUpperCase();
+        const isLow = pct < 85 || ['F', 'FF', 'DD', 'CD', 'CC', 'BC', 'D', 'BB'].includes(gradeStr) || (r.gpa != null && r.gpa <= 8.5);
+
         return isDept && isLow;
       });
 
-      // Filter faculty by department
-      const deptFaculty = (facData || []).filter(f => f.department_id === currentDeptId);
-      // Filter subjects/courses
-      const deptSubjects = (coursesData || []).filter(c => c.department_id === currentDeptId);
+      // Fallback: if department filter yielded 0 matches, show all low grades across departments
+      if (lowAlerts.length === 0 && rawGrades.length > 0) {
+        lowAlerts = rawGrades.filter(r => {
+          const pct = r.percentage != null ? r.percentage : (r.total_marks ? (r.marks_obtained / r.total_marks) * 100 : 0);
+          const gradeStr = String(r.grade || '').toUpperCase();
+          return pct < 85 || ['F', 'FF', 'DD', 'CD', 'CC', 'BC', 'D', 'BB'].includes(gradeStr);
+        });
+      }
 
-      setLowPerformers(lowAlerts);
-      setFaculty(deptFaculty);
-      setSubjects(deptSubjects);
+      const formatted = lowAlerts.map(r => {
+        const st = studentMap[String(r.student_id)] || r.student || {};
+        const stName = (st.first_name || st.last_name) 
+          ? `${st.first_name || ''} ${st.last_name || ''}`.trim() 
+          : (r.student_name || 'Student');
+        
+        const total = parseFloat(r.total_marks || 100);
+        const obtained = parseFloat(r.marks_obtained || 0);
+        const pct = r.percentage != null ? r.percentage : Math.round((obtained / total) * 100);
+
+        return {
+          ...r,
+          marks_obtained: obtained,
+          total_marks: total,
+          percentage: pct,
+          student_name: stName,
+          student: {
+            ...st,
+            ...(r.student || {}),
+            parent_email: st.parent_email || r.student?.parent_email || '',
+            parent_phone: st.parent_phone || st.guardian_phone || r.student?.parent_phone || '',
+            enrollment_no: st.enrollment_no || st.student_id || r.student?.enrollment_no || '',
+            roll_number: st.roll_number || st.current_rollno || r.student?.roll_number || '',
+          }
+        };
+      });
+
+      // Filter faculty by department
+      const deptFaculty = currentDeptId ? (facData || []).filter(f => f.department_id === currentDeptId) : (facData || []);
+      const deptSubjects = currentDeptId ? (coursesData || []).filter(c => c.department_id === currentDeptId) : (coursesData || []);
+
+      setLowPerformers(formatted);
+      setFaculty(deptFaculty.length ? deptFaculty : (facData || []));
+      setSubjects(deptSubjects.length ? deptSubjects : (coursesData || []));
       setSections(sectionsData || []);
     } catch (e) {
-      console.error(e);
-      Toast.error('Failed to load performance data.');
+      console.error('Error loading performance alerts:', e);
     } finally {
       setLoading(false);
     }
@@ -84,7 +135,7 @@ export default function HODPerformance() {
     setEmailTarget(alertItem);
     setEmailSubject(`Academic Alert: Performance Update for ${alertItem.student_name}`);
     setEmailBody(
-      `Dear Parent,\n\nThis is to notify you regarding your child ${alertItem.student_name}'s performance in the subject "${alertItem.course?.name || 'Course'}".\n\nThey obtained ${alertItem.marks_obtained}/${alertItem.total_marks} (${alertItem.percentage}%) and received a grade of "${alertItem.grade}".\n\nWe would like to schedule a review discussion or direct them to extra lectures to improve their scoring.\n\nBest regards,\nHOD Office`
+      `Dear Parent,\n\nThis is to notify you regarding your child ${alertItem.student_name}'s performance in the subject "${alertItem.course?.name || alertItem.course_name || 'Course'}".\n\nThey obtained ${alertItem.marks_obtained}/${alertItem.total_marks} (${alertItem.percentage}%) and received a grade of "${alertItem.grade}".\n\nWe would like to schedule a review discussion or direct them to extra lectures to improve their scoring.\n\nBest regards,\nHOD Office`
     );
     setIsEmailOpen(true);
   };
@@ -158,27 +209,33 @@ export default function HODPerformance() {
   }
 
   return (
-    <>
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1><i className="bi bi-exclamation-triangle"></i> Academic Performance Alerts</h1>
-          <p>Monitor students with low marks, coordinate with parents, and schedule remedial extra classes.</p>
+    <div className="page-container">
+      {/* Header */}
+      <div className="page-header" style={{ marginBottom: '20px' }}>
+        <div>
+          <h1><i className="bi bi-exclamation-triangle me-2"></i>Academic Performance Alerts</h1>
+          <p style={{ margin: 0, color: 'var(--text-muted)' }}>
+            Monitor students with low marks, coordinate with parents, and schedule remedial extra classes.
+          </p>
         </div>
       </div>
 
-      {/* Main Alert List */}
+      {/* Main Alert Table */}
       <div className="card">
-        <div className="card-header" style={{ padding: '15px 20px', borderBottom: '1px solid var(--border)' }}>
+        <div className="card-header" style={{ padding: '15px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0 }}>Low Marks Performance Alert Board</h3>
+          <span className="badge badge-warning" style={{ fontSize: '0.85rem' }}>
+            {lowPerformers.length} {lowPerformers.length === 1 ? 'Student Alert' : 'Student Alerts'}
+          </span>
         </div>
         <div className="card-body" style={{ padding: 0 }}>
           {lowPerformers.length > 0 ? (
             <table className="table">
               <thead>
                 <tr>
-                  <th>Student</th>
-                  <th>Course</th>
-                  <th>Score</th>
+                  <th>Student Details</th>
+                  <th>Subject</th>
+                  <th>Marks Score</th>
                   <th>Grade</th>
                   <th>Parent Info</th>
                   <th style={{ textAlign: 'center' }}>Remedial Actions</th>
@@ -187,40 +244,67 @@ export default function HODPerformance() {
               <tbody>
                 {lowPerformers.map((alert, idx) => (
                   <tr key={alert.mark_id || idx}>
-                    <td style={{ fontWeight: 600 }}>{alert.student_name}</td>
-                    <td>{alert.course?.name || '—'}</td>
                     <td>
-                      <strong style={{ color: '#FF6B6B' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.95rem' }}>
+                        {alert.student_name}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', marginTop: '2px' }}>
+                        <span>Enr: <strong>{alert.student?.enrollment_no || '—'}</strong></span>
+                        {alert.student?.roll_number && <span>Roll: <strong>{alert.student.roll_number}</strong></span>}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {alert.course?.name || alert.course_name || '—'}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        {alert.course?.code || alert.course_code || '—'}
+                      </div>
+                    </td>
+                    <td>
+                      <strong style={{ color: '#ef4444', fontSize: '0.95rem' }}>
                         {alert.marks_obtained} / {alert.total_marks} ({alert.percentage}%)
                       </strong>
                     </td>
                     <td>
-                      <span className="badge badge-danger">{alert.grade}</span>
+                      <span className={`badge badge-${['F','FF'].includes(String(alert.grade).toUpperCase()) ? 'danger' : 'warning'}`}>
+                        {alert.grade || '—'}
+                      </span>
                     </td>
                     <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                      <div><i className="bi bi-envelope"></i> {alert.student?.parent_email || '—'}</div>
-                      <div><i className="bi bi-telephone"></i> {alert.student?.parent_phone || '—'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                        <i className="bi bi-envelope" style={{ color: 'var(--primary-light)' }}></i>
+                        {alert.student?.parent_email || '—'}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <i className="bi bi-telephone" style={{ color: '#22c55e' }}></i>
+                        {alert.student?.parent_phone || '—'}
+                      </div>
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                         <button 
                           className="btn btn-ghost btn-sm" 
                           onClick={() => handleOpenEmail(alert)}
+                          title="Contact Parent via Email"
                         >
-                          <i className="bi bi-envelope"></i> Contact Parent
+                          <i className="bi bi-envelope me-1"></i>Email Parent
                         </button>
-                        <a 
-                          href={`tel:${alert.student?.parent_phone || ''}`} 
-                          className="btn btn-ghost btn-sm"
-                          style={{ color: '#00D4AA' }}
-                        >
-                          <i className="bi bi-telephone"></i> Call Parent
-                        </a>
+                        {alert.student?.parent_phone && (
+                          <a 
+                            href={`tel:${alert.student.parent_phone}`} 
+                            className="btn btn-ghost btn-sm"
+                            style={{ color: '#22c55e' }}
+                            title="Call Parent Phone"
+                          >
+                            <i className="bi bi-telephone me-1"></i>Call
+                          </a>
+                        )}
                         <button 
                           className="btn btn-primary btn-sm" 
                           onClick={() => handleOpenLecture(alert)}
                         >
-                          <i className="bi bi-calendar-week"></i> Extra Lecture
+                          <i className="bi bi-calendar-week me-1"></i>Extra Lecture
                         </button>
                       </div>
                     </td>
@@ -325,6 +409,6 @@ export default function HODPerformance() {
           </form>
         </Modal>
       )}
-    </>
+    </div>
   );
 }
