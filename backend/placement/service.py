@@ -1,33 +1,65 @@
-"""
-Turns a student's real academic record into a placement-readiness score object,
-using the trained model in `ml.py`. Output matches what the React Placement page expects.
-"""
+from django.db import connection
 from django.utils import timezone
 
-from grades.models import Grade
-from attendance.models import AttendanceRecord
-from campus.models import Doubt
 from .models import PlacementCompany
 from . import ml
 
 
-def _extract_features(student):
-    """Derive (cpi, attendance_pct, active_backlogs, extra_count) from real data."""
-    grades = list(Grade.objects.filter(student=student))
-    if grades:
-        cpi = round(sum(g.grade_point for g in grades) / len(grades), 2)
-        active_backlogs = sum(1 for g in grades if g.grade == 'F')
+def _extract_features(student_input):
+    """Derive (cpi, attendance_pct, active_backlogs, extra_count, has_history, student_id_str) from real PostgreSQL data."""
+    student_id_str = ''
+    if hasattr(student_input, 'student_id') and student_input.student_id:
+        student_id_str = str(student_input.student_id)
+    elif hasattr(student_input, 'pk'):
+        student_id_str = str(student_input.pk)
     else:
-        cpi, active_backlogs = 0.0, 0
+        student_id_str = str(student_input)
 
-    att_total = AttendanceRecord.objects.filter(student=student).count()
-    att_present = AttendanceRecord.objects.filter(student=student, status__in=['present', 'late']).count()
-    attendance_pct = round((att_present / att_total) * 100, 1) if att_total else 0.0
+    with connection.cursor() as cur:
+        # Resolve student_id if student_id_str is user_id or email
+        cur.execute("""
+            SELECT CAST(student_id AS TEXT) FROM students
+            WHERE CAST(student_id AS TEXT) = %s OR CAST(user_id AS TEXT) = %s
+            LIMIT 1
+        """, [student_id_str, student_id_str])
+        r = cur.fetchone()
+        if r:
+            student_id_str = r[0]
 
-    # Engagement proxy for extracurriculars: how actively the student raises doubts.
-    extra_count = min(3, Doubt.objects.filter(student=student).count())
+        # 1. Marks & CPI
+        cur.execute("""
+            SELECT grade_points, grade FROM marks
+            WHERE CAST(student_id AS TEXT) = %s
+        """, [student_id_str])
+        marks_rows = cur.fetchall()
+        if marks_rows:
+            cpi = round(sum(float(m[0] or 0) for m in marks_rows) / len(marks_rows), 2)
+            active_backlogs = sum(1 for m in marks_rows if (m[1] or '').upper() in ('F', 'FF'))
+        else:
+            cpi, active_backlogs = 0.0, 0
 
-    return cpi, attendance_pct, active_backlogs, extra_count, bool(grades or att_total)
+        # 2. Attendance
+        cur.execute("""
+            SELECT COUNT(*),
+                   SUM(CASE WHEN LOWER(CAST(status AS TEXT)) IN ('present', 'late', 'p', 'l') THEN 1 ELSE 0 END)
+            FROM attendance_records
+            WHERE CAST(student_id AS TEXT) = %s
+        """, [student_id_str])
+        att_row = cur.fetchone()
+        att_total = att_row[0] if att_row else 0
+        att_present = (att_row[1] or 0) if att_row else 0
+        attendance_pct = round((att_present / att_total) * 100, 1) if att_total else 0.0
+
+        # 3. Doubts / Extracurriculars
+        cur.execute("""
+            SELECT COUNT(*) FROM doubts
+            WHERE CAST(student_id AS TEXT) = %s
+        """, [student_id_str])
+        doubt_row = cur.fetchone()
+        extra_count = min(3, doubt_row[0] if doubt_row else 0)
+
+    has_history = bool(marks_rows or att_total)
+    return cpi, attendance_pct, active_backlogs, extra_count, has_history, student_id_str
 
 
 def _category(score, has_history):
@@ -58,7 +90,7 @@ def _tips(cpi, attendance_pct, backlogs, extra_count, category):
 
 
 def compute_placement(student):
-    cpi, attendance_pct, backlogs, extra_count, has_history = _extract_features(student)
+    cpi, attendance_pct, backlogs, extra_count, has_history, student_id_str = _extract_features(student)
 
     # Trained model → placement-readiness probability → 0-100 headline score.
     prob = ml.predict_probability(cpi, attendance_pct, backlogs, extra_count)
@@ -73,12 +105,18 @@ def compute_placement(student):
 
     # Eligible companies from real criteria.
     eligible_ids = []
-    for c in PlacementCompany.objects.filter(is_active=True):
-        if cpi >= float(c.min_cpi) and backlogs <= c.max_backlogs and attendance_pct >= float(c.min_attendance):
-            eligible_ids.append(str(c.pk))
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT CAST(company_id AS TEXT), min_cpi, max_backlogs, min_attendance
+            FROM placement_companies
+            WHERE is_active = true
+        """)
+        for cid, min_cpi, max_b, min_att in cur.fetchall():
+            if cpi >= float(min_cpi or 0) and backlogs <= int(max_b or 0) and attendance_pct >= float(min_att or 0):
+                eligible_ids.append(cid)
 
     return {
-        'student_id': str(student.pk),
+        'student_id': student_id_str,
         'total_score': total_score,
         'placement_probability': round(prob, 4),
         'category': category,
@@ -92,6 +130,6 @@ def compute_placement(student):
         'extra_score': extra_score,
         'eligible_company_ids': eligible_ids,
         'improvement_tips': _tips(cpi, attendance_pct, backlogs, extra_count, category),
-        'model': 'logistic-regression (numpy, trained on synthetic placement data)',
+        'model': f'{ml._MODEL_TYPE} (scikit-learn)',
         'computed_at': timezone.now().isoformat(),
     }

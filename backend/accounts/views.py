@@ -132,6 +132,11 @@ def dashboard_stats(request):
     active_users = User.objects.filter(is_active=True).count()
     inactive_users = User.objects.filter(is_active=False).count()
 
+    from django.db import connection
+    with connection.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM hod")
+        total_hod = cur.fetchone()[0]
+
     return Response({
         'total_students': all_student_count,
         'total_faculty': Faculty.objects.count(),
@@ -142,6 +147,6 @@ def dashboard_stats(request):
         'fees_pending_students': fees_pending_students,
         'active_users': active_users,
         'inactive_users': inactive_users,
-        'total_hod': User.objects.filter(role='admin').count(),
+        'total_hod': total_hod,
         'total_users': User.objects.count(),
     })

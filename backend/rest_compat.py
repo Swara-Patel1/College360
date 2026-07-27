@@ -757,14 +757,14 @@ def handle_hod(request, params, body):
             hod_id = hod_id[3:]
 
         sql = """
-            SELECT h.hod_id, h.user_id, h.department_id, h.address,
+            SELECT h.hod_id, h.user_id, h.department_id, h.address, h.firstname, h.lastname,
                    d.name AS dept_name, d.code AS dept_code,
                    u.email AS user_email,
                    f.faculty_id, f.first_name AS fac_first, f.last_name AS fac_last, f.employee_id
             FROM hod h
             LEFT JOIN departments d ON CAST(d.department_id AS TEXT) = CAST(h.department_id AS TEXT)
             LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(h.user_id AS TEXT) OR LOWER(CAST(h.user_id AS TEXT)) = LOWER(u.email)
-            LEFT JOIN faculty f ON CAST(f.user_id AS TEXT) = CAST(u.id AS TEXT) OR CAST(f.user_id AS TEXT) = CAST(h.user_id AS TEXT) OR CAST(f.department_id AS TEXT) = CAST(h.department_id AS TEXT)
+            LEFT JOIN faculty f ON CAST(f.user_id AS TEXT) = CAST(u.id AS TEXT) OR CAST(f.user_id AS TEXT) = CAST(h.user_id AS TEXT)
             WHERE 1=1
         """
         args = []
@@ -793,8 +793,8 @@ def handle_hod(request, params, body):
                 continue
             seen.add(hid)
 
-            first = r.get('fac_first') or ''
-            last = r.get('fac_last') or ''
+            first = r.get('firstname') or r.get('fac_first') or ''
+            last = r.get('lastname') or r.get('fac_last') or ''
             email = r.get('user_email') or ''
 
             if not first and not last and email:
@@ -2700,9 +2700,19 @@ def handle_notices(request, params, body):
             'is_active': True
         }
 
+    FM = {
+        'id': 'pk',
+        'notice_id': 'pk',
+        'title': 'title',
+        'content': 'content',
+        'audience': 'audience',
+        'target_audience': 'audience',
+        'department_id': 'department__pk',
+    }
+
     if request.method == 'PATCH':
         qs = Notice.objects.all()
-        nid_filter = params.get('notice_id', '')
+        nid_filter = params.get('notice_id', '') or params.get('id', '')
         if nid_filter.startswith('eq.'):
             qs = qs.filter(pk=nid_filter[3:])
         else:
@@ -2712,8 +2722,8 @@ def handle_notices(request, params, body):
                 n.title = body['title']
             if 'content' in body:
                 n.content = body['content']
-            if 'target_audience' in body:
-                n.audience = body['target_audience']
+            if 'target_audience' in body or 'audience' in body:
+                n.audience = body.get('target_audience') or body.get('audience')
             if 'priority' in body:
                 TYPE_MAP = {'URGENT': 'urgent', 'HIGH': 'exam', 'LOW': 'holiday', 'NORMAL': 'general'}
                 n.notice_type = TYPE_MAP.get(body['priority'], 'general')
@@ -2721,13 +2731,20 @@ def handle_notices(request, params, body):
         return [serialize_notice(n) for n in qs]
 
     if request.method == 'DELETE':
-        qs = Notice.objects.all()
-        nid_filter = params.get('notice_id', '')
+        nid_filter = params.get('notice_id', '') or params.get('id', '')
         if nid_filter.startswith('eq.'):
-            qs = qs.filter(pk=nid_filter[3:])
+            nid_val = nid_filter[3:]
+            with connection.cursor() as cur:
+                cur.execute("DELETE FROM notices WHERE CAST(notice_id AS TEXT) = %s", [nid_val])
+                cur.execute("DELETE FROM notices_notice WHERE CAST(id AS TEXT) = %s", [nid_val])
+            Notice.objects.filter(pk=nid_val).delete()
         else:
+            qs = Notice.objects.all()
             qs = apply_postgrest_filters(qs, params, FM)
-        qs.delete()
+            for n in qs:
+                with connection.cursor() as cur:
+                    cur.execute("DELETE FROM notices WHERE CAST(notice_id AS TEXT) = %s", [str(n.pk)])
+            qs.delete()
         return []
 
 
@@ -2844,6 +2861,8 @@ def handle_admin_stats(request, params, body):
         total_fees_pending = float(cur.fetchone()[0])
         cur.execute("SELECT COUNT(DISTINCT student_id) FROM fee_payments WHERE status != 'paid'")
         fees_pending_students = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM hod")
+        total_hod = cur.fetchone()[0]
 
     return {
         'total_students': total_students,
@@ -2855,7 +2874,7 @@ def handle_admin_stats(request, params, body):
         'fees_pending_students': fees_pending_students,
         'active_users': active_users,
         'inactive_users': inactive_users,
-        'total_hod': 1,
+        'total_hod': total_hod,
         'total_users': total_users,
     }
 
@@ -4075,19 +4094,27 @@ def handle_placement_companies(request, params, body):
 def handle_placement_scores(request, params, body):
     """ML-predicted placement readiness — computed live from the student's real record."""
     from placement.service import compute_placement
+    from django.db import connection
     sid = params.get('student_id', '')
-    student = None
+    target_id = None
     if sid.startswith('eq.'):
-        val = sid[3:]
-        if val.isdigit():
-            student = Student.objects.filter(pk=val).first() or Student.objects.filter(user__pk=val).first()
-        if not student:
-            student = Student.objects.filter(student_id=val).first()
-    if not student and hasattr(request, 'user') and request.user.is_authenticated:
-        student = getattr(request.user, 'student_profile', None)
-    if not student:
+        target_id = sid[3:]
+    
+    if not target_id and hasattr(request, 'user') and request.user.is_authenticated:
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT CAST(s.student_id AS TEXT) FROM students s
+                LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(s.user_id AS TEXT) OR LOWER(u.email) = LOWER(%s)
+                WHERE LOWER(u.email) = LOWER(%s) OR CAST(u.id AS TEXT) = %s
+                LIMIT 1
+            """, [request.user.email, request.user.email, str(request.user.pk)])
+            r = cur.fetchone()
+            if r:
+                target_id = r[0]
+
+    if not target_id:
         return []
-    return [compute_placement(student)]
+    return [compute_placement(target_id)]
 
 
 @handler('alumni')
@@ -5342,12 +5369,11 @@ class RestV1View(View):
                     u_obj = User.objects.filter(pk=django_user_id).first()
                     if u_obj:
                         request.user = u_obj
-                        if 'user_id' not in params and 'user' not in params:
-                            with connection.cursor() as cur:
-                                cur.execute("SELECT id FROM users WHERE email ILIKE %s LIMIT 1", [u_obj.email])
-                                r_uid = cur.fetchone()
-                                if r_uid:
-                                    params['user_id'] = str(r_uid[0])
+                        with connection.cursor() as cur:
+                            cur.execute("SELECT id FROM users WHERE email ILIKE %s LIMIT 1", [u_obj.email])
+                            r_uid = cur.fetchone()
+                            if r_uid:
+                                request.user_id = str(r_uid[0])
             except Exception:
                 pass
 

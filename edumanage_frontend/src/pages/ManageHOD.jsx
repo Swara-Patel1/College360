@@ -184,7 +184,6 @@ export default function ManageHOD() {
                 <tr>
                   <th>HOD</th>
                   <th>Department</th>
-                  <th>Employee ID</th>
                   <th>Email</th>
                   {isAdmin && <th style={{ textAlign: 'center' }}>Actions</th>}
                 </tr>
@@ -197,7 +196,6 @@ export default function ManageHOD() {
                       <span className="badge badge-info" style={{ marginLeft: '8px' }}>HOD</span>
                     </td>
                     <td>{h.department_name || h.department?.name || '—'}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{h.employee_id || '—'}</td>
                     <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{h.email || h.user?.email || '—'}</td>
                     {isAdmin && (
                       <td style={{ textAlign: 'center' }}>

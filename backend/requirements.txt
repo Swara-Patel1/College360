@@ -8,6 +8,7 @@ django-cors-headers==4.9.0
 psycopg2-binary==2.9.10
 python-dotenv==1.0.1
 
-# ML placement predictor (numpy-only logistic regression — no scikit-learn needed)
+# ML placement predictor
 numpy==2.4.1
+scikit-learn>=1.4.0
 
