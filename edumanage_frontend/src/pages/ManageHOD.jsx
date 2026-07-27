@@ -42,7 +42,9 @@ export default function ManageHOD() {
     }
   };
 
-  useEffect(() => { if (user) loadData(); }, [user]);
+  useEffect(() => {
+    loadData();
+  }, [user]);
 
   const openAssign = (deptId = '') => {
     setAssignDept(deptId);
