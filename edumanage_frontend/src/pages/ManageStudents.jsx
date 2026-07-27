@@ -37,16 +37,16 @@ export default function ManageStudents() {
   const [viewingStudent, setViewingStudent] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.roles === 'admin';
 
   const loadData = async () => {
     try {
       setLoading(true);
 
       let filterDeptId = user?.department_id || user?.department?.id || user?.department?.department_id || '';
-      let filterDeptName = user?.department_name || user?.department?.name || '';
+      let filterDeptName = user?.department_name || user?.department?.name || user?.dept_name || '';
 
-      if (user?.role !== 'admin') {
+      if (!isAdmin) {
         try {
           const hodInfo = await API.get('hod/check');
           if (hodInfo && (hodInfo.isHod || hodInfo.hod)) {
@@ -65,6 +65,16 @@ export default function ManageStudents() {
           } catch (_) {}
         }
 
+        if (!filterDeptId && user?.email) {
+          try {
+            const hodInfo = await API.get(`hod/check?email=eq.${user.email}`);
+            if (hodInfo && (hodInfo.isHod || hodInfo.hod)) {
+              filterDeptId = hodInfo.hod?.department_id || hodInfo.department_id || filterDeptId;
+              filterDeptName = hodInfo.hod?.dept_name || hodInfo.dept_name || filterDeptName;
+            }
+          } catch (_) {}
+        }
+
         if (!filterDeptId) {
           try {
             const prof = await API.get('faculty/my_profile');
@@ -76,7 +86,7 @@ export default function ManageStudents() {
         }
       }
 
-      const studentsEndpoint = (user?.role !== 'admin' && filterDeptId)
+      const studentsEndpoint = (!isAdmin && filterDeptId)
         ? `students?department_id=${filterDeptId}&limit=1000`
         : 'students?limit=1000';
 
@@ -90,7 +100,7 @@ export default function ManageStudents() {
       const deptsList = Array.isArray(deptsData) ? deptsData : [];
       const semsList = Array.isArray(semsData) ? semsData : [];
 
-      if (user?.role !== 'admin' && (filterDeptId || filterDeptName)) {
+      if (!isAdmin && (filterDeptId || filterDeptName)) {
         const targetId = String(filterDeptId || '').toLowerCase();
         const targetName = String(filterDeptName || '').toLowerCase();
 
@@ -107,7 +117,7 @@ export default function ManageStudents() {
       setStudents(allowedStudents);
       setDepartments(deptsList);
       setSemesters(semsList);
-      if (user?.role !== 'admin' && filterDeptId) {
+      if (!isAdmin && filterDeptId) {
         setSelectedDept(filterDeptId);
       }
     } catch (e) {

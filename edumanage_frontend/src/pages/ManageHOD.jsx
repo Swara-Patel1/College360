@@ -84,12 +84,17 @@ export default function ManageHOD() {
     (!assignDept || f.department_id === assignDept) && !hodUserIds.has(f.user_id)
   );
 
-  const departmentsWithoutHod = departments.filter(d => !hods.some(h => h.department_id === d.id));
+  const departmentsWithoutHod = departments.filter(d => {
+    const dId = d.department_id || d.id;
+    return !hods.some(h => (h.department_id || h.department?.department_id || h.department?.id) === dId);
+  });
 
   const filtered = hods.filter(h => {
     const q = searchQuery.toLowerCase();
-    const name = `${h.first_name || ''} ${h.last_name || ''}`.toLowerCase();
-    return name.includes(q) || (h.email || '').toLowerCase().includes(q) || (h.department_name || '').toLowerCase().includes(q);
+    const name = `${h.first_name || h.user?.first_name || ''} ${h.last_name || h.user?.last_name || ''}`.trim().toLowerCase();
+    const email = (h.email || h.user?.email || '').toLowerCase();
+    const deptName = (h.department_name || h.department?.name || '').toLowerCase();
+    return name.includes(q) || email.includes(q) || deptName.includes(q);
   });
 
   if (loading && !hods.length) {
@@ -184,14 +189,14 @@ export default function ManageHOD() {
               </thead>
               <tbody>
                 {filtered.map(h => (
-                  <tr key={h.id}>
+                  <tr key={h.id || h.hod_id}>
                     <td style={{ fontWeight: 600 }}>
-                      {`${h.first_name || ''} ${h.last_name || ''}`.trim() || h.email}
+                      {`${h.first_name || h.user?.first_name || ''} ${h.last_name || h.user?.last_name || ''}`.trim() || h.email || h.user?.email || 'HOD'}
                       <span className="badge badge-info" style={{ marginLeft: '8px' }}>HOD</span>
                     </td>
-                    <td>{h.department_name}</td>
+                    <td>{h.department_name || h.department?.name || '—'}</td>
                     <td style={{ color: 'var(--text-secondary)' }}>{h.employee_id || '—'}</td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{h.email || '—'}</td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{h.email || h.user?.email || '—'}</td>
                     {isAdmin && (
                       <td style={{ textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>

@@ -10,28 +10,38 @@ export default function HODComplaints() {
   const [loading, setLoading] = useState(true);
   const [deptId, setDeptId] = useState('');
   
-  // Resolution Modal State
+  // Modal States
   const [isResolveOpen, setIsResolveOpen] = useState(false);
+  const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [resolutionText, setResolutionText] = useState('');
+  const [rejectionText, setRejectionText] = useState('');
 
   const loadData = async () => {
     try {
       setLoading(true);
       
       // 1. Get HOD info
-      const hodInfo = await API.get('hod/check');
-      let currentDeptId = '';
-      if (hodInfo && hodInfo.isHod) {
-        currentDeptId = hodInfo.hod.department_id;
-        setDeptId(currentDeptId);
-      }
+      let currentDeptId = user?.department_id || user?.department?.id || user?.department?.department_id || '';
+      try {
+        const query = user?.id ? `hod/check?user_id=eq.${user.id}` : (user?.email ? `hod/check?email=eq.${user.email}` : 'hod/check');
+        const hodInfo = await API.get(query);
+        if (hodInfo && (hodInfo.isHod || hodInfo.hod)) {
+          currentDeptId = hodInfo.hod?.department_id || hodInfo.department_id || currentDeptId;
+        }
+      } catch (_) {}
+      setDeptId(currentDeptId);
 
-      // 2. Get complaints
-      const allComplaints = await API.get('complaints');
-      const deptComplaints = (allComplaints || []).filter(
-        c => c.student?.department_id === currentDeptId
-      );
+      // 2. Get grievances / complaints
+      const grievanceEndpoint = currentDeptId ? `grievances?department_id=${currentDeptId}&limit=1000` : 'grievances?limit=1000';
+      const allComplaints = await API.get(grievanceEndpoint);
+      let deptComplaints = Array.isArray(allComplaints) ? allComplaints : [];
+      if (currentDeptId) {
+        const targetId = String(currentDeptId).toLowerCase();
+        deptComplaints = deptComplaints.filter(
+          c => String(c.student?.department_id || c.department_id || '').toLowerCase() === targetId
+        );
+      }
       setComplaints(deptComplaints);
     } catch (e) {
       console.error(e);
@@ -50,7 +60,8 @@ export default function HODComplaints() {
   // Aggregate stats by category
   const categoryCounts = {};
   complaints.forEach(c => {
-    if (c.status?.toUpperCase() !== 'RESOLVED') {
+    const st = c.status?.toUpperCase();
+    if (st !== 'RESOLVED' && st !== 'REJECTED') {
       const cat = c.category || 'Other';
       categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
     }
@@ -63,11 +74,11 @@ export default function HODComplaints() {
 
   // Sorting: Pinned critical category complaints first, then others
   const sortedComplaints = [...complaints].sort((a, b) => {
-    const aCritical = criticalCategories.includes(a.category) && a.status?.toUpperCase() !== 'RESOLVED';
-    const bCritical = criticalCategories.includes(b.category) && b.status?.toUpperCase() !== 'RESOLVED';
+    const aCritical = criticalCategories.includes(a.category) && a.status?.toUpperCase() !== 'RESOLVED' && a.status?.toUpperCase() !== 'REJECTED';
+    const bCritical = criticalCategories.includes(b.category) && b.status?.toUpperCase() !== 'RESOLVED' && b.status?.toUpperCase() !== 'REJECTED';
     if (aCritical && !bCritical) return -1;
     if (!aCritical && bCritical) return 1;
-    return new Date(b.created_at) - new Date(a.created_at);
+    return new Date(b.created_at || b.submitted_at) - new Date(a.created_at || a.submitted_at);
   });
 
   const handleResolveSubmit = async (e) => {
@@ -95,9 +106,37 @@ export default function HODComplaints() {
     }
   };
 
+  const handleRejectSubmit = async (e) => {
+    e.preventDefault();
+    if (!rejectionText.trim()) {
+      Toast.warning('Please enter rejection reason.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await API.patch(`grievances?grievance_id=eq.${selectedComplaint.grievance_id}`, {
+        status: 'REJECTED',
+        resolution_note: `[REJECTED] ${rejectionText}`,
+        resolved_at: new Date().toISOString()
+      });
+      Toast.info('Grievance marked as rejected.');
+      setIsRejectOpen(false);
+      setRejectionText('');
+      loadData();
+    } catch (err) {
+      console.error(err);
+      Toast.error('Failed to reject complaint.');
+      setLoading(false);
+    }
+  };
+
   const totalCount = complaints.length;
-  const pendingCount = complaints.filter(c => c.status?.toUpperCase() !== 'RESOLVED').length;
-  const resolvedCount = totalCount - pendingCount;
+  const pendingCount = complaints.filter(c => {
+    const st = c.status?.toUpperCase();
+    return st !== 'RESOLVED' && st !== 'REJECTED';
+  }).length;
+  const resolvedCount = complaints.filter(c => c.status?.toUpperCase() === 'RESOLVED').length;
 
   if (loading && !complaints.length) {
     return (
@@ -187,11 +226,28 @@ export default function HODComplaints() {
               </thead>
               <tbody>
                 {sortedComplaints.map((c) => {
-                  const isCritical = criticalCategories.includes(c.category) && c.status?.toUpperCase() !== 'RESOLVED';
+                  const st = c.status?.toUpperCase();
+                  const isCritical = criticalCategories.includes(c.category) && st !== 'RESOLVED' && st !== 'REJECTED';
+                  const isAnon = Boolean(c.is_anonymous);
+                  const displayName = isAnon 
+                    ? 'Anonymous Student' 
+                    : (c.student_name || c.student?.name || (c.student?.first_name ? `${c.student.first_name} ${c.student.last_name || ''}` : '') || 'Student');
+
                   return (
                     <tr key={c.grievance_id} style={isCritical ? { background: 'rgba(255,107,107,0.03)' } : {}}>
                       <td style={{ fontWeight: 600 }}>
-                        {c.student_name}
+                        {isAnon ? (
+                          <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            <i className="bi bi-eye-slash me-1"></i> Anonymous Student
+                          </span>
+                        ) : (
+                          <div>
+                            <div>{displayName}</div>
+                            {c.student?.enrollment_no && (
+                              <small style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{c.student.enrollment_no}</small>
+                            )}
+                          </div>
+                        )}
                         {isCritical && <span style={{ marginLeft: '8px', fontSize: '0.7rem', color: '#FF6B6B', border: '1px solid #FF6B6B', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>SLA 3-Day Alert</span>}
                       </td>
                       <td>
@@ -200,28 +256,39 @@ export default function HODComplaints() {
                       <td style={{ maxWidth: '400px', whiteSpace: 'normal', wordBreak: 'break-word', color: 'var(--text-secondary)' }}>
                         {c.description}
                         {c.resolution_note && (
-                          <div style={{ marginTop: '8px', fontSize: '0.8rem', padding: '8px', borderRadius: '6px', background: 'rgba(0,212,170,0.06)', borderLeft: '3px solid #00D4AA', color: 'var(--text-primary)' }}>
-                            <strong>Resolution Note:</strong> {c.resolution_note}
+                          <div style={{ marginTop: '8px', fontSize: '0.8rem', padding: '8px', borderRadius: '6px', background: st === 'REJECTED' ? 'rgba(255,107,107,0.08)' : 'rgba(0,212,170,0.06)', borderLeft: st === 'REJECTED' ? '3px solid #FF6B6B' : '3px solid #00D4AA', color: 'var(--text-primary)' }}>
+                            <strong>{st === 'REJECTED' ? 'Rejection Note:' : 'Resolution Note:'}</strong> {c.resolution_note}
                           </div>
                         )}
                       </td>
-                      <td>{Utils.formatDate(c.created_at)}</td>
+                      <td>{Utils.formatDate(c.created_at || c.submitted_at)}</td>
                       <td>
-                        <span className={`badge badge-${c.status?.toUpperCase() === 'RESOLVED' ? 'success' : 'warning'}`}>
-                          {c.status?.toUpperCase()}
+                        <span className={`badge badge-${st === 'RESOLVED' ? 'success' : st === 'REJECTED' ? 'danger' : 'warning'}`}>
+                          {st}
                         </span>
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        {c.status?.toUpperCase() !== 'RESOLVED' ? (
-                          <button 
-                            className="btn btn-ghost btn-sm" 
-                            style={{ color: 'var(--primary)' }}
-                            onClick={() => { setSelectedComplaint(c); setIsResolveOpen(true); }}
-                          >
-                            <i className="bi bi-pencil"></i> Resolve
-                          </button>
+                        {st === 'RESOLVED' ? (
+                          <span style={{ color: '#00D4AA', fontSize: '0.9rem', fontWeight: 600 }}><i className="bi bi-check-lg me-1"></i> Resolved</span>
+                        ) : st === 'REJECTED' ? (
+                          <span style={{ color: '#FF6B6B', fontSize: '0.9rem', fontWeight: 600 }}><i className="bi bi-x-circle me-1"></i> Rejected</span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}><i className="bi bi-check-lg"></i> Resolved</span>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            <button 
+                              className="btn btn-ghost btn-sm" 
+                              style={{ color: 'var(--primary)' }}
+                              onClick={() => { setSelectedComplaint(c); setIsResolveOpen(true); }}
+                            >
+                              <i className="bi bi-check2-circle"></i> Resolve
+                            </button>
+                            <button 
+                              className="btn btn-ghost btn-sm" 
+                              style={{ color: '#FF6B6B' }}
+                              onClick={() => { setSelectedComplaint(c); setIsRejectOpen(true); }}
+                            >
+                              <i className="bi bi-x-circle"></i> Reject
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -240,7 +307,7 @@ export default function HODComplaints() {
 
       {/* ======================== RESOLVE COMPLAINT MODAL ======================== */}
       {isResolveOpen && selectedComplaint && (
-        <Modal isOpen={isResolveOpen} onClose={() => setIsResolveOpen(false)} title={<><i className="bi bi-pencil-square me-2"></i>Resolve Student Grievance</>}>
+        <Modal isOpen={isResolveOpen} onClose={() => setIsResolveOpen(false)} title={<><i className="bi bi-check-circle me-2" style={{ color: '#00D4AA' }}></i>Resolve Student Grievance</>}>
           <form onSubmit={handleResolveSubmit}>
             <div style={{ marginBottom: '15px' }}>
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
@@ -261,6 +328,34 @@ export default function HODComplaints() {
             <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setIsResolveOpen(false)}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={loading}>Submit Resolution</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ======================== REJECT COMPLAINT MODAL ======================== */}
+      {isRejectOpen && selectedComplaint && (
+        <Modal isOpen={isRejectOpen} onClose={() => setIsRejectOpen(false)} title={<><i className="bi bi-x-circle me-2" style={{ color: '#FF6B6B' }}></i>Reject Student Grievance</>}>
+          <form onSubmit={handleRejectSubmit}>
+            <div style={{ marginBottom: '15px' }}>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                <strong>Grievance:</strong> {selectedComplaint.description}
+              </p>
+            </div>
+            <div className="form-group" style={{ marginBottom: '20px' }}>
+              <label className="form-label">Rejection Reason / Note *</label>
+              <textarea 
+                className="form-input" 
+                rows="4" 
+                required 
+                placeholder="State the reason why this grievance is being rejected..."
+                value={rejectionText} 
+                onChange={e => setRejectionText(e.target.value)}
+              />
+            </div>
+            <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setIsRejectOpen(false)}>Cancel</button>
+              <button type="submit" className="btn btn-danger" disabled={loading} style={{ background: '#FF6B6B', borderColor: '#FF6B6B', color: '#fff' }}>Reject Grievance</button>
             </div>
           </form>
         </Modal>

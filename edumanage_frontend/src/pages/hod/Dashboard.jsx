@@ -50,10 +50,11 @@ export default function HODDashboard() {
         } catch (_) {}
 
         const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+        const facultyEndpoint = deptId ? `faculty?department_id=${deptId}&limit=1000` : 'faculty?limit=1000';
         const studentsEndpoint = deptId ? `students?department_id=${deptId}&limit=1000` : 'students?limit=1000';
 
         const [facList, studList, courseList, compList, todaySchedule] = await Promise.all([
-          API.get('faculty'),
+          API.get(facultyEndpoint),
           API.get(studentsEndpoint),
           API.get('courses'),
           API.get('complaints'),

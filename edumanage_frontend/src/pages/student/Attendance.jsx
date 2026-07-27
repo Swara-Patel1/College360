@@ -60,7 +60,8 @@ export default function Attendance() {
           const breakdown = await Promise.all(
             enrollData.map(async (e) => {
               try {
-                const cStats = await API.get(`attendance/stats?student=${studUuid}&course=${e.course}`);
+                const courseId = typeof e.course === 'object' ? (e.course?.id || e.course?.subject_id || e.course?.course_id) : (e.course || e.subject_id || e.course_id || e.id);
+                const cStats = await API.get(`attendance/stats?student=${studUuid}&course=${courseId}`);
                 return { ...e, stats: cStats };
               } catch {
                 return {

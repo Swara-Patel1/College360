@@ -576,6 +576,44 @@ def handle_faculty(request, params, body):
         uid_in = params.get('user_id', '')  # could be "in.(uuid1,uuid2,...)"
         limit = int(params.get('limit', 200))
 
+        # Always check if requesting user is an HOD or Faculty member to restrict by department
+        user_param = params.get('user_id', '') or params.get('user', '') or params.get('email', '')
+        if user_param.startswith('eq.'):
+            user_param = user_param[3:]
+
+        from accounts.models import User
+        from django.db.models import Q
+
+        req_user = getattr(request, 'user', None)
+        u_found = None
+        if req_user and hasattr(req_user, 'email') and req_user.email and hasattr(req_user, 'is_authenticated') and req_user.is_authenticated:
+            u_found = req_user
+        elif user_param:
+            if user_param.isdigit():
+                u_found = User.objects.filter(pk=int(user_param)).first()
+            if not u_found:
+                u_found = User.objects.filter(Q(email__iexact=user_param) | Q(username__iexact=user_param)).first()
+
+        req_email = u_found.email.lower() if u_found else ''
+        req_role = (getattr(u_found, 'role', '') or getattr(u_found, 'roles', '')).lower() if u_found else ''
+
+        if not did_filter and req_role != 'admin' and (req_email or user_param):
+            try:
+                with connection.cursor() as cur:
+                    cur.execute("""
+                        SELECT department_id FROM (
+                            SELECT h.department_id FROM hod h JOIN users u ON CAST(u.id AS TEXT) = CAST(h.user_id AS TEXT) OR LOWER(CAST(h.user_id AS TEXT)) = LOWER(u.email) WHERE (%s <> '' AND LOWER(u.email) = %s) OR (%s <> '' AND CAST(u.id AS TEXT) = %s) OR (%s <> '' AND CAST(h.user_id AS TEXT) = %s)
+                            UNION
+                            SELECT f.department_id FROM faculty f JOIN users u ON CAST(u.id AS TEXT) = CAST(f.user_id AS TEXT) OR LOWER(CAST(f.user_id AS TEXT)) = LOWER(u.email) WHERE (%s <> '' AND LOWER(u.email) = %s) OR (%s <> '' AND CAST(u.id AS TEXT) = %s) OR (%s <> '' AND CAST(f.user_id AS TEXT) = %s)
+                        ) sub WHERE department_id IS NOT NULL LIMIT 1
+                    """, [req_email, req_email, user_param, user_param, user_param, user_param,
+                          req_email, req_email, user_param, user_param, user_param, user_param])
+                    r_hod = cur.fetchone()
+                    if r_hod and r_hod[0]:
+                        did_filter = str(r_hod[0])
+            except Exception:
+                pass
+
         sql = """
             SELECT f.faculty_id, f.user_id, f.employee_id, f.first_name, f.last_name,
                    'Faculty' AS designation, f.department_id, f.subject_id,
@@ -588,19 +626,28 @@ def handle_faculty(request, params, body):
         """
         args = []
         if uid_filter.startswith('eq.'):
-            sql += ' AND f.user_id = %s'
+            sql += ' AND CAST(f.user_id AS TEXT) = %s'
             args.append(uid_filter[3:])
         elif uid_in.startswith('in.('):
             ids = uid_in[4:-1].split(',')
             placeholders = ','.join(['%s'] * len(ids))
-            sql += f' AND f.user_id IN ({placeholders})'
+            sql += f' AND CAST(f.user_id AS TEXT) IN ({placeholders})'
             args.extend(ids)
+
         if did_filter.startswith('eq.'):
-            sql += ' AND f.department_id = %s'
+            sql += ' AND CAST(f.department_id AS TEXT) = %s'
             args.append(did_filter[3:])
+        elif did_filter:
+            sql += ' AND CAST(f.department_id AS TEXT) = %s'
+            args.append(did_filter)
+
         if fid_filter.startswith('eq.'):
-            sql += ' AND f.faculty_id = %s'
+            sql += ' AND CAST(f.faculty_id AS TEXT) = %s'
             args.append(fid_filter[3:])
+        elif fid_filter:
+            sql += ' AND CAST(f.faculty_id AS TEXT) = %s'
+            args.append(fid_filter)
+
         sql += ' ORDER BY f.employee_id ASC LIMIT %s'
         args.append(limit)
 
@@ -695,50 +742,140 @@ def handle_faculty(request, params, body):
 
 @handler('hod')
 def handle_hod(request, params, body):
-    """HOD table — backed by admin/hod-role users."""
+    """HOD table — backed by table hod joined with departments, users, and faculty."""
+    from django.db import connection
     if request.method == 'GET':
-        qs = Faculty.objects.select_related('user', 'department').filter(
-            designation='hod'
-        )
-        user_id = params.get('user_id', '')
-        if user_id and user_id.startswith('eq.'):
-            qs = qs.filter(user__pk=user_id[3:])
-        dept_id = params.get('department_id', '')
-        if dept_id and dept_id.startswith('eq.'):
-            qs = qs.filter(department__pk=dept_id[3:])
-        return [{
-            'hod_id': str(f.pk),
-            'id': str(f.pk),
-            'user_id': str(f.user.pk),
-            'department_id': str(f.department.pk) if f.department else None,
-            'user': serialize_user(f.user),
-            'department': serialize_dept(f.department),
-        } for f in qs]
+        user_id = params.get('user_id', '') or params.get('user', '')
+        dept_id = params.get('department_id', '') or params.get('department', '')
+        hod_id = params.get('hod_id', '') or params.get('id', '')
+
+        if user_id.startswith('eq.'):
+            user_id = user_id[3:]
+        if dept_id.startswith('eq.'):
+            dept_id = dept_id[3:]
+        if hod_id.startswith('eq.'):
+            hod_id = hod_id[3:]
+
+        sql = """
+            SELECT h.hod_id, h.user_id, h.department_id, h.address,
+                   d.name AS dept_name, d.code AS dept_code,
+                   u.email AS user_email,
+                   f.faculty_id, f.first_name AS fac_first, f.last_name AS fac_last, f.employee_id
+            FROM hod h
+            LEFT JOIN departments d ON CAST(d.department_id AS TEXT) = CAST(h.department_id AS TEXT)
+            LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(h.user_id AS TEXT) OR LOWER(CAST(h.user_id AS TEXT)) = LOWER(u.email)
+            LEFT JOIN faculty f ON CAST(f.user_id AS TEXT) = CAST(u.id AS TEXT) OR CAST(f.user_id AS TEXT) = CAST(h.user_id AS TEXT) OR CAST(f.department_id AS TEXT) = CAST(h.department_id AS TEXT)
+            WHERE 1=1
+        """
+        args = []
+        if hod_id:
+            sql += ' AND CAST(h.hod_id AS TEXT) = %s'
+            args.append(hod_id)
+        if user_id:
+            sql += ' AND (CAST(h.user_id AS TEXT) = %s OR LOWER(CAST(u.email AS TEXT)) = %s OR CAST(u.id AS TEXT) = %s)'
+            args.extend([user_id, user_id.lower(), user_id])
+        if dept_id:
+            sql += ' AND CAST(h.department_id AS TEXT) = %s'
+            args.append(dept_id)
+
+        sql += ' ORDER BY d.name ASC'
+
+        with connection.cursor() as cur:
+            cur.execute(sql, args)
+            cols = [c[0] for c in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+
+        seen = set()
+        out = []
+        for r in rows:
+            hid = str(r['hod_id'])
+            if hid in seen:
+                continue
+            seen.add(hid)
+
+            first = r.get('fac_first') or ''
+            last = r.get('fac_last') or ''
+            email = r.get('user_email') or ''
+
+            if not first and not last and email:
+                first = email.split('@')[0].capitalize()
+                last = 'HOD'
+
+            out.append({
+                'hod_id': hid,
+                'id': hid,
+                'user_id': str(r['user_id']) if r.get('user_id') else None,
+                'department_id': str(r['department_id']) if r.get('department_id') else None,
+                'department_name': r.get('dept_name') or 'Department',
+                'office_location': r.get('address') or 'Main Campus Building',
+                'address': r.get('address') or '',
+                'first_name': first,
+                'last_name': last,
+                'name': f"{first} {last}".strip(),
+                'email': email,
+                'employee_id': r.get('employee_id') or '',
+                'faculty_id': str(r['faculty_id']) if r.get('faculty_id') else None,
+                'user': {
+                    'id': str(r['user_id']) if r.get('user_id') else None,
+                    'user_id': str(r['user_id']) if r.get('user_id') else None,
+                    'email': email,
+                    'first_name': first,
+                    'last_name': last,
+                },
+                'department': {
+                    'department_id': str(r['department_id']) if r.get('department_id') else None,
+                    'id': str(r['department_id']) if r.get('department_id') else None,
+                    'name': r.get('dept_name') or 'Department',
+                    'code': r.get('dept_code') or '',
+                },
+                'faculty': {
+                    'faculty_id': str(r['faculty_id']) if r.get('faculty_id') else None,
+                    'id': str(r['faculty_id']) if r.get('faculty_id') else None,
+                    'first_name': first,
+                    'last_name': last,
+                    'email': email,
+                }
+            })
+        return out
 
     if request.method == 'POST':
-        # Promote a faculty member to HOD. Accepts faculty_id (preferred) or user_id.
+        import uuid
         dept_id = body.get('department_id')
-        fac = None
-        if body.get('faculty_id'):
-            fac = Faculty.objects.filter(pk=body['faculty_id']).first()
-        elif body.get('user_id'):
-            fac = Faculty.objects.filter(user__pk=body['user_id']).first()
-        if not fac:
-            return {'error': 'Faculty not found.'}
-        # A department has one HOD: demote any current HOD of the target department.
-        if dept_id:
-            Faculty.objects.filter(department__pk=dept_id, designation='hod').exclude(pk=fac.pk) \
-                .update(designation='assistant_professor')
-            fac.department_id = dept_id
-        fac.designation = 'hod'
-        fac.save()
-        return [{'hod_id': str(fac.pk), 'id': str(fac.pk), 'user_id': str(fac.user.pk),
-                 'department_id': str(fac.department.pk) if fac.department else None}]
+        user_id = body.get('user_id')
+        fac_id = body.get('faculty_id')
+
+        if fac_id:
+            with connection.cursor() as cur:
+                cur.execute("SELECT user_id, department_id FROM faculty WHERE CAST(faculty_id AS TEXT) = %s LIMIT 1", [fac_id])
+                r_f = cur.fetchone()
+                if r_f:
+                    user_id = user_id or str(r_f[0])
+                    dept_id = dept_id or str(r_f[1])
+
+        if not user_id or not dept_id:
+            return {'error': 'Missing user_id or department_id.'}
+
+        h_id = str(uuid.uuid4())
+        with connection.cursor() as cur:
+            cur.execute("DELETE FROM hod WHERE CAST(department_id AS TEXT) = %s", [dept_id])
+            cur.execute("""
+                INSERT INTO hod (hod_id, user_id, department_id, address)
+                VALUES (%s, %s, %s, 'Main Campus Building')
+            """, [h_id, user_id, dept_id])
+
+            cur.execute("UPDATE users SET roles = 'hod' WHERE CAST(id AS TEXT) = %s", [user_id])
+
+        return [{'hod_id': h_id, 'id': h_id, 'user_id': user_id, 'department_id': dept_id}]
 
     if request.method == 'DELETE':
-        hod_id_filter = params.get('hod_id', '') or params.get('id', '')
-        if hod_id_filter.startswith('eq.'):
-            Faculty.objects.filter(pk=hod_id_filter[3:]).update(designation='assistant_professor')
+        hid = params.get('hod_id', '') or params.get('id', '')
+        if hid.startswith('eq.'):
+            hid = hid[3:]
+        with connection.cursor() as cur:
+            if hid:
+                cur.execute("DELETE FROM hod WHERE CAST(hod_id AS TEXT) = %s", [hid])
+            else:
+                cur.execute("DELETE FROM hod")
         return []
 
 
@@ -793,23 +930,44 @@ def handle_students(request, params, body):
         """
         args = []
         dept_filter = params.get('department_id', '')
-        if not dept_filter and hasattr(request, 'user') and request.user and request.user.is_authenticated:
-            req_user = request.user
-            req_role = getattr(req_user, 'role', '') or getattr(req_user, 'roles', '')
-            if req_role in ('hod', 'faculty'):
-                try:
-                    with connection.cursor() as cur:
-                        cur.execute("""
-                            SELECT department_id FROM hod WHERE CAST(user_id AS TEXT) = %s OR LOWER(CAST(user_id AS TEXT)) = %s
+        
+        # Always check if the requesting user is an HOD or Faculty member to restrict by department
+        user_param = params.get('user_id', '') or params.get('user', '') or params.get('email', '')
+        if user_param.startswith('eq.'):
+            user_param = user_param[3:]
+
+        from accounts.models import User
+        from django.db.models import Q
+
+        req_user = getattr(request, 'user', None)
+        u_found = None
+        if req_user and hasattr(req_user, 'email') and req_user.email and hasattr(req_user, 'is_authenticated') and req_user.is_authenticated:
+            u_found = req_user
+        elif user_param:
+            if user_param.isdigit():
+                u_found = User.objects.filter(pk=int(user_param)).first()
+            if not u_found:
+                u_found = User.objects.filter(Q(email__iexact=user_param) | Q(username__iexact=user_param)).first()
+
+        req_email = u_found.email.lower() if u_found else ''
+        req_role = (getattr(u_found, 'role', '') or getattr(u_found, 'roles', '')).lower() if u_found else ''
+
+        if req_role != 'admin':
+            try:
+                with connection.cursor() as cur:
+                    cur.execute("""
+                        SELECT department_id FROM (
+                            SELECT h.department_id FROM hod h JOIN users u ON CAST(u.id AS TEXT) = CAST(h.user_id AS TEXT) OR LOWER(CAST(h.user_id AS TEXT)) = LOWER(u.email) WHERE (%s <> '' AND LOWER(u.email) = %s) OR (%s <> '' AND CAST(u.id AS TEXT) = %s) OR (%s <> '' AND CAST(h.user_id AS TEXT) = %s)
                             UNION
-                            SELECT department_id FROM faculty WHERE CAST(user_id AS TEXT) = %s OR LOWER(CAST(user_id AS TEXT)) = %s
-                            LIMIT 1
-                        """, [str(req_user.pk), str(getattr(req_user, 'email', '')).lower(), str(req_user.pk), str(getattr(req_user, 'email', '')).lower()])
-                        r_hod = cur.fetchone()
-                        if r_hod and r_hod[0]:
-                            dept_filter = str(r_hod[0])
-                except Exception:
-                    pass
+                            SELECT f.department_id FROM faculty f JOIN users u ON CAST(u.id AS TEXT) = CAST(f.user_id AS TEXT) OR LOWER(CAST(f.user_id AS TEXT)) = LOWER(u.email) WHERE (%s <> '' AND LOWER(u.email) = %s) OR (%s <> '' AND CAST(u.id AS TEXT) = %s) OR (%s <> '' AND CAST(f.user_id AS TEXT) = %s)
+                        ) sub WHERE department_id IS NOT NULL LIMIT 1
+                    """, [req_email, req_email, user_param, user_param, user_param, user_param,
+                          req_email, req_email, user_param, user_param, user_param, user_param])
+                    r_hod = cur.fetchone()
+                    if r_hod and r_hod[0]:
+                        dept_filter = str(r_hod[0])
+            except Exception:
+                pass
 
         if dept_filter.startswith('eq.'):
             sql += ' AND CAST(s.department_id AS TEXT) = %s'
@@ -1007,14 +1165,25 @@ def handle_subjects(request, params, body):
             args.extend([fac_filter, fac_filter])
 
         if dept_filter.startswith('eq.'):
-            sql += ' AND sub.department_id = %s'
+            sql += ' AND CAST(sub.department_id AS TEXT) = %s'
             args.append(dept_filter[3:])
+        elif dept_filter:
+            sql += ' AND CAST(sub.department_id AS TEXT) = %s'
+            args.append(dept_filter)
+
         if sem_filter.startswith('eq.'):
-            sql += ' AND sub.semester_id = %s'
+            sql += ' AND CAST(sub.semester_id AS TEXT) = %s'
             args.append(sem_filter[3:])
+        elif sem_filter:
+            sql += ' AND CAST(sub.semester_id AS TEXT) = %s'
+            args.append(sem_filter)
+
         if code_filter.startswith('eq.'):
             sql += ' AND sub.code = %s'
             args.append(code_filter[3:])
+        elif code_filter:
+            sql += ' AND sub.code = %s'
+            args.append(code_filter)
         sql += ' ORDER BY sem.number ASC, sub.name ASC LIMIT %s'
         args.append(limit)
 
@@ -2066,133 +2235,154 @@ def handle_library_stats(request, params, body):
 
 
 @handler('admin/fees')
-def handle_admin_fees(request, params, body):
-    """Flat, denormalized fee list for the admin fee console."""
-    out = []
-    for f in Fee.objects.select_related('student__user', 'student__department').all()[:1000]:
-        stu = f.student
-        out.append({
-            'id': str(f.pk),
-            'payment_id': str(f.pk),
-            'student_name': f'{stu.user.first_name} {stu.user.last_name}'.strip() or '—',
-            'enrollment_no': stu.student_id,
-            'department_name': stu.department.name if stu.department else '—',
-            'component_name': f.get_fee_type_display(),
-            'fee_type': f.fee_type,
-            'amount': float(f.amount),
-            'amount_paid': float(f.amount) if f.status == 'paid' else 0.0,
-            'due_date': _dt(f.due_date),
-            'status': f.status,
-            'transaction_ref': f.transaction_id or '',
-        })
-    return out
-
-
-@handler('fees/mark-paid')
-def handle_fee_mark_paid(request, params, body):
-    """Mark a single fee record paid, stamping the payment date + a transaction ref."""
-    if request.method != 'POST':
-        return []
-    pid = body.get('payment_id') or (params.get('payment_id', '').replace('eq.', ''))
-    fee = Fee.objects.filter(pk=pid).first()
-    if not fee:
-        return {'error': 'fee not found'}
-    fee.status = 'paid'
-    fee.payment_date = timezone.now().date()
-    fee.transaction_id = body.get('transaction_ref') or f'TXN{int(timezone.now().timestamp())}'
-    fee.save()
-    return [serialize_fee(fee)]
-
-
 @handler('fee_payments')
 @handler('fees')
 def handle_fee_payments(request, params, body):
-    FM = {'payment_id': 'pk', 'id': 'pk', 'student_id': 'student__pk', 'status': 'status'}
     from django.db import connection
     if request.method == 'GET':
-        student_id = params.get('student_id', '')
+        student_id = params.get('student_id', '') or params.get('student', '')
         status_filter = params.get('status', '')
+        if student_id.startswith('eq.'):
+            student_id = student_id[3:]
 
         sql = """
-            SELECT fp.payment_id, fp.student_id, fp.fee_structure_id, fp.amount_paid,
-                   fp.payment_date, fp.status, fp.transaction_ref,
-                   s.first_name, s.last_name, s.enrollment_no, s.department_id, s.parent_email, s.parent_phone, s.current_rollno,
-                   d.name AS dept_name,
-                   fs.component_name, fs.amount AS fee_amount, fs.due_date
-            FROM fee_payments fp
-            LEFT JOIN students s ON CAST(s.student_id AS TEXT) = CAST(fp.student_id AS TEXT)
+            SELECT s.student_id, s.enrollment_no, s.first_name AS stu_first, s.last_name AS stu_last, s.department_id, s.parent_email, s.parent_phone, s.current_rollno,
+                   u.email AS stu_email, d.name AS dept_name,
+                   fp.payment_id, fp.fee_structure_id, fp.amount_paid, fp.payment_date, fp.status, fp.transaction_ref,
+                   fs.component_name, fs.amount AS fee_amount, fs.due_date, fs.program_code
+            FROM students s
+            LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(s.user_id AS TEXT)
             LEFT JOIN departments d ON CAST(d.department_id AS TEXT) = CAST(s.department_id AS TEXT)
+            LEFT JOIN fee_payments fp ON CAST(fp.student_id AS TEXT) = CAST(s.student_id AS TEXT)
             LEFT JOIN fee_structures fs ON CAST(fs.fee_id AS TEXT) = CAST(fp.fee_structure_id AS TEXT)
             WHERE 1=1
         """
         args = []
-        if student_id.startswith('eq.'):
-            sql += ' AND CAST(fp.student_id AS TEXT) = %s'
-            args.append(student_id[3:])
+        if student_id:
+            sql += ' AND (CAST(s.student_id AS TEXT) = %s OR CAST(fp.student_id AS TEXT) = %s)'
+            args.extend([student_id, student_id])
+
         if status_filter.startswith('eq.'):
-            sql += ' AND LOWER(CAST(fp.status AS TEXT)) = %s'
-            args.append(status_filter[3:].lower())
-        sql += ' LIMIT 500'
+            st_f = status_filter[3:].lower()
+            if st_f == 'pending':
+                sql += ' AND (fp.status IS NULL OR LOWER(CAST(fp.status AS TEXT)) = %s)'
+            else:
+                sql += ' AND LOWER(CAST(fp.status AS TEXT)) = %s'
+            args.append(st_f)
+        elif status_filter:
+            st_f = status_filter.lower()
+            if st_f == 'pending':
+                sql += ' AND (fp.status IS NULL OR LOWER(CAST(fp.status AS TEXT)) = %s)'
+            else:
+                sql += ' AND LOWER(CAST(fp.status AS TEXT)) = %s'
+            args.append(st_f)
+
+        sql += ' ORDER BY fp.payment_date DESC NULLS LAST, s.enrollment_no ASC LIMIT 1000'
 
         with connection.cursor() as cur:
             cur.execute(sql, args)
             cols = [c[0] for c in cur.description]
             rows = [dict(zip(cols, r)) for r in cur.fetchall()]
 
-        return [{
-            'payment_id': str(r['payment_id']),
-            'id': str(r['payment_id']),
-            'student_id': str(r['student_id']) if r.get('student_id') else None,
-            'fee_structure_id': str(r['fee_structure_id']) if r.get('fee_structure_id') else None,
-            'amount_paid': float(r.get('amount_paid') or 0),
-            'amount': float(r.get('fee_amount') or r.get('amount_paid') or 0),
-            'payment_date': _dt(r.get('payment_date')),
-            'status': str(r.get('status') or 'pending').lower(),
-            'transaction_ref': r.get('transaction_ref') or '',
-            'due_date': _dt(r.get('due_date')),
-            'fee_type': r.get('component_name') or 'Tuition Fee',
-            'student': {
+        out = []
+        for r in rows:
+            fn = r.get('stu_first') or ''
+            ln = r.get('stu_last') or ''
+            stu_name = f"{fn} {ln}".strip() or (r.get('stu_email') or '').split('@')[0].capitalize() or 'Student'
+            p_id = str(r['payment_id']) if r.get('payment_id') else f"draft-{r['student_id']}"
+            status_str = str(r.get('status') or 'pending').lower()
+
+            out.append({
+                'payment_id': p_id,
+                'id': p_id,
                 'student_id': str(r['student_id']) if r.get('student_id') else None,
-                'id': str(r['student_id']) if r.get('student_id') else None,
-                'first_name': r.get('first_name') or '',
-                'last_name': r.get('last_name') or '',
+                'fee_structure_id': str(r['fee_structure_id']) if r.get('fee_structure_id') else None,
+                'student_name': stu_name,
                 'enrollment_no': r.get('enrollment_no') or '',
-                'roll_number': r.get('current_rollno') or '',
-                'department_id': str(r['department_id']) if r.get('department_id') else None,
-                'parent_email': r.get('parent_email') or '',
-                'parent_phone': r.get('parent_phone') or '',
-            },
-            'fee_structures': {
-                'fee_id': str(r['fee_structure_id']) if r.get('fee_structure_id') else None,
+                'department_name': r.get('dept_name') or 'Department',
                 'component_name': r.get('component_name') or 'Tuition Fee',
-                'amount': float(r.get('fee_amount') or 0),
-                'due_date': _dt(r.get('due_date')),
-            },
-        } for r in rows]
+                'fee_type': r.get('component_name') or 'Tuition Fee',
+                'amount': float(r.get('fee_amount') or 25000.0),
+                'amount_paid': float(r.get('amount_paid') or 0.0),
+                'payment_date': _dt(r.get('payment_date')),
+                'due_date': _dt(r.get('due_date') or '2024-07-31'),
+                'status': status_str,
+                'transaction_ref': r.get('transaction_ref') or '',
+                'student': {
+                    'student_id': str(r['student_id']) if r.get('student_id') else None,
+                    'id': str(r['student_id']) if r.get('student_id') else None,
+                    'first_name': fn,
+                    'last_name': ln,
+                    'enrollment_no': r.get('enrollment_no') or '',
+                    'roll_number': r.get('current_rollno') or '',
+                    'department_id': str(r['department_id']) if r.get('department_id') else None,
+                    'parent_email': r.get('parent_email') or '',
+                    'parent_phone': r.get('parent_phone') or '',
+                },
+                'fee_structures': {
+                    'fee_id': str(r['fee_structure_id']) if r.get('fee_structure_id') else None,
+                    'component_name': r.get('component_name') or 'Tuition Fee',
+                    'amount': float(r.get('fee_amount') or 25000.0),
+                    'due_date': _dt(r.get('due_date') or '2024-07-31'),
+                },
+            })
+        return out
 
-    if request.method == 'PATCH':
-        qs = Fee.objects.all()
-        pid_filter = params.get('payment_id', '')
-        if pid_filter.startswith('eq.'):
-            qs = qs.filter(pk=pid_filter[3:])
-        else:
-            qs = apply_postgrest_filters(qs, params, FM)
-        if 'status' in body:
-            qs.update(status=body['status'])
-        if 'payment_date' in body:
-            qs.update(payment_date=body['payment_date'])
-        if 'transaction_ref' in body:
-            qs.update(transaction_id=body['transaction_ref'])
-        return [serialize_fee(f) for f in qs]
-
-    return []
+    if request.method == 'POST' or request.method == 'PATCH':
+        pid = body.get('payment_id') or body.get('id') or params.get('payment_id', '').replace('eq.', '')
+        status_val = body.get('status', 'paid')
+        tx_ref = body.get('transaction_ref') or f'TXN{int(timezone.now().timestamp())}'
+        with connection.cursor() as cur:
+            if pid:
+                cur.execute("""
+                    UPDATE fee_payments
+                    SET status = %s, payment_date = CURRENT_DATE, transaction_ref = %s,
+                        amount_paid = COALESCE((SELECT amount FROM fee_structures WHERE CAST(fee_id AS TEXT) = CAST(fee_payments.fee_structure_id AS TEXT)), amount_paid)
+                    WHERE CAST(payment_id AS TEXT) = %s
+                """, [status_val, tx_ref, pid])
+        return [{'payment_id': pid, 'status': status_val, 'transaction_ref': tx_ref}]
 
 
+@handler('fees/mark-paid')
+def handle_fee_mark_paid(request, params, body):
+    from django.db import connection
+    pid = body.get('payment_id') or body.get('id') or params.get('payment_id', '').replace('eq.', '')
+    tx_ref = body.get('transaction_ref') or f'TXN{int(timezone.now().timestamp())}'
+    with connection.cursor() as cur:
+        if pid:
+            cur.execute("""
+                UPDATE fee_payments
+                SET status = 'paid', payment_date = CURRENT_DATE, transaction_ref = %s,
+                    amount_paid = COALESCE((SELECT amount FROM fee_structures WHERE CAST(fee_id AS TEXT) = CAST(fee_payments.fee_structure_id AS TEXT)), amount_paid)
+                WHERE CAST(payment_id AS TEXT) = %s
+            """, [tx_ref, pid])
 @handler('fee_structures')
 def handle_fee_structures(request, params, body):
-    """Map fee_structures reads to Fee objects."""
-    qs = Fee.objects.all()
-    return [serialize_fee(f)['fee_structures'] for f in qs[:200]]
+    """Fee structures table."""
+    from django.db import connection
+    sql = """
+        SELECT fs.fee_id, fs.semester_id, fs.program_code, fs.component_name, fs.amount, fs.due_date, fs.is_optional,
+               sem.number AS sem_number
+        FROM fee_structures fs
+        LEFT JOIN semesters sem ON CAST(sem.semester_id AS TEXT) = CAST(fs.semester_id AS TEXT)
+        ORDER BY fs.due_date ASC NULLS LAST LIMIT 200
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql)
+        cols = [c[0] for c in cur.description]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+
+    return [{
+        'fee_id': str(r['fee_id']),
+        'id': str(r['fee_id']),
+        'semester_id': str(r['semester_id']) if r.get('semester_id') else None,
+        'program_code': r.get('program_code') or '',
+        'component_name': r.get('component_name') or 'Tuition Fee',
+        'amount': float(r.get('amount') or 0),
+        'due_date': _dt(r.get('due_date')),
+        'is_optional': bool(r.get('is_optional')),
+        'semester_number': r.get('sem_number'),
+    } for r in rows]
 
 
 @handler('timetable')
@@ -2200,14 +2390,55 @@ def handle_timetable(request, params, body):
     FM = {'timetable_id': 'pk', 'id': 'pk', 'faculty_id': 'faculty__pk'}
     from django.db import connection
     if request.method == 'GET':
-        day_filter = params.get('day_of_week', '')
-        faculty_filter = params.get('faculty_id', '')
-        section_filter = params.get('class_section_id', '')
+        day_filter = params.get('day_of_week', '') or params.get('day', '')
+        faculty_filter = params.get('faculty_id', '') or params.get('faculty', '')
+        section_filter = params.get('class_section_id', '') or params.get('section', '')
+        department_filter = params.get('department_id', '') or params.get('department', '')
+        semester_filter = params.get('semester_id', '') or params.get('semester', '')
+
+        user_param = params.get('user_id', '') or params.get('user', '') or params.get('email', '') or params.get('student', '') or params.get('student_id', '')
+        if user_param.startswith('eq.'):
+            user_param = user_param[3:]
+
+        from accounts.models import User
+        from django.db.models import Q
+
+        req_user = getattr(request, 'user', None)
+        u_found = None
+        if req_user and hasattr(req_user, 'email') and req_user.email and hasattr(req_user, 'is_authenticated') and req_user.is_authenticated:
+            u_found = req_user
+        elif user_param:
+            if user_param.isdigit():
+                u_found = User.objects.filter(pk=int(user_param)).first()
+            if not u_found:
+                u_found = User.objects.filter(Q(email__iexact=user_param) | Q(username__iexact=user_param)).first()
+
+        req_email = u_found.email.lower() if u_found else ''
+        req_role = (getattr(u_found, 'role', '') or getattr(u_found, 'roles', '')).lower() if u_found else ''
+
+        if not department_filter and (req_email or user_param):
+            try:
+                with connection.cursor() as cur:
+                    cur.execute("""
+                        SELECT department_id FROM (
+                            SELECT s.department_id FROM students s JOIN users u ON CAST(u.id AS TEXT) = CAST(s.user_id AS TEXT) WHERE (%s <> '' AND LOWER(u.email) = %s) OR (%s <> '' AND CAST(u.id AS TEXT) = %s) OR (%s <> '' AND CAST(s.student_id AS TEXT) = %s)
+                            UNION
+                            SELECT h.department_id FROM hod h JOIN users u ON CAST(u.id AS TEXT) = CAST(h.user_id AS TEXT) OR LOWER(CAST(h.user_id AS TEXT)) = LOWER(u.email) WHERE (%s <> '' AND LOWER(u.email) = %s) OR (%s <> '' AND CAST(u.id AS TEXT) = %s) OR (%s <> '' AND CAST(h.user_id AS TEXT) = %s)
+                            UNION
+                            SELECT f.department_id FROM faculty f JOIN users u ON CAST(u.id AS TEXT) = CAST(f.user_id AS TEXT) OR LOWER(CAST(f.user_id AS TEXT)) = LOWER(u.email) WHERE (%s <> '' AND LOWER(u.email) = %s) OR (%s <> '' AND CAST(u.id AS TEXT) = %s) OR (%s <> '' AND CAST(f.user_id AS TEXT) = %s)
+                        ) sub WHERE department_id IS NOT NULL LIMIT 1
+                    """, [req_email, req_email, user_param, user_param, user_param, user_param,
+                          req_email, req_email, user_param, user_param, user_param, user_param,
+                          req_email, req_email, user_param, user_param, user_param, user_param])
+                    r_dept = cur.fetchone()
+                    if r_dept and r_dept[0]:
+                        department_filter = str(r_dept[0])
+            except Exception:
+                pass
 
         sql = """
-            SELECT t.timetable_id, t.class_section_id, t.subject_id, t.faculty_id,
-                   t.day_of_week, t.start_time, t.end_time, t.room_no,
-                   t.academic_year, t.is_active,
+            SELECT t.timetable_id, t.class_section_id, t.subject_id, t.faculty_id, t.department_id AS t_dept_id,
+                   t.day_of_week, t.start_time, t.end_time, t.room_no, t.is_active,
                    sub.name AS subject_name, sub.code AS subject_code, sub.department_id AS sub_dept_id,
                    f.first_name AS fac_first, f.last_name AS fac_last, f.department_id AS fac_dept_id,
                    u.email AS fac_email
@@ -2240,6 +2471,20 @@ def handle_timetable(request, params, body):
             sql += ' AND CAST(t.class_section_id AS TEXT) = %s'
             args.append(section_filter)
 
+        if department_filter.startswith('eq.'):
+            sql += ' AND (CAST(t.department_id AS TEXT) = %s OR CAST(sub.department_id AS TEXT) = %s OR CAST(f.department_id AS TEXT) = %s)'
+            args.extend([department_filter[3:], department_filter[3:], department_filter[3:]])
+        elif department_filter:
+            sql += ' AND (CAST(t.department_id AS TEXT) = %s OR CAST(sub.department_id AS TEXT) = %s OR CAST(f.department_id AS TEXT) = %s)'
+            args.extend([department_filter, department_filter, department_filter])
+
+        if semester_filter.startswith('eq.'):
+            sql += ' AND (CAST(sub.semester_id AS TEXT) = %s OR CAST(sub.semester_id AS TEXT) IS NULL)'
+            args.append(semester_filter[3:])
+        elif semester_filter:
+            sql += ' AND (CAST(sub.semester_id AS TEXT) = %s OR CAST(sub.semester_id AS TEXT) IS NULL)'
+            args.append(semester_filter)
+
         sql += ' ORDER BY t.start_time ASC LIMIT 200'
 
         with connection.cursor() as cur:
@@ -2253,14 +2498,19 @@ def handle_timetable(request, params, body):
             'class_section_id': str(r['class_section_id']) if r.get('class_section_id') else None,
             'subject_id': str(r['subject_id']) if r.get('subject_id') else None,
             'faculty_id': str(r['faculty_id']) if r.get('faculty_id') else None,
-            'day_of_week': r.get('day_of_week') or 'monday',
-            'day': r.get('day_of_week') or 'monday',
+            'day_of_week': (r.get('day_of_week') or 'monday').lower(),
+            'day': (r.get('day_of_week') or 'monday').lower(),
             'start_time': str(r.get('start_time') or '')[:5],
             'end_time': str(r.get('end_time') or '')[:5],
             'room_no': r.get('room_no') or '',
             'room': r.get('room_no') or '',
             'academic_year': r.get('academic_year') or '',
             'is_active': bool(r.get('is_active')),
+            'course_code': r.get('subject_code') or '—',
+            'course_name': r.get('subject_name') or '—',
+            'subject_code': r.get('subject_code') or '—',
+            'subject_name': r.get('subject_name') or '—',
+            'faculty_name': f"{r.get('fac_first', '')} {r.get('fac_last', '')}".strip() or 'Faculty',
             'course': {
                 'subject_id': str(r['subject_id']) if r.get('subject_id') else None,
                 'department_id': str(r['sub_dept_id']) if r.get('sub_dept_id') else None,
@@ -2276,8 +2526,8 @@ def handle_timetable(request, params, body):
                     'email': r.get('fac_email') or '',
                     'first_name': r.get('fac_first') or '',
                     'last_name': r.get('fac_last') or '',
-                },
-            } if r.get('faculty_id') else None,
+                }
+            }
         } for r in rows]
 
     if request.method == 'POST':
@@ -2733,6 +2983,386 @@ def handle_faculty_profile(request, params, body):
     }
 
 
+@handler('grievances')
+@handler('complaints')
+def handle_grievances(request, params, body):
+    from django.db import connection
+    if request.method == 'GET':
+        gid_filter = params.get('grievance_id', '') or params.get('id', '')
+        sid_filter = params.get('student_id', '')
+        dept_filter = params.get('department_id', '')
+        status_filter = params.get('status', '')
+        limit = int(params.get('limit', 500))
+
+        user_param = params.get('user_id', '') or params.get('user', '') or params.get('email', '')
+        if user_param.startswith('eq.'):
+            user_param = user_param[3:]
+
+        from accounts.models import User
+        from django.db.models import Q
+
+        req_user = getattr(request, 'user', None)
+        u_found = None
+        if req_user and hasattr(req_user, 'email') and req_user.email and hasattr(req_user, 'is_authenticated') and req_user.is_authenticated:
+            u_found = req_user
+        elif user_param:
+            if user_param.isdigit():
+                u_found = User.objects.filter(pk=int(user_param)).first()
+            if not u_found:
+                u_found = User.objects.filter(Q(email__iexact=user_param) | Q(username__iexact=user_param)).first()
+
+        req_email = u_found.email.lower() if u_found else ''
+        req_role = (getattr(u_found, 'role', '') or getattr(u_found, 'roles', '')).lower() if u_found else ''
+
+        if not dept_filter and req_role != 'admin' and (req_email or user_param):
+            try:
+                with connection.cursor() as cur:
+                    cur.execute("""
+                        SELECT department_id FROM (
+                            SELECT h.department_id FROM hod h JOIN users u ON CAST(u.id AS TEXT) = CAST(h.user_id AS TEXT) OR LOWER(CAST(h.user_id AS TEXT)) = LOWER(u.email) WHERE (%s <> '' AND LOWER(u.email) = %s) OR (%s <> '' AND CAST(u.id AS TEXT) = %s) OR (%s <> '' AND CAST(h.user_id AS TEXT) = %s)
+                            UNION
+                            SELECT f.department_id FROM faculty f JOIN users u ON CAST(u.id AS TEXT) = CAST(f.user_id AS TEXT) OR LOWER(CAST(f.user_id AS TEXT)) = LOWER(u.email) WHERE (%s <> '' AND LOWER(u.email) = %s) OR (%s <> '' AND CAST(u.id AS TEXT) = %s) OR (%s <> '' AND CAST(f.user_id AS TEXT) = %s)
+                        ) sub WHERE department_id IS NOT NULL LIMIT 1
+                    """, [req_email, req_email, user_param, user_param, user_param, user_param,
+                          req_email, req_email, user_param, user_param, user_param, user_param])
+                    r_hod = cur.fetchone()
+                    if r_hod and r_hod[0]:
+                        dept_filter = str(r_hod[0])
+            except Exception:
+                pass
+
+        sql = """
+            SELECT g.grievance_id, g.student_id, g.category, g.description, g.attachment_url,
+                   g.status, g.is_critical, g.resolution_note, g.resolved_by,
+                   g.submitted_at, g.resolved_at, g.sla_deadline, g.is_anonymous,
+                   s.enrollment_no, s.first_name AS student_first_name, s.last_name AS student_last_name,
+                   s.department_id AS student_department_id,
+                   u.email AS student_email,
+                   d.name AS dept_name, d.code AS dept_code
+            FROM grievances g
+            LEFT JOIN students s ON CAST(s.student_id AS TEXT) = CAST(g.student_id AS TEXT) OR CAST(s.user_id AS TEXT) = CAST(g.student_id AS TEXT)
+            LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(s.user_id AS TEXT)
+            LEFT JOIN departments d ON CAST(d.department_id AS TEXT) = CAST(s.department_id AS TEXT)
+            WHERE 1=1
+        """
+        args = []
+        if gid_filter.startswith('eq.'):
+            sql += ' AND CAST(g.grievance_id AS TEXT) = %s'
+            args.append(gid_filter[3:])
+        elif gid_filter:
+            sql += ' AND CAST(g.grievance_id AS TEXT) = %s'
+            args.append(gid_filter)
+
+        if sid_filter.startswith('eq.'):
+            sql += ' AND (CAST(g.student_id AS TEXT) = %s OR CAST(s.student_id AS TEXT) = %s OR CAST(s.user_id AS TEXT) = %s)'
+            args.extend([sid_filter[3:], sid_filter[3:], sid_filter[3:]])
+        elif sid_filter:
+            sql += ' AND (CAST(g.student_id AS TEXT) = %s OR CAST(s.student_id AS TEXT) = %s OR CAST(s.user_id AS TEXT) = %s)'
+            args.extend([sid_filter, sid_filter, sid_filter])
+
+        if dept_filter.startswith('eq.'):
+            sql += ' AND CAST(s.department_id AS TEXT) = %s'
+            args.append(dept_filter[3:])
+        elif dept_filter:
+            sql += ' AND CAST(s.department_id AS TEXT) = %s'
+            args.append(dept_filter)
+
+        if status_filter.startswith('eq.'):
+            sql += ' AND LOWER(g.status) = %s'
+            args.append(status_filter[3:].lower())
+        elif status_filter:
+            sql += ' AND LOWER(g.status) = %s'
+            args.append(status_filter.lower())
+
+        sql += ' ORDER BY g.submitted_at DESC LIMIT %s'
+        args.append(limit)
+
+        with connection.cursor() as cur:
+            cur.execute(sql, args)
+            cols = [c[0] for c in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+
+        return [{
+            'grievance_id': str(r['grievance_id']),
+            'id': str(r['grievance_id']),
+            'student_id': str(r['student_id']) if r.get('student_id') else None,
+            'category': r.get('category') or 'Other',
+            'title': f"{r.get('category', 'Grievance')} - {r.get('description', '')[:30]}",
+            'description': r.get('description') or '',
+            'attachment_url': r.get('attachment_url') or '',
+            'status': r.get('status') or 'pending',
+            'is_critical': bool(r.get('is_critical')),
+            'resolution_note': r.get('resolution_note') or '',
+            'resolved_note': r.get('resolution_note') or '',
+            'hod_response': r.get('resolution_note') or '',
+            'resolved_by': str(r['resolved_by']) if r.get('resolved_by') else None,
+            'submitted_at': _dt(r.get('submitted_at')),
+            'created_at': _dt(r.get('submitted_at')),
+            'resolved_at': _dt(r.get('resolved_at')),
+            'sla_deadline': _dt(r.get('sla_deadline')),
+            'is_anonymous': bool(r.get('is_anonymous')),
+            'student_name': 'Anonymous Student' if bool(r.get('is_anonymous')) else (f"{r.get('student_first_name', '')} {r.get('student_last_name', '')}".strip() or r.get('student_email', '') or 'Student'),
+            'student': {
+                'student_id': str(r['student_id']) if r.get('student_id') else None,
+                'id': str(r['student_id']) if r.get('student_id') else None,
+                'enrollment_no': r.get('enrollment_no') or '',
+                'first_name': r.get('student_first_name') or '',
+                'last_name': r.get('student_last_name') or '',
+                'name': f"{r.get('student_first_name', '')} {r.get('student_last_name', '')}".strip(),
+                'email': r.get('student_email') or '',
+                'department_id': str(r['student_department_id']) if r.get('student_department_id') else None,
+                'department_name': r.get('dept_name') or '',
+            }
+        } for r in rows]
+
+    if request.method == 'POST':
+        import uuid
+        from datetime import datetime
+        g_id = str(uuid.uuid4())
+        category = body.get('category', 'Other')
+        description = body.get('description', '')
+        student_id = body.get('student_id')
+        is_anonymous = bool(body.get('is_anonymous', False))
+        is_critical = bool(body.get('is_critical', False))
+        attachment_url = body.get('attachment_url', '')
+
+        with connection.cursor() as cur:
+            cur.execute("""
+                INSERT INTO grievances (grievance_id, student_id, category, description, attachment_url, status, is_critical, submitted_at, is_anonymous)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), %s)
+            """, [g_id, student_id, category, description, attachment_url, 'submitted', is_critical, is_anonymous])
+
+        return [{
+            'grievance_id': g_id,
+            'id': g_id,
+            'category': category,
+            'description': description,
+            'status': 'submitted',
+            'submitted_at': datetime.now().isoformat(),
+        }]
+
+    if request.method == 'PATCH':
+        gid = params.get('grievance_id', '') or params.get('id', '')
+        if gid.startswith('eq.'):
+            gid = gid[3:]
+
+        status_val = body.get('status') or 'resolved'
+        res_note = body.get('resolution_note') or body.get('resolved_note') or body.get('hod_response') or ''
+        resolved_by = body.get('resolved_by')
+
+        with connection.cursor() as cur:
+            if gid:
+                cur.execute("""
+                    UPDATE grievances
+                    SET status = %s, resolution_note = %s, resolved_at = NOW()
+                    WHERE CAST(grievance_id AS TEXT) = %s
+                """, [status_val, res_note, gid])
+            else:
+                cur.execute("""
+                    UPDATE grievances
+                    SET status = %s, resolution_note = %s, resolved_at = NOW()
+                """, [status_val, res_note])
+
+        return [{'status': status_val, 'resolution_note': res_note}]
+
+    if request.method == 'DELETE':
+        gid = params.get('grievance_id', '') or params.get('id', '')
+        if gid.startswith('eq.'):
+            gid = gid[3:]
+        with connection.cursor() as cur:
+            if gid:
+                cur.execute("DELETE FROM grievances WHERE CAST(grievance_id AS TEXT) = %s", [gid])
+            else:
+                cur.execute("DELETE FROM grievances")
+        return []
+
+
+@handler('attendance_records')
+@handler('attendance')
+def handle_attendance_records(request, params, body):
+    from django.db import connection
+    if request.method == 'GET':
+        student_filter = params.get('student_id', '') or params.get('student', '')
+        subject_filter = params.get('subject_id', '') or params.get('course', '') or params.get('subject', '')
+        status_filter = params.get('status', '')
+        limit = int(params.get('limit', 1000))
+
+        if student_filter.startswith('eq.'):
+            student_filter = student_filter[3:]
+        if subject_filter.startswith('eq.'):
+            subject_filter = subject_filter[3:]
+
+        user_param = params.get('user_id', '') or params.get('user', '') or params.get('email', '')
+        if user_param.startswith('eq.'):
+            user_param = user_param[3:]
+
+        from accounts.models import User
+        from django.db.models import Q
+
+        req_user = getattr(request, 'user', None)
+        u_found = None
+        if req_user and hasattr(req_user, 'email') and req_user.email and hasattr(req_user, 'is_authenticated') and req_user.is_authenticated:
+            u_found = req_user
+        elif user_param or student_filter:
+            target_id = user_param or student_filter
+            if target_id.isdigit():
+                u_found = User.objects.filter(pk=int(target_id)).first()
+            if not u_found:
+                u_found = User.objects.filter(Q(email__iexact=target_id) | Q(username__iexact=target_id)).first()
+
+        req_email = u_found.email.lower() if u_found else ''
+
+        sql = """
+            SELECT ar.record_id, ar.student_id, ar.subject_id, ar.date, ar.status, ar.marked_at,
+                   sub.code AS subject_code, sub.name AS subject_name, sub.credits,
+                   s.enrollment_no, s.first_name AS student_first, s.last_name AS student_last, s.department_id
+            FROM attendance_records ar
+            LEFT JOIN subjects sub ON CAST(sub.subject_id AS TEXT) = CAST(ar.subject_id AS TEXT)
+            LEFT JOIN students s ON CAST(s.student_id AS TEXT) = CAST(ar.student_id AS TEXT)
+            LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(s.user_id AS TEXT)
+            WHERE 1=1
+        """
+        args = []
+        if req_email or student_filter:
+            st_val = student_filter or req_email
+            sql += ' AND (LOWER(CAST(u.email AS TEXT)) = %s OR CAST(ar.student_id AS TEXT) = %s OR CAST(s.student_id AS TEXT) = %s OR CAST(u.id AS TEXT) = %s)'
+            args.extend([st_val.lower(), st_val, st_val, st_val])
+
+        if subject_filter:
+            sql += ' AND (CAST(ar.subject_id AS TEXT) = %s OR CAST(sub.subject_id AS TEXT) = %s)'
+            args.extend([subject_filter, subject_filter])
+
+        if status_filter.startswith('eq.'):
+            sql += ' AND LOWER(CAST(ar.status AS TEXT)) = %s'
+            args.append(status_filter[3:].lower())
+        elif status_filter:
+            sql += ' AND LOWER(CAST(ar.status AS TEXT)) = %s'
+            args.append(status_filter.lower())
+
+        sql += ' ORDER BY ar.date DESC, ar.marked_at DESC LIMIT %s'
+        args.append(limit)
+
+        with connection.cursor() as cur:
+            cur.execute(sql, args)
+            cols = [c[0] for c in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+
+        return [{
+            'record_id': str(r['record_id']),
+            'id': str(r['record_id']),
+            'student_id': str(r['student_id']) if r.get('student_id') else None,
+            'subject_id': str(r['subject_id']) if r.get('subject_id') else None,
+            'course_id': str(r['subject_id']) if r.get('subject_id') else None,
+            'date': _dt(r.get('date')),
+            'status': str(r.get('status') or 'present').lower(),
+            'subject_code': r.get('subject_code') or '',
+            'subject_name': r.get('subject_name') or '',
+            'course_code': r.get('subject_code') or '',
+            'course_name': r.get('subject_name') or '',
+            'course': {
+                'subject_id': str(r['subject_id']) if r.get('subject_id') else None,
+                'code': r.get('subject_code') or '',
+                'name': r.get('subject_name') or '',
+            },
+            'student': {
+                'student_id': str(r['student_id']) if r.get('student_id') else None,
+                'first_name': r.get('student_first') or '',
+                'last_name': r.get('student_last') or '',
+                'enrollment_no': r.get('enrollment_no') or '',
+            }
+        } for r in rows]
+
+    if request.method == 'POST':
+        import uuid
+        r_id = str(uuid.uuid4())
+        student_id = body.get('student_id')
+        subject_id = body.get('subject_id') or body.get('course_id')
+        status_val = body.get('status', 'present')
+        att_date = body.get('date')
+
+        with connection.cursor() as cur:
+            cur.execute("""
+                INSERT INTO attendance_records (record_id, student_id, subject_id, date, status, ip_address, marked_at)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            """, [r_id, student_id, subject_id, att_date, status_val, '127.0.0.1'])
+
+        return [{'record_id': r_id, 'status': status_val}]
+
+
+@handler('attendance/stats')
+def handle_attendance_stats(request, params, body):
+    from django.db import connection
+    student_filter = params.get('student_id', '') or params.get('student', '')
+    course_filter = params.get('course', '') or params.get('subject_id', '') or params.get('subject', '') or params.get('course_id', '')
+    if student_filter.startswith('eq.'):
+        student_filter = student_filter[3:]
+    if course_filter.startswith('eq.'):
+        course_filter = course_filter[3:]
+
+    user_param = params.get('user_id', '') or params.get('user', '') or params.get('email', '')
+    if user_param.startswith('eq.'):
+        user_param = user_param[3:]
+
+    from accounts.models import User
+    from django.db.models import Q
+
+    req_user = getattr(request, 'user', None)
+    u_found = None
+    if req_user and hasattr(req_user, 'email') and req_user.email and hasattr(req_user, 'is_authenticated') and req_user.is_authenticated:
+        u_found = req_user
+    elif user_param or student_filter:
+        target_id = user_param or student_filter
+        if target_id.isdigit():
+            u_found = User.objects.filter(pk=int(target_id)).first()
+        if not u_found:
+            u_found = User.objects.filter(Q(email__iexact=target_id) | Q(username__iexact=target_id)).first()
+
+    req_email = u_found.email.lower() if u_found else ''
+
+    sql = """
+        SELECT
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE LOWER(CAST(ar.status AS TEXT)) = 'present') AS present,
+            COUNT(*) FILTER (WHERE LOWER(CAST(ar.status AS TEXT)) = 'absent') AS absent,
+            COUNT(*) FILTER (WHERE LOWER(CAST(ar.status AS TEXT)) = 'late') AS late,
+            COUNT(*) FILTER (WHERE LOWER(CAST(ar.status AS TEXT)) = 'excused') AS excused
+        FROM attendance_records ar
+        LEFT JOIN students s ON CAST(s.student_id AS TEXT) = CAST(ar.student_id AS TEXT)
+        LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(s.user_id AS TEXT)
+        WHERE 1=1
+    """
+    args = []
+    if req_email or student_filter:
+        st_val = student_filter or req_email
+        sql += ' AND (LOWER(CAST(u.email AS TEXT)) = %s OR CAST(ar.student_id AS TEXT) = %s OR CAST(s.student_id AS TEXT) = %s OR CAST(u.id AS TEXT) = %s)'
+        args.extend([st_val.lower(), st_val, st_val, st_val])
+
+    if course_filter:
+        sql += ' AND (CAST(ar.subject_id AS TEXT) = %s)'
+        args.append(course_filter)
+
+    with connection.cursor() as cur:
+        cur.execute(sql, args)
+        row = cur.fetchone()
+
+    total = row[0] or 0
+    present = row[1] or 0
+    absent = row[2] or 0
+    late = row[3] or 0
+    excused = row[4] or 0
+
+    pct = round(((present + late) / total) * 100, 1) if total > 0 else 0.0
+
+    return {
+        'total': total,
+        'present': present,
+        'absent': absent,
+        'late': late,
+        'excused': excused,
+        'percentage': pct,
+    }
+
+
 @handler('hod/check')
 def handle_hod_check(request, params, body):
     from django.db import connection
@@ -2747,20 +3377,34 @@ def handle_hod_check(request, params, body):
         if not email and hasattr(request.user, 'email'):
             email = request.user.email
 
+    from accounts.models import User
+    from django.db.models import Q
+    u_found = None
+    if user_id and user_id.isdigit():
+        u_found = User.objects.filter(pk=int(user_id)).first()
+    if not u_found and user_id:
+        u_found = User.objects.filter(Q(email__iexact=user_id) | Q(username__iexact=user_id)).first()
+    if not u_found and email:
+        u_found = User.objects.filter(email__iexact=email).first()
+    if not u_found and hasattr(request, 'user') and request.user and hasattr(request.user, 'email') and request.user.email:
+        u_found = request.user
+
+    search_email = u_found.email.lower() if u_found else email.lower()
+
     sql = """
         SELECT h.hod_id, h.user_id, h.department_id, d.name AS dept_name, d.code AS dept_code
         FROM hod h
-        LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(h.user_id AS TEXT)
+        LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(h.user_id AS TEXT) OR LOWER(CAST(h.user_id AS TEXT)) = LOWER(u.email)
         LEFT JOIN departments d ON CAST(d.department_id AS TEXT) = CAST(h.department_id AS TEXT)
         WHERE 1=1
     """
     args = []
-    if user_id:
+    if search_email:
+        sql += " AND (LOWER(CAST(u.email AS TEXT)) = %s OR LOWER(CAST(h.user_id AS TEXT)) = %s)"
+        args.extend([search_email, search_email])
+    elif user_id:
         sql += " AND (CAST(h.user_id AS TEXT) = %s OR CAST(u.id AS TEXT) = %s)"
         args.extend([user_id, user_id])
-    elif email:
-        sql += " AND LOWER(CAST(u.email AS TEXT)) = %s"
-        args.append(email.lower())
 
     sql += " LIMIT 1"
 
@@ -4684,27 +5328,29 @@ class RestV1View(View):
         for key in request.GET:
             params[key] = request.GET[key]
 
-        # Extract user_id from Bearer JWT token if missing from params
-        if 'user_id' not in params and 'user' not in params:
-            auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-            if auth_header.startswith('Bearer '):
-                token_str = auth_header[7:].strip()
-                try:
-                    from rest_framework_simplejwt.tokens import AccessToken
-                    from django.db import connection
-                    token_obj = AccessToken(token_str)
-                    django_user_id = token_obj.get('user_id')
-                    if django_user_id:
-                        from accounts.models import User
-                        u_obj = User.objects.filter(pk=django_user_id).first()
-                        if u_obj:
+        # Extract user_id and authenticate request.user from Bearer JWT token
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Bearer '):
+            token_str = auth_header[7:].strip()
+            try:
+                from rest_framework_simplejwt.tokens import AccessToken
+                from django.db import connection
+                token_obj = AccessToken(token_str)
+                django_user_id = token_obj.get('user_id')
+                if django_user_id:
+                    from accounts.models import User
+                    u_obj = User.objects.filter(pk=django_user_id).first()
+                    if u_obj:
+                        request.user = u_obj
+                        if 'user_id' not in params and 'user' not in params:
                             with connection.cursor() as cur:
                                 cur.execute("SELECT id FROM users WHERE email ILIKE %s LIMIT 1", [u_obj.email])
                                 r_uid = cur.fetchone()
                                 if r_uid:
                                     params['user_id'] = str(r_uid[0])
-                except Exception:
-                    pass
+            except Exception:
+                pass
+
 
         # Parse body
         body = {}

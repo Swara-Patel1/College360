@@ -513,38 +513,21 @@ export const API = {
       // 7d. HOD MANAGEMENT (assign / list / remove Heads of Department)
       if (path === 'hod') {
         if (method === 'GET') {
-          const rows = await SupaFetch.request('hod?select=*,user:users(*),department:departments!hod_department_id_fkey(*)');
-          // HOD names live in the faculty table, keyed by user_id
-          const userIds = (rows || []).map(h => h.user_id).filter(Boolean);
-          let facMap = {};
-          if (userIds.length) {
-            const facs = await SupaFetch.request(`faculty?select=user_id,faculty_id,first_name,last_name,employee_id&user_id=in.(${userIds.join(',')})`);
-            (facs || []).forEach(f => { facMap[f.user_id] = f; });
-          }
-          return (rows || []).map(h => {
-            const fac = facMap[h.user_id] || {};
-            return {
-              ...h,
-              id: h.hod_id,
-              department_id: h.department_id,
-              department_name: h.department?.name || '—',
-              email: h.user?.email || '',
-              first_name: fac.first_name || h.user?.email?.split('@')[0] || '',
-              last_name: fac.last_name || '',
-              employee_id: fac.employee_id || '',
-              faculty_id: fac.faculty_id || null,
-            };
-          });
+          const rows = await SupaFetch.request('hod');
+          return (Array.isArray(rows) ? rows : []).map(h => ({
+            ...h,
+            id: h.hod_id || h.id,
+            department_id: h.department_id || h.department?.id || h.department?.department_id,
+            department_name: h.department_name || h.department?.name || '—',
+            email: h.email || h.user?.email || '',
+            first_name: h.first_name || h.user?.first_name || '',
+            last_name: h.last_name || h.user?.last_name || '',
+            employee_id: h.employee_id || '',
+            faculty_id: h.faculty_id || null,
+          }));
         }
         if (method === 'POST') {
-          // Promote a faculty member to HOD — Django handles demoting any prior HOD.
-          if (!body.faculty_id || !body.department_id) {
-            throw { error: 'validation_error', message: 'Faculty and department are required.' };
-          }
-          const created = await SupaFetch.request('hod', 'POST', {
-            faculty_id: body.faculty_id,
-            department_id: body.department_id,
-          });
+          const created = await SupaFetch.request('hod', 'POST', body);
           return Array.isArray(created) ? created[0] : created;
         }
       }
@@ -801,9 +784,10 @@ export const API = {
         });
       }
 
-      // 13. FEES — ADMIN (aggregated server-side)
-      if (path === 'admin/fees') {
-        return await SupaFetch.request('admin/fees');
+      // 13. FEES — ADMIN / GENERAL LIST
+      if (path === 'admin/fees' || path === 'fee_payments') {
+        const rows = await SupaFetch.request('admin/fees');
+        return Array.isArray(rows) ? rows : [];
       }
 
       // 13a. FEES — mark a payment paid (server stamps date + txn ref)
@@ -816,17 +800,15 @@ export const API = {
         return Array.isArray(row) ? row[0] : row;
       }
 
-      // 13. FEES
-      if (path === 'fees') {
-        const studentUuid = params.get('student');
-        const payments = await SupaFetch.request(`fee_payments?select=*,fee_structures(*)&student_id=eq.${studentUuid || 'st000000-0000-0000-0000-000000000001'}`);
-        return payments.map(p => ({
-          ...p,
-          fee_type: p.fee_structures?.component_name?.toLowerCase() || 'tuition',
-          amount: p.fee_structures?.amount || 0,
-          due_date: p.fee_structures?.due_date || '',
-          remarks: p.transaction_ref || ''
-        }));
+      // 13b. FEES BY STUDENT
+      if (path === 'fees' || path.startsWith('fees?')) {
+        const studentUuid = params.get('student') || params.get('student_id');
+        if (!studentUuid) {
+          const rows = await SupaFetch.request('admin/fees');
+          return Array.isArray(rows) ? rows : [];
+        }
+        const payments = await SupaFetch.request(`fees?student_id=${encodeURIComponent(studentUuid)}`);
+        return Array.isArray(payments) ? payments : [];
       }
 
       // 14. NOTICES

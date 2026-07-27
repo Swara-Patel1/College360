@@ -36,6 +36,26 @@ class UserSerializer(serializers.ModelSerializer):
 
         ret['first_name'] = first_name
         ret['last_name'] = last_name
+
+        try:
+            from django.db import connection
+            user_email = instance.email.lower() if instance.email else ''
+            user_pk_str = str(instance.pk)
+            with connection.cursor() as cur:
+                cur.execute("""
+                    SELECT h.department_id, d.name FROM hod h JOIN users u ON CAST(u.id AS TEXT) = CAST(h.user_id AS TEXT) JOIN departments d ON CAST(d.department_id AS TEXT) = CAST(h.department_id AS TEXT) WHERE LOWER(u.email) = %s OR CAST(h.user_id AS TEXT) = %s
+                    UNION
+                    SELECT f.department_id, d.name FROM faculty f JOIN users u ON CAST(u.id AS TEXT) = CAST(f.user_id AS TEXT) JOIN departments d ON CAST(d.department_id AS TEXT) = CAST(f.department_id AS TEXT) WHERE LOWER(u.email) = %s OR CAST(f.user_id AS TEXT) = %s
+                    LIMIT 1
+                """, [user_email, user_pk_str, user_email, user_pk_str])
+                row = cur.fetchone()
+                if row:
+                    ret['department_id'] = str(row[0]) if row[0] else ''
+                    ret['department_name'] = row[1] or ''
+                    ret['dept_name'] = row[1] or ''
+        except Exception:
+            pass
+
         return ret
 
 

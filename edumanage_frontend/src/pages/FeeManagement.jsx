@@ -21,7 +21,13 @@ export default function FeeManagement() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const data = await API.get('admin/fees');
+      let data = await API.get('admin/fees');
+      if (!Array.isArray(data) || data.length === 0) {
+        data = await API.get('fees');
+      }
+      if (!Array.isArray(data) || data.length === 0) {
+        data = await API.get('fee_payments');
+      }
       setPayments(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
@@ -31,7 +37,9 @@ export default function FeeManagement() {
     }
   };
 
-  useEffect(() => { if (user) loadData(); }, [user]);
+  useEffect(() => {
+    loadData();
+  }, [user]);
 
   const handlePayClick = (p) => { setPaying(p); setIsPayOpen(true); };
 
@@ -51,13 +59,13 @@ export default function FeeManagement() {
     const q = searchQuery.toLowerCase();
     const matchesSearch = (p.student_name || '').toLowerCase().includes(q) ||
       (p.enrollment_no || '').toLowerCase().includes(q) ||
-      (p.component_name || '').toLowerCase().includes(q);
+      (p.component_name || p.fee_type || '').toLowerCase().includes(q);
     const matchesStatus = selectedStatus ? p.status === selectedStatus : true;
     return matchesSearch && matchesStatus;
   });
 
-  const totalCollected = payments.filter(p => p.status === 'paid').reduce((a, c) => a + (c.amount_paid || c.amount || 0), 0);
-  const totalPending = payments.filter(p => p.status !== 'paid').reduce((a, c) => a + (c.amount || 0), 0);
+  const totalCollected = payments.filter(p => p.status === 'paid' || p.status === 'partial').reduce((a, c) => a + (c.amount_paid || 0), 0);
+  const totalPending = payments.filter(p => p.status !== 'paid').reduce((a, c) => a + (Math.max(0, (c.amount || 0) - (c.amount_paid || 0))), 0);
   const paidCount = payments.filter(p => p.status === 'paid').length;
   const pendingCount = payments.filter(p => p.status !== 'paid').length;
 
@@ -101,7 +109,7 @@ export default function FeeManagement() {
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}><i className="bi bi-exclamation-octagon-fill"></i></div>
+          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}><i className="bi bi-exclamation-circle"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#FF6B6B' }}>{pendingCount}</div>
             <div className="stats-mini-lbl">Pending Records</div>
@@ -111,7 +119,7 @@ export default function FeeManagement() {
 
       <div className="card">
         <div className="filters-bar" style={{ display: 'flex', gap: '10px', padding: '15px 20px', flexWrap: 'wrap' }}>
-          <div style={{ flex: 2, minWidth: '200px' }}>
+          <div style={{ flex: 1, minWidth: '200px' }}>
             <input
               type="text" className="form-input"
               placeholder="Search by student, enrollment no, fee type..."
@@ -121,9 +129,9 @@ export default function FeeManagement() {
           <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}>
             <option value="">All Statuses</option>
             <option value="paid">Paid</option>
+            <option value="partial">Partial</option>
             <option value="pending">Pending</option>
             <option value="overdue">Overdue</option>
-            <option value="waived">Waived</option>
           </select>
         </div>
 
