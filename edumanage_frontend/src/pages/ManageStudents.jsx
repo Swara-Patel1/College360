@@ -252,9 +252,9 @@ export default function ManageStudents() {
     const query = searchQuery.toLowerCase();
 
     const matchesSearch = name.includes(query) || email.includes(query) || roll.includes(query);
-    const matchesDept = selectedDept ? (String(s.department_id || s.department?.department_id || s.department?.id || s.department || '').toLowerCase() === String(selectedDept).toLowerCase()) : true;
-    const matchesSem = selectedSem ? s.current_semester_id === selectedSem : true;
-    const matchesStatus = selectedStatus ? s.status === selectedStatus : true;
+    const matchesDept = (isAdmin && selectedDept) ? (String(s.department_id || s.department?.department_id || s.department?.id || s.department || '').toLowerCase() === String(selectedDept).toLowerCase()) : true;
+    const matchesSem = (isAdmin && selectedSem) ? s.current_semester_id === selectedSem : true;
+    const matchesStatus = (isAdmin && selectedStatus) ? s.status === selectedStatus : true;
 
     return matchesSearch && matchesDept && matchesSem && matchesStatus;
   });
@@ -335,25 +335,27 @@ export default function ManageStudents() {
             />
           </div>
           {isAdmin && (
-            <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
-              <option value="">All Departments</option>
-              {departments.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
+            <>
+              <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
+                <option value="">All Departments</option>
+                {departments.map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+              <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedSem} onChange={e => setSelectedSem(e.target.value)}>
+                <option value="">All Semesters</option>
+                {semesters.map(s => (
+                  <option key={s.semester_id} value={s.semester_id}>Semester {s.number}</option>
+                ))}
+              </select>
+              <select className="form-input" style={{ flex: 1, minWidth: '120px' }} value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}>
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="graduated">Graduated</option>
+              </select>
+            </>
           )}
-          <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedSem} onChange={e => setSelectedSem(e.target.value)}>
-            <option value="">All Semesters</option>
-            {semesters.map(s => (
-              <option key={s.semester_id} value={s.semester_id}>Semester {s.number}</option>
-            ))}
-          </select>
-          <select className="form-input" style={{ flex: 1, minWidth: '120px' }} value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}>
-            <option value="">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="graduated">Graduated</option>
-          </select>
         </div>
 
         {/* Students Table */}

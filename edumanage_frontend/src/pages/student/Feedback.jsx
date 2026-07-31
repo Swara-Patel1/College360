@@ -42,28 +42,68 @@ export default function Feedback() {
     (async () => {
       try {
         setLoading(true);
-        const [enrolled, allCourses] = await Promise.all([
+
+        let currentSem = null;
+        let deptId = null;
+        const cached = localStorage.getItem('student_profile');
+        if (cached) {
+          try {
+            const p = JSON.parse(cached);
+            currentSem = p.semester || p.current_semester;
+            deptId = p.department_id || p.department?.id || p.department?.department_id;
+          } catch (e) {}
+        }
+        if (!currentSem || !deptId) {
+          try {
+            const profile = await API.get('students/my_profile');
+            currentSem = currentSem || profile?.semester || profile?.current_semester;
+            deptId = deptId || profile?.department_id || profile?.department?.id || profile?.department?.department_id;
+          } catch (e) {}
+        }
+
+        const [enrolled, allCourses, hodList] = await Promise.all([
           API.get('courses/enrollments').catch(() => []),
           API.get('courses').catch(() => []),
+          API.get('hod').catch(() => []),
         ]);
-        const facById = {};
-        (allCourses || []).forEach(c => {
-          facById[String(c.subject_id || c.id)] = { facultyId: c.faculty_id, facultyName: c.faculty_name };
+
+        const myCourseIds = new Set((enrolled || []).map(e => String(e.course || e.subject_id || e.course_id)).filter(Boolean));
+
+        const currentSemCourses = (allCourses || []).filter(c => {
+          const isEnrolled = myCourseIds.size === 0 || myCourseIds.has(String(c.id)) || myCourseIds.has(String(c.subject_id));
+          const isCurrentSem = !currentSem || String(c.semester) === String(currentSem);
+          return isEnrolled && isCurrentSem;
         });
-        const list = (enrolled || []).map(e => {
-          const cid = String(e.course || e.subject_id || e.course_id);
-          const f = facById[cid] || {};
-          return {
-            courseId: cid,
-            courseName: e.course_name || '—',
-            courseCode: e.course_code || '—',
-            facultyId: f.facultyId,
-            facultyName: f.facultyName || 'Faculty',
-          };
-        }).filter(x => x.facultyId);
+
+        const list = currentSemCourses.map(c => ({
+          courseId: String(c.id || c.subject_id),
+          courseName: c.name || c.course_name || '—',
+          courseCode: c.code || c.course_code || '—',
+          facultyId: c.faculty_id,
+          facultyName: c.faculty_name || c.faculty || 'Faculty',
+          isHod: false,
+        })).filter(x => x.facultyId);
+
+        const matchedHod = (hodList || []).find(h => 
+          (deptId && String(h.department_id || h.department?.id) === String(deptId)) ||
+          (h.department_name && h.department_name.toLowerCase().includes('computer'))
+        );
+
+        if (matchedHod) {
+          const hodName = matchedHod.name || `${matchedHod.first_name || ''} ${matchedHod.last_name || ''}`.trim() || 'Head of Department';
+          list.unshift({
+            courseId: `hod-${matchedHod.id || matchedHod.hod_id}`,
+            courseName: `Head of Department`,
+            courseCode: matchedHod.department_name || 'HOD',
+            facultyId: matchedHod.user_id || matchedHod.id || matchedHod.hod_id,
+            facultyName: `Dr. ${hodName}`,
+            isHod: true,
+          });
+        }
+
         setItems(list);
       } catch (e) {
-        console.error(e);
+        console.error('Failed to load feedback list:', e);
       } finally {
         setLoading(false);
       }
@@ -126,10 +166,17 @@ export default function Feedback() {
       {items.length ? (
         <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
           {items.map(item => (
-            <div key={item.courseId} className="card" style={{ padding: '20px' }}>
+            <div key={item.courseId} className="card" style={{ padding: '20px', border: item.isHod ? '1px solid rgba(108, 99, 255, 0.4)' : undefined, background: item.isHod ? 'rgba(108, 99, 255, 0.04)' : undefined }}>
+              {item.isHod && (
+                <div style={{ marginBottom: '8px' }}>
+                  <span className="badge badge-primary" style={{ fontSize: '0.68rem' }}><i className="bi bi-person-badge"></i> Department HOD</span>
+                </div>
+              )}
               <div style={{ fontWeight: 700, marginBottom: '4px' }}>{item.courseName}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '10px' }}>{item.courseCode}</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}><i className="bi bi-person-video3"></i> {item.facultyName}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                <i className={item.isHod ? 'bi bi-person-workspace' : 'bi bi-person-video3'}></i> {item.facultyName}
+              </div>
               {done[item.courseId] ? (
                 <span className="badge badge-success"><i className="bi bi-check"></i> Feedback submitted</span>
               ) : (

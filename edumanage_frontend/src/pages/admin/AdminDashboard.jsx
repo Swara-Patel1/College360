@@ -51,9 +51,9 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ── People ── */}
+      {/* ── People & Departments ── */}
       <section className="admin-dash-section">
-        <h2 className="admin-section-heading"><i className="bi bi-people"></i> People</h2>
+        <h2 className="admin-section-heading"><i className="bi bi-people"></i> People & Structure</h2>
         <div className="admin-stat-grid">
           <StatCard icon={<i className="bi bi-mortarboard-fill" />} label="Total Students"
             value={fmt(stats?.total_students)}
@@ -63,7 +63,11 @@ export default function AdminDashboard() {
             value={fmt(stats?.total_faculty)}
             sub="Teaching staff"
             color="#0ea5e9" loading={loading} onClick={() => navigate('/admin/faculty')} />
-          <StatCard icon={<i className="bi bi-building" />} label="HOD"
+          <StatCard icon={<i className="bi bi-building" />} label="Total Departments"
+            value={fmt(stats?.total_departments)}
+            sub="Academic departments"
+            color="#ec4899" loading={loading} onClick={() => navigate('/admin/departments')} />
+          <StatCard icon={<i className="bi bi-person-badge-fill" />} label="HOD"
             value={fmt(stats?.total_hod)}
             sub="Heads of Department"
             color="#8b5cf6" loading={loading} onClick={() => navigate('/admin/hod')} />

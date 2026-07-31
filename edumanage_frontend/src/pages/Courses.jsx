@@ -11,6 +11,7 @@ export default function Courses() {
   const [enrollments, setEnrollments] = useState([]);
   const [activeTab, setActiveTab] = useState('courses'); // 'courses' or 'enrollments'
   const [loading, setLoading] = useState(true);
+  const [studentCurrentSem, setStudentCurrentSem] = useState(null);
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,11 +63,18 @@ export default function Courses() {
       if (isStudent) {
         const cached = localStorage.getItem('student_profile');
         if (cached) {
-          currentSem = JSON.parse(cached).semester;
-        } else {
-          const profile = await API.get('students/my_profile');
-          currentSem = profile?.semester;
+          try {
+            const p = JSON.parse(cached);
+            currentSem = p.semester || p.current_semester;
+          } catch(e) {}
         }
+        if (!currentSem) {
+          try {
+            const profile = await API.get('students/my_profile');
+            currentSem = profile?.semester || profile?.current_semester;
+          } catch (e) {}
+        }
+        setStudentCurrentSem(currentSem);
       } else {
         const activeSemesters = semData || [];
         if (activeSemesters.length > 0) {
@@ -80,7 +88,10 @@ export default function Courses() {
         const enrollData = await API.get('enrollments');
         const myCourseIds = new Set((enrollData || []).map(e => String(e.course || e.course_id || e.subject_id || '')));
         loadedCourses = loadedCourses.filter(c => myCourseIds.has(String(c.id)) || myCourseIds.has(String(c.subject_id)));
-        // Students: don't filter further by semester — enrolled courses ARE their courses
+        // Filter to show only current_semester subjects for students
+        if (currentSem && currentSem !== '—') {
+          loadedCourses = loadedCourses.filter(c => String(c.semester) === String(currentSem));
+        }
       } else if (isFaculty) {
         const facProfile = await API.get('faculty/my_profile');
         const facId = facProfile?.id;
@@ -253,7 +264,7 @@ export default function Courses() {
     );
   }
 
-  const activeSemesterNumber = courses.length ? (courses.find(c => c.is_active)?.semester || courses[courses.length - 1]?.semester || 3) : '3';
+  const activeSemesterNumber = studentCurrentSem || (courses.length ? (courses.find(c => c.is_active)?.semester || courses[courses.length - 1]?.semester || 3) : '3');
   const totalCredits = courses.reduce((sum, c) => sum + (c.credits || 0), 0);
 
   return (
@@ -310,26 +321,7 @@ export default function Courses() {
 
       {/* Tab Panels */}
       <div className="card col-12">
-        {isAdmin && (
-          <div className="tabs-header" style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-            <button 
-              className={`tab-btn ${activeTab === 'courses' ? 'active' : ''}`}
-              onClick={() => setActiveTab('courses')}
-            >
-              Courses Catalog
-            </button>
-            <button 
-              className={`tab-btn ${activeTab === 'enrollments' ? 'active' : ''}`}
-              onClick={() => setActiveTab('enrollments')}
-            >
-              Enrollments
-            </button>
-          </div>
-        )}
-
-        {/* Catalog Tab */}
-        {activeTab === 'courses' && (
-          <div className="tab-panel active">
+        <div className="tab-panel active">
             <div className="filters-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', padding: '16px' }}>
               <div className="search-input-wrap">
                 <span><i className="bi bi-search"></i></span>
@@ -367,20 +359,6 @@ export default function Courses() {
                   <option value={s} key={s}>Semester {s}</option>
                 ))}
               </select>
-
-              <select 
-                className="form-control" 
-                id="activeFilter"
-                value={selectedActive}
-                onChange={(e) => { setSelectedActive(e.target.value); setCurrentPage(1); }}
-                style={{ width: 'auto' }}
-              >
-                <option value="">All Statuses</option>
-                <option value="true">Active</option>
-                <option value="false">Inactive</option>
-              </select>
-
-              <button className="btn btn-ghost btn-sm" onClick={clearFilters}><i className="bi bi-eraser"></i> Clear Filters</button>
             </div>
 
             <div className="table-wrapper" style={{ padding: 0 }}>
@@ -393,18 +371,16 @@ export default function Courses() {
                     <th>Faculty</th>
                     <th>Credits</th>
                     <th>Semester</th>
-                    <th>Status</th>
                     {isAdmin && <th style={{ textAlign: 'center' }}>Actions</th>}
                   </tr>
                 </thead>
                 <tbody id="coursesTableBody">
-                  {paginatedCourses.length ? (
-                    paginatedCourses.map((c, idx) => {
+                  {filtered.length ? (
+                    filtered.map((c, idx) => {
                       const code = c.code || c.course_code || '—';
                       const deptName = c.department_name || departments.find(d => d.id == c.department)?.name || '—';
                       const facultyObj = faculty.find(f => f.id == c.faculty || f.id == c.faculty_id);
                       const facultyName = c.faculty_name || (facultyObj ? `${facultyObj.user?.first_name} ${facultyObj.user?.last_name}` : '—');
-                      const isActive = c.is_active !== false;
 
                       return (
                         <tr key={idx}>
@@ -421,16 +397,15 @@ export default function Courses() {
                           </td>
                           <td><span className="badge badge-primary">{c.credits || '—'} cr</span></td>
                           <td><span className="badge badge-info">Sem {c.semester || '—'}</span></td>
-                          <td>
-                            <span className={`badge ${isActive ? 'badge-success' : 'badge-muted'}`}>
-                              {isActive ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
                           {isAdmin && (
-                            <td>
-                              <div className="table-actions" style={{ justifyContent: 'center' }}>
-                                <button className="action-btn edit" title="Edit" onClick={() => handleOpenEdit(c)}><i className="bi bi-pencil"></i></button>
-                                <button className="action-btn delete" title="Delete" onClick={() => handleOpenDelete(c)}><i className="bi bi-trash"></i></button>
+                            <td style={{ textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                <button className="btn btn-ghost btn-sm" onClick={() => handleOpenEdit(c)}>
+                                  <i className="bi bi-pencil-square me-1"></i> Edit
+                                </button>
+                                <button className="btn btn-ghost btn-sm" style={{ color: '#FF6B6B' }} onClick={() => handleOpenDelete(c)}>
+                                  <i className="bi bi-trash me-1"></i> Delete
+                                </button>
                               </div>
                             </td>
                           )}
@@ -439,7 +414,7 @@ export default function Courses() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={isAdmin ? 8 : 7}>
+                      <td colSpan={isAdmin ? 7 : 6}>
                         <div className="empty-state" style={{ padding: '40px' }}>
                           <div className="empty-state-icon"><i className="bi bi-book"></i></div>
                           <h3>No Subjects Found</h3>
@@ -457,104 +432,7 @@ export default function Courses() {
                 </tbody>
               </table>
             </div>
-
-            {filtered.length > perPage && (
-              <div className="pagination" style={{ display: 'flex', padding: '16px', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span id="paginationInfo">
-                  Showing { (currentPage - 1) * perPage + 1 }–{ Math.min(currentPage * perPage, filtered.length) } of { filtered.length } courses
-                </span>
-                <div className="pagination-btns" id="paginationBtns">
-                  <button 
-                    className="page-btn" 
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    &lt;
-                  </button>
-                  {Array.from({ length: totalPages }).map((_, i) => (
-                    <button 
-                      key={i}
-                      className={`page-btn ${currentPage === i + 1 ? 'active' : ''}`}
-                      onClick={() => setCurrentPage(i + 1)}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
-                  <button 
-                    className="page-btn" 
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    &gt;
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
-        )}
-
-        {/* Enrollments Tab */}
-        {activeTab === 'enrollments' && isAdmin && (
-          <div className="tab-panel active" id="tab-enrollments">
-            <div className="filters-bar" style={{ display: 'flex', gap: '12px', padding: '16px' }}>
-              <div className="search-input-wrap">
-                <span><i className="bi bi-search"></i></span>
-                <input 
-                  type="text" 
-                  id="enrollSearchInput" 
-                  placeholder="Search by student or course..."
-                  value={enrollSearchQuery}
-                  onChange={(e) => setEnrollSearchQuery(e.target.value)}
-                />
-              </div>
-              <button className="btn btn-ghost btn-sm" onClick={loadEnrollments}><i className="bi bi-arrow-repeat"></i> Refresh</button>
-            </div>
-            
-            <div id="enrollmentsBody" style={{ padding: '0 20px 20px' }}>
-              {getFilteredEnrollments().length > 0 ? (
-                <div style={{ paddingTop: '20px' }}>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '16px' }}>
-                    {getFilteredEnrollments().length} enrollment records
-                  </div>
-                  {getFilteredEnrollments().map((e, idx) => {
-                    const studentName = e.student_name || `${e.student?.user?.first_name || ''} ${e.student?.user?.last_name || ''}`.trim() || 'Unknown';
-                    const courseName = e.course_name || e.course?.name || 'Unknown Course';
-                    const courseCode = e.course_code || e.course?.code || '';
-                    const enrollDate = Utils.formatDate(e.enrollment_date || e.created_at);
-                    const initials = Utils.getInitials(studentName);
-                    return (
-                      <div className="enrollment-item" key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div className="table-avatar" style={{ background: Utils.getRandomColor(studentName), width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '12px', fontWeight: 600 }}>
-                          {initials}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.875rem' }}>{studentName}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{e.student?.student_id || ''}</div>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{courseName}</div>
-                          <span className="course-code" style={{ fontSize: '0.7rem' }}>{courseCode}</span>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Enrolled {enrollDate}</div>
-                          <span className={`badge ${e.is_active !== false ? 'badge-success' : 'badge-muted'}`} style={{ marginTop: '4px' }}>
-                            {e.is_active !== false ? 'Active' : 'Dropped'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="empty-state" style={{ padding: '40px' }}>
-                  <div className="empty-state-icon"><i className="bi bi-clipboard"></i></div>
-                  <h3>No Enrollments Found</h3>
-                  <p>No enrollment records match your search.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ======================== ADD COURSE MODAL ======================== */}

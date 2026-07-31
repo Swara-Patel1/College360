@@ -4,8 +4,8 @@ import { useAuthStore } from '../../store/useAuthStore.js';
 import { Toast } from '../../store/useNotifStore.js';
 import Modal from '../../components/Modal.jsx';
 
-const ROLE_BADGE = { admin: 'badge badge-danger', faculty: 'badge badge-info', student: 'badge badge-primary', parent: 'badge badge-warning' };
-const ROLES = ['admin', 'faculty', 'student', 'parent'];
+const ROLE_BADGE = { admin: 'badge badge-danger', faculty: 'badge badge-info', student: 'badge badge-primary', parent: 'badge badge-warning', hod: 'badge badge-success' };
+const ROLES = ['admin', 'faculty', 'hod', 'student'];
 
 export default function ManageUsers() {
   const { user: me } = useAuthStore();
@@ -33,9 +33,9 @@ export default function ManageUsers() {
 
   const counts = useMemo(() => ({
     total: users.length,
-    active: users.filter(u => u.is_active !== false).length,
-    admins: users.filter(u => u.role === 'admin').length,
-    students: users.filter(u => u.role === 'student').length,
+    hods: users.filter(u => (u.role || '').toLowerCase() === 'hod').length,
+    faculty: users.filter(u => (u.role || '').toLowerCase() === 'faculty').length,
+    students: users.filter(u => (u.role || '').toLowerCase() === 'student').length,
   }), [users]);
 
   const filtered = useMemo(() => users.filter(u => {
@@ -95,8 +95,8 @@ export default function ManageUsers() {
 
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
         <div className="stat-card primary"><div className="stat-icon"><i className="bi bi-people"></i></div><div className="stat-value">{counts.total}</div><div className="stat-label">Total Users</div></div>
-        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div><div className="stat-value">{counts.active}</div><div className="stat-label">Active</div></div>
-        <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-shield-check"></i></div><div className="stat-value">{counts.admins}</div><div className="stat-label">Admins</div></div>
+        <div className="stat-card success"><div className="stat-icon"><i className="bi bi-person-badge"></i></div><div className="stat-value">{counts.hods}</div><div className="stat-label">HODs</div></div>
+        <div className="stat-card danger"><div className="stat-icon"><i className="bi bi-person-workspace"></i></div><div className="stat-value">{counts.faculty}</div><div className="stat-label">Faculty</div></div>
         <div className="stat-card info"><div className="stat-icon"><i className="bi bi-mortarboard"></i></div><div className="stat-value">{counts.students}</div><div className="stat-label">Students</div></div>
       </div>
 

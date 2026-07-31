@@ -3,7 +3,7 @@ import { API } from '../../api/client.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
 
 export default function Timetable() {
-  const { user } = useAuthStore();
+  const { user, studentProfile } = useAuthStore();
   const [allSchedules, setAllSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,9 +14,27 @@ export default function Timetable() {
 
     const fetchTimetable = async () => {
       try {
-        const data = await API.get('timetable');
+        let profile = studentProfile;
+        if (!profile && user?.role === 'student') {
+          try {
+            profile = await API.get('students/my_profile');
+          } catch (e) {
+            console.error('Could not fetch student profile:', e);
+          }
+        }
+
+        const deptId = profile?.department_id || profile?.department?.department_id || profile?.department?.id;
+        const semId = profile?.current_semester_id || profile?.current_semester?.semester_id || profile?.semester;
+
+        const queryParams = [];
+        if (user?.id) queryParams.push(`user_id=${user.id}`);
+        if (deptId) queryParams.push(`department_id=${deptId}`);
+        if (semId) queryParams.push(`semester_id=${semId}`);
+
+        const url = queryParams.length > 0 ? `timetable?${queryParams.join('&')}` : 'timetable';
+        const data = await API.get(url);
         if (isMounted && data) {
-          setAllSchedules(data.results || data || []);
+          setAllSchedules(Array.isArray(data) ? data : (data.results || []));
         }
       } catch (e) {
         console.error('Failed to load student timetable:', e);
@@ -27,7 +45,7 @@ export default function Timetable() {
 
     fetchTimetable();
     return () => { isMounted = false; };
-  }, [user]);
+  }, [user, studentProfile]);
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   

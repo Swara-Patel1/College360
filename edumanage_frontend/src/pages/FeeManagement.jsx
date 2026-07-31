@@ -7,10 +7,12 @@ import Modal from '../components/Modal.jsx';
 export default function FeeManagement() {
   const { user } = useAuthStore();
   const [payments, setPayments] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('');
 
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [paying, setPaying] = useState(null);
@@ -21,14 +23,27 @@ export default function FeeManagement() {
   const loadData = async () => {
     try {
       setLoading(true);
-      let data = await API.get('admin/fees');
+      const [feeRes, deptRes] = await Promise.all([
+        API.get('admin/fees').catch(() => []),
+        API.get('departments').catch(() => [])
+      ]);
+      let data = feeRes;
       if (!Array.isArray(data) || data.length === 0) {
-        data = await API.get('fees');
+        data = await API.get('fees').catch(() => []);
       }
       if (!Array.isArray(data) || data.length === 0) {
-        data = await API.get('fee_payments');
+        data = await API.get('fee_payments').catch(() => []);
       }
-      setPayments(Array.isArray(data) ? data : []);
+      const paymentList = Array.isArray(data) ? data : [];
+      setPayments(paymentList);
+
+      if (Array.isArray(deptRes) && deptRes.length > 0) {
+        setDepartments(deptRes);
+      } else {
+        const uniqueDepts = Array.from(new Set(paymentList.map(p => p.department_name).filter(Boolean)))
+          .map(name => ({ id: name, name }));
+        setDepartments(uniqueDepts);
+      }
     } catch (e) {
       console.error(e);
       Toast.error('Failed to load fee records.');
@@ -60,14 +75,22 @@ export default function FeeManagement() {
     const matchesSearch = (p.student_name || '').toLowerCase().includes(q) ||
       (p.enrollment_no || '').toLowerCase().includes(q) ||
       (p.component_name || p.fee_type || '').toLowerCase().includes(q);
-    const matchesStatus = selectedStatus ? p.status === selectedStatus : true;
-    return matchesSearch && matchesStatus;
+
+    const matchesStatus = selectedStatus
+      ? (p.status || '').toLowerCase() === selectedStatus.toLowerCase()
+      : true;
+
+    const matchesDept = selectedDepartment
+      ? (p.department_name === selectedDepartment || p.department_id === selectedDepartment)
+      : true;
+
+    return matchesSearch && matchesStatus && matchesDept;
   });
 
   const totalCollected = payments.filter(p => p.status === 'paid' || p.status === 'partial').reduce((a, c) => a + (c.amount_paid || 0), 0);
   const totalPending = payments.filter(p => p.status !== 'paid').reduce((a, c) => a + (Math.max(0, (c.amount || 0) - (c.amount_paid || 0))), 0);
-  const paidCount = payments.filter(p => p.status === 'paid').length;
-  const pendingCount = payments.filter(p => p.status !== 'paid').length;
+  const paidCount = payments.filter(p => (p.status || '').toLowerCase() === 'paid').length;
+  const pendingCount = payments.filter(p => (p.status || '').toLowerCase() !== 'paid').length;
 
   if (loading && !payments.length) {
     return (
@@ -119,13 +142,21 @@ export default function FeeManagement() {
 
       <div className="card">
         <div className="filters-bar" style={{ display: 'flex', gap: '10px', padding: '15px 20px', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '200px' }}>
+          <div style={{ flex: 2, minWidth: '200px' }}>
             <input
               type="text" className="form-input"
               placeholder="Search by student, enrollment no, fee type..."
               value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
+          <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedDepartment} onChange={e => setSelectedDepartment(e.target.value)}>
+            <option value="">All Departments</option>
+            {departments.map(d => (
+              <option key={d.department_id || d.id || d.name} value={d.name || d.department_id || d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
           <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}>
             <option value="">All Statuses</option>
             <option value="paid">Paid</option>
@@ -142,6 +173,7 @@ export default function FeeManagement() {
                 <tr>
                   <th>Student</th>
                   <th>Enrollment No.</th>
+                  <th>Department</th>
                   <th>Fee Component</th>
                   <th>Amount</th>
                   <th>Due Date</th>
@@ -154,10 +186,11 @@ export default function FeeManagement() {
                   <tr key={p.id}>
                     <td style={{ fontWeight: 600 }}>{p.student_name}</td>
                     <td style={{ color: 'var(--text-secondary)' }}>{p.enrollment_no}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{p.department_name}</td>
                     <td>{p.component_name}</td>
                     <td>{Utils.formatCurrency(p.amount)}</td>
                     <td style={{ color: 'var(--text-secondary)' }}>{p.due_date ? Utils.formatDate(p.due_date) : '—'}</td>
-                    <td><span className={Utils.getStatusBadgeClass(p.status)}>{p.status?.toUpperCase()}</span></td>
+                    <td><span className={Utils.getStatusBadgeClass(p.status)}>{(p.status || '').toUpperCase()}</span></td>
                     {isAdmin && (
                       <td style={{ textAlign: 'center' }}>
                         {p.status !== 'paid' ? (

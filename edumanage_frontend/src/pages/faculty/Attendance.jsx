@@ -6,6 +6,7 @@ import { Toast } from '../../store/useNotifStore.js';
 export default function Attendance() {
   const { user } = useAuthStore();
   const [profile, setProfile] = useState(null);
+  const [departments, setDepartments] = useState([]);
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState('');
   const [selectedLecture, setSelectedLecture] = useState('Lecture 1');
@@ -17,9 +18,11 @@ export default function Attendance() {
   const [scheduledLectures, setScheduledLectures] = useState([]);
 
   // Filter States for View Records
+  const [filterDept, setFilterDept] = useState('');
   const [filterCourse, setFilterCourse] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [viewTab, setViewTab] = useState('summary');
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -31,22 +34,35 @@ export default function Attendance() {
   const loadInitialData = async () => {
     try {
       setLoading(true);
+      const isAdmin = user?.role === 'admin';
       const prof = await API.get(`faculty/my_profile?user_id=${user.id}`).catch(() => null);
       setProfile(prof);
-      if (!prof) return;
 
-      const facId = prof.id || prof.faculty_id;
-      const subjId = prof.subject_id;
+      const facId = prof?.id || prof?.faculty_id;
+      const subjId = prof?.subject_id;
 
-      const [allCourses, allAttendance, ttList] = await Promise.all([
+      const [allCourses, allAttendance, deptsData, ttList] = await Promise.all([
         API.get('courses').catch(() => []),
         API.get('attendance').catch(() => []),
-        API.get(`timetable?faculty_id=eq.${facId}`).catch(() => [])
+        API.get('departments').catch(() => []),
+        facId ? API.get(`timetable?faculty_id=eq.${facId}`).catch(() => []) : API.get('timetable').catch(() => []),
       ]);
 
+      const deptArr = Array.isArray(deptsData) ? deptsData : [];
+      const courseArr = Array.isArray(allCourses) ? allCourses : [];
+      const attArr = Array.isArray(allAttendance) ? allAttendance : [];
+
+      setDepartments(deptArr);
       setTimetableEntries(Array.isArray(ttList) ? ttList : []);
 
-      let myCoursesList = (allCourses || []).filter(c => 
+      if (isAdmin || !prof) {
+        setCourses(courseArr);
+        setHistory(attArr);
+        calculateStats(attArr);
+        return;
+      }
+
+      let myCoursesList = (courseArr || []).filter(c => 
         c.faculty_id === facId || 
         c.faculty?.faculty_id === facId || 
         c.faculty?.id === facId ||
@@ -54,17 +70,15 @@ export default function Attendance() {
       );
 
       if (myCoursesList.length === 0 && subjId) {
-        const matched = (allCourses || []).find(c => c.subject_id === subjId || c.id === subjId);
+        const matched = (courseArr || []).find(c => c.subject_id === subjId || c.id === subjId);
         if (matched) myCoursesList.push(matched);
       }
 
       setCourses(myCoursesList);
 
-      // Filter attendance history to only display records for subjects taught by this faculty member
       const mySubjectIds = myCoursesList.map(c => c.subject_id || c.id);
-      const myAttendance = (allAttendance || []).filter(r => mySubjectIds.includes(r.subject_id || r.course));
+      const myAttendance = (attArr || []).filter(r => mySubjectIds.includes(r.subject_id || r.course));
       setHistory(myAttendance);
-
       calculateStats(myAttendance);
     } catch (e) {
       console.error('Failed to load initial attendance data:', e);
@@ -296,24 +310,145 @@ export default function Attendance() {
     }
   };
 
-  // Filter attendance log by Subject, Date, and Status
-  const filteredHistory = history.filter(r => {
-    const matchesCourse = filterCourse 
-      ? (r.subject_id === filterCourse || r.course === filterCourse || r.course_code === filterCourse || r.subject_name === filterCourse) 
-      : true;
+  // Filter attendance log by Department, Subject, Date, and Status
+  const filteredHistory = useMemo(() => {
+    return history.filter(r => {
+      let matchesDept = true;
+      if (filterDept) {
+        const dId = r.department_id || r.student?.department_id || r.course?.department_id;
+        const targetDept = departments.find(d => String(d.department_id || d.id) === String(filterDept));
+        const targetName = (targetDept?.name || '').toLowerCase();
+        const targetCode = (targetDept?.code || '').toLowerCase();
 
-    // Date format fix: compare first 10 chars (YYYY-MM-DD)
-    const recDateStr = r.date ? String(r.date).slice(0, 10) : '';
-    const matchesDate = filterDate ? recDateStr === filterDate : true;
+        const matchId = dId && String(dId) === String(filterDept);
+        const matchName = r.department_name && (
+          r.department_name.toLowerCase() === filterDept.toLowerCase() ||
+          (targetName && r.department_name.toLowerCase() === targetName)
+        );
+        const matchCode = r.course_code && targetCode && r.course_code.toLowerCase().startsWith(targetCode);
 
-    const rStat = String(r.status || '').toLowerCase();
-    const fStat = String(filterStatus || '').toLowerCase();
-    const matchesStatus = fStat 
-      ? (rStat === fStat || (fStat === 'present' && rStat === 'p') || (fStat === 'absent' && rStat === 'a') || (fStat === 'late' && rStat === 'l')) 
-      : true;
+        matchesDept = matchId || matchName || matchCode;
+      }
 
-    return matchesCourse && matchesDate && matchesStatus;
-  });
+      const matchesCourse = filterCourse 
+        ? (r.subject_id === filterCourse || r.course === filterCourse || r.course_code === filterCourse || r.subject_name === filterCourse) 
+        : true;
+
+      // Date format fix: compare first 10 chars (YYYY-MM-DD)
+      const recDateStr = r.date ? String(r.date).slice(0, 10) : '';
+      const matchesDate = filterDate ? recDateStr === filterDate : true;
+
+      const rStat = String(r.status || '').toLowerCase();
+      const fStat = String(filterStatus || '').toLowerCase();
+      const matchesStatus = fStat 
+        ? (rStat === fStat || (fStat === 'present' && rStat === 'p') || (fStat === 'absent' && rStat === 'a') || (fStat === 'late' && rStat === 'l')) 
+        : true;
+
+      return matchesDept && matchesCourse && matchesDate && matchesStatus;
+    });
+  }, [history, filterDept, filterCourse, filterDate, filterStatus, departments]);
+
+  useEffect(() => {
+    calculateStats(filteredHistory);
+  }, [filteredHistory]);
+
+  const availableFilterCourses = useMemo(() => {
+    if (!filterDept) return courses;
+    return courses.filter(c => !c.department_id || String(c.department_id) === String(filterDept));
+  }, [courses, filterDept]);
+
+  const subjectSummaries = useMemo(() => {
+    const map = new Map();
+
+    courses.forEach(c => {
+      const cId = String(c.subject_id || c.id || '');
+      const dept = departments.find(d => String(d.department_id || d.id) === String(c.department_id));
+      map.set(cId, {
+        subject_id: cId,
+        code: c.code || '—',
+        name: c.name || 'Subject',
+        department_id: c.department_id || '',
+        department_name: dept?.name || c.department_name || 'General',
+        total: 0,
+        present: 0,
+        absent: 0,
+        late: 0,
+        datesSet: new Set(),
+      });
+    });
+
+    history.forEach(r => {
+      const sId = String(r.subject_id || r.course || '');
+      let entry = map.get(sId);
+      if (!entry) {
+        for (const [, v] of map.entries()) {
+          if (v.code && r.course_code && v.code.toLowerCase() === r.course_code.toLowerCase()) {
+            entry = v;
+            break;
+          }
+        }
+      }
+
+      if (!entry && (r.subject_name || r.course_code)) {
+        entry = {
+          subject_id: sId || r.course_code,
+          code: r.course_code || '—',
+          name: r.subject_name || 'Subject',
+          department_id: r.department_id || '',
+          department_name: r.department_name || 'General',
+          total: 0,
+          present: 0,
+          absent: 0,
+          late: 0,
+          datesSet: new Set(),
+        };
+        map.set(entry.subject_id, entry);
+      }
+
+      if (entry) {
+        entry.total++;
+        const st = String(r.status || '').toLowerCase();
+        if (st === 'present' || st === 'p') entry.present++;
+        else if (st === 'absent' || st === 'a') entry.absent++;
+        else if (st === 'late' || st === 'l') entry.late++;
+
+        if (r.date) entry.datesSet.add(String(r.date).slice(0, 10));
+      }
+    });
+
+    let list = Array.from(map.values()).map(item => {
+      const attended = item.present + item.late;
+      const percentage = item.total > 0 ? parseFloat(((attended / item.total) * 100).toFixed(1)) : 0.0;
+      return {
+        ...item,
+        sessionsCount: item.datesSet.size,
+        percentage,
+      };
+    });
+
+    if (filterDept) {
+      list = list.filter(item => {
+        const targetDept = departments.find(d => String(d.department_id || d.id) === String(filterDept));
+        const targetName = (targetDept?.name || '').toLowerCase();
+        const targetCode = (targetDept?.code || '').toLowerCase();
+
+        const matchId = item.department_id && String(item.department_id) === String(filterDept);
+        const matchName = item.department_name && (
+          item.department_name.toLowerCase() === filterDept.toLowerCase() ||
+          (targetName && item.department_name.toLowerCase() === targetName)
+        );
+        const matchCode = item.code && targetCode && item.code.toLowerCase().startsWith(targetCode);
+        return matchId || matchName || matchCode;
+      });
+    }
+
+    if (filterCourse) {
+      list = list.filter(item => item.subject_id === filterCourse || item.code === filterCourse);
+    }
+
+    list.sort((a, b) => a.department_name.localeCompare(b.department_name) || a.code.localeCompare(b.code));
+    return list;
+  }, [history, courses, departments, filterDept, filterCourse]);
 
   const selectedSubjectObj = courses.find(c => (c.subject_id || c.id) === selectedCourse);
   const dayNameStr = new Date(attendanceDate).toLocaleDateString('en-US', { weekday: 'long' });
@@ -587,73 +722,191 @@ export default function Attendance() {
         /* VIEW RECORDS MODE */
         <div className="card col-12">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-            <div className="card-title"><i className="bi bi-clipboard"></i> Attendance Log {filterStatus && <span className="badge badge-info ms-2">Filter: {filterStatus.toUpperCase()}</span>}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div className="card-title" style={{ margin: 0 }}>
+                <i className="bi bi-bar-chart-fill me-2"></i> Attendance Overview
+              </div>
+              <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.06)', borderRadius: '8px', padding: '3px' }}>
+                <button
+                  className={`btn btn-sm ${viewTab === 'summary' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ borderRadius: '6px', padding: '4px 12px', fontSize: '0.78rem' }}
+                  onClick={() => setViewTab('summary')}
+                >
+                  <i className="bi bi-grid-3x3-gap-fill me-1"></i> Subject Summary
+                </button>
+                <button
+                  className={`btn btn-sm ${viewTab === 'detailed' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ borderRadius: '6px', padding: '4px 12px', fontSize: '0.78rem' }}
+                  onClick={() => setViewTab('detailed')}
+                >
+                  <i className="bi bi-person-lines-fill me-1"></i> Detailed Logs
+                </button>
+              </div>
+            </div>
+
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <select 
+                className="form-input" 
+                style={{ width: '180px', padding: '6px 10px', fontSize: '0.8rem' }} 
+                value={filterDept} 
+                onChange={e => { setFilterDept(e.target.value); setFilterCourse(''); }}
+              >
+                <option value="">All Departments</option>
+                {departments.map(d => (
+                  <option key={d.department_id || d.id} value={d.department_id || d.id}>{d.name}</option>
+                ))}
+              </select>
               <select className="form-input" style={{ width: '180px', padding: '6px 10px', fontSize: '0.8rem' }} value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
                 <option value="">All Subjects</option>
-                {courses.map(c => (
+                {availableFilterCourses.map(c => (
                   <option key={c.subject_id || c.id} value={c.subject_id || c.id}>{c.code} — {c.name}</option>
                 ))}
               </select>
-              <input
-                type="date"
-                className="form-input"
-                style={{ width: 'auto', padding: '6px 10px', fontSize: '0.8rem' }}
-                value={filterDate}
-                onChange={e => setFilterDate(e.target.value)}
-              />
-              <select className="form-input" style={{ width: '130px', padding: '6px 10px', fontSize: '0.8rem' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                <option value="">All Statuses</option>
-                <option value="present">Present</option>
-                <option value="absent">Absent</option>
-                <option value="late">Late</option>
-              </select>
-              {(filterCourse || filterDate || filterStatus) && (
+              {viewTab === 'detailed' && (
+                <>
+                  <input
+                    type="date"
+                    className="form-input"
+                    style={{ width: 'auto', padding: '6px 10px', fontSize: '0.8rem' }}
+                    value={filterDate}
+                    onChange={e => setFilterDate(e.target.value)}
+                  />
+                  <select className="form-input" style={{ width: '130px', padding: '6px 10px', fontSize: '0.8rem' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                    <option value="">All Statuses</option>
+                    <option value="present">Present</option>
+                    <option value="absent">Absent</option>
+                    <option value="late">Late</option>
+                  </select>
+                </>
+              )}
+              {(filterDept || filterCourse || filterDate || filterStatus) && (
                 <button 
                   className="btn btn-ghost" 
                   style={{ padding: '4px 10px', fontSize: '0.75rem', color: '#ef4444' }} 
-                  onClick={() => { setFilterCourse(''); setFilterDate(''); setFilterStatus(''); }}
+                  onClick={() => { setFilterDept(''); setFilterCourse(''); setFilterDate(''); setFilterStatus(''); }}
                 >
                   <i className="bi bi-x-circle me-1" />Reset Filters
                 </button>
               )}
             </div>
           </div>
+
           <div className="card-body" style={{ padding: 0 }}>
-            {filteredHistory.length > 0 ? (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Subject</th>
-                    <th>Lecture</th>
-                    <th>Student Name</th>
-                    <th>Status</th>
-                    <th>Marked By</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredHistory.map((r, idx) => (
-                    <tr key={r.attendance_id || idx}>
-                      <td>{r.date ? String(r.date).slice(0, 10) : '—'}</td>
-                      <td><strong>{r.course_code || r.subject_name || 'Subject'}</strong></td>
-                      <td><span className="badge badge-info">{r.lecture || 'Lecture 1'}</span></td>
-                      <td>{r.student_name}</td>
-                      <td>
-                        <span className={`badge badge-${r.status === 'present' ? 'success' : r.status === 'absent' ? 'danger' : 'warning'}`}>
-                          {r.status?.toUpperCase()}
-                        </span>
-                      </td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{r.marked_by || 'System'}</td>
+            {viewTab === 'summary' ? (
+              /* SUBJECT SUMMARY TABLE */
+              subjectSummaries.length > 0 ? (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Department</th>
+                      <th>Subject / Course</th>
+                      <th>Sessions Held</th>
+                      <th style={{ minWidth: '180px' }}>Attendance Rate</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {subjectSummaries.map((item, idx) => {
+                      const color = item.percentage >= 75 ? '#22c55e' : item.percentage >= 60 ? '#f59e0b' : '#ef4444';
+                      return (
+                        <tr key={item.subject_id || idx}>
+                          <td>
+                            <span className="badge badge-secondary" style={{ fontSize: '0.75rem', background: 'rgba(108, 99, 255, 0.15)', color: '#6C63FF', border: '1px solid rgba(108, 99, 255, 0.3)' }}>
+                              {item.department_name}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{item.code}</div>
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{item.name}</div>
+                          </td>
+                          <td>
+                            <span className="badge badge-info" style={{ borderRadius: '6px' }}>
+                              <i className="bi bi-calendar-event me-1"></i>{item.sessionsCount} {item.sessionsCount === 1 ? 'Session' : 'Sessions'}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ flex: 1, height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                                <div style={{ width: `${Math.min(100, item.percentage)}%`, height: '100%', background: color, borderRadius: '4px', transition: 'width 0.3s ease' }}></div>
+                              </div>
+                              <span style={{ fontWeight: 700, fontSize: '0.88rem', color: color, minWidth: '48px', textAlign: 'right' }}>
+                                {item.percentage}%
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{ borderRadius: '8px', fontSize: '0.78rem', color: 'var(--primary-light)', borderColor: 'rgba(108, 99, 255, 0.3)' }}
+                              onClick={() => {
+                                setFilterCourse(item.subject_id);
+                                setViewTab('detailed');
+                              }}
+                            >
+                              View Logs →
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-state-icon"><i className="bi bi-book"></i></div>
+                  <p>No subjects found for the selected department filter.</p>
+                </div>
+              )
             ) : (
-              <div className="empty-state">
-                <div className="empty-state-icon"><i className="bi bi-clipboard"></i></div>
-                <p>No matching attendance records found for the selected filters.</p>
-              </div>
+              /* DETAILED LOGS TABLE */
+              filteredHistory.length > 0 ? (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Student Name</th>
+                      <th>Department</th>
+                      <th>Subject / Course</th>
+                      <th>Lecture</th>
+                      <th>Status</th>
+                      <th>Marked By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredHistory.map((r, idx) => (
+                      <tr key={r.attendance_id || r.record_id || idx}>
+                        <td>{r.date ? String(r.date).slice(0, 10) : '—'}</td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{r.student_name || 'Student'}</div>
+                          {(r.student?.enrollment_no || r.enrollment_no) && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              {r.student?.enrollment_no || r.enrollment_no}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <span className="badge badge-secondary" style={{ fontSize: '0.75rem', background: 'rgba(108, 99, 255, 0.15)', color: '#6C63FF', border: '1px solid rgba(108, 99, 255, 0.3)' }}>
+                            {r.department_name || 'General'}
+                          </span>
+                        </td>
+                        <td><strong>{r.course_code || r.subject_name || 'Subject'}</strong></td>
+                        <td><span className="badge badge-info">{r.lecture || 'Lecture 1'}</span></td>
+                        <td>
+                          <span className={`badge badge-${r.status === 'present' ? 'success' : r.status === 'absent' ? 'danger' : 'warning'}`}>
+                            {r.status?.toUpperCase()}
+                          </span>
+                        </td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{r.marked_by || 'Faculty'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-state-icon"><i className="bi bi-clipboard"></i></div>
+                  <p>No matching attendance records found for the selected filters.</p>
+                </div>
+              )
             )}
           </div>
         </div>

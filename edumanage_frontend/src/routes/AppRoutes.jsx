@@ -17,15 +17,12 @@ import StudentDoubts from '../pages/student/Doubts.jsx';
 import StudentComplaints from '../pages/student/Complaints.jsx';
 import Notices from '../pages/Notices.jsx';
 import StudentFeedback from '../pages/student/Feedback.jsx';
-import StudentBacklogs from '../pages/student/Backlogs.jsx';
 import ExamSchedule from '../pages/ExamSchedule.jsx';
 import ExamScheduling from '../pages/admin/ExamScheduling.jsx';
 import LibraryManagement from '../pages/admin/LibraryManagement.jsx';
 import StudentLibrary from '../pages/student/Library.jsx';
-import StudentPortfolio from '../pages/student/Portfolio.jsx';
 import StudentPlacement from '../pages/student/Placement.jsx';
 import StudentFees from '../pages/student/Fees.jsx';
-import StudentRecords from '../pages/admin/StudentRecords.jsx';
 import HODFeedback from '../pages/hod/Feedback.jsx';
 import ParentDashboard from '../pages/parent/Dashboard.jsx';
 import ParentAttendance from '../pages/parent/Attendance.jsx';
@@ -115,10 +112,8 @@ export const AppRoutes = () => {
         <Route path="/student/complaints" element={<MainLayout><StudentComplaints /></MainLayout>} />
         <Route path="/student/notices" element={<MainLayout><Notices /></MainLayout>} />
         <Route path="/student/feedback" element={<MainLayout><StudentFeedback /></MainLayout>} />
-        <Route path="/student/backlogs" element={<MainLayout><StudentBacklogs /></MainLayout>} />
         <Route path="/student/exams" element={<MainLayout><ExamSchedule /></MainLayout>} />
         <Route path="/student/library" element={<MainLayout><StudentLibrary /></MainLayout>} />
-        <Route path="/student/portfolio" element={<MainLayout><StudentPortfolio /></MainLayout>} />
         <Route path="/student/placement" element={<MainLayout><StudentPlacement /></MainLayout>} />
         <Route path="/student/fees" element={<MainLayout><StudentFees /></MainLayout>} />
       </Route>
@@ -135,6 +130,7 @@ export const AppRoutes = () => {
         <Route path="/faculty/interchange" element={<MainLayout><FacultyInterchange /></MainLayout>} />
         <Route path="/faculty/doubts" element={<MainLayout><FacultyDoubts /></MainLayout>} />
         <Route path="/faculty/students" element={<MainLayout><ManageStudents /></MainLayout>} />
+        <Route path="/faculty/hod" element={<MainLayout><ManageFaculty /></MainLayout>} />
         <Route path="/faculty/courses" element={<MainLayout><Courses /></MainLayout>} />
         <Route path="/faculty/notices" element={<MainLayout><Notices /></MainLayout>} />
         <Route path="/faculty/exams" element={<MainLayout><ExamSchedule /></MainLayout>} />
@@ -176,7 +172,6 @@ export const AppRoutes = () => {
         <Route path="/admin/notices" element={<MainLayout><Notices /></MainLayout>} />
         <Route path="/admin/exams" element={<MainLayout><ExamScheduling /></MainLayout>} />
         <Route path="/admin/library" element={<MainLayout><LibraryManagement /></MainLayout>} />
-        <Route path="/admin/student-records" element={<MainLayout><StudentRecords /></MainLayout>} />
       </Route>
 
       {/* Fallback */}

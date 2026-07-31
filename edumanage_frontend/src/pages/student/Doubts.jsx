@@ -40,15 +40,48 @@ export default function Doubts() {
 
   const fetchCourses = async () => {
     try {
-      const data = await API.get('courses/enrollments');
-      setEnrolledCourses(Array.isArray(data) ? data : (data?.results || []));
-    } catch {
-      try {
-        const data = await API.get('courses');
-        setEnrolledCourses(Array.isArray(data) ? data : (data?.results || []));
-      } catch (err) {
-        console.error('Failed to load courses:', err);
+      let currentSem = null;
+      if (user?.role === 'student') {
+        const cached = localStorage.getItem('student_profile');
+        if (cached) {
+          try {
+            const p = JSON.parse(cached);
+            currentSem = p.semester || p.current_semester;
+          } catch (e) {}
+        }
+        if (!currentSem) {
+          try {
+            const profile = await API.get('students/my_profile');
+            currentSem = profile?.semester || profile?.current_semester;
+          } catch (e) {}
+        }
       }
+
+      const [enrollData, coursesData] = await Promise.all([
+        API.get('enrollments').catch(() => []),
+        API.get('courses').catch(() => [])
+      ]);
+
+      const enrollList = Array.isArray(enrollData) ? enrollData : (enrollData?.results || []);
+      const courseList = Array.isArray(coursesData) ? coursesData : (coursesData?.results || []);
+
+      const myCourseIds = new Set(enrollList.map(e => String(e.course || e.course_id || e.subject_id)).filter(Boolean));
+
+      let filteredCourses = courseList.filter(c => {
+        const isEnrolled = myCourseIds.size === 0 || myCourseIds.has(String(c.id)) || myCourseIds.has(String(c.subject_id));
+        const isCurrentSem = !currentSem || String(c.semester) === String(currentSem);
+        return isEnrolled && isCurrentSem;
+      });
+
+      if (!filteredCourses.length && enrollList.length) {
+        filteredCourses = enrollList
+          .map(e => e.course || e)
+          .filter(c => c && (!currentSem || String(c.semester) === String(currentSem)));
+      }
+
+      setEnrolledCourses(filteredCourses);
+    } catch (err) {
+      console.error('Failed to load courses:', err);
     }
   };
 
@@ -119,9 +152,10 @@ export default function Doubts() {
       return;
     }
 
-    const courseObj = enrolledCourses.find(c => String(c.course || c.id) === String(selectedSubjectId));
+    const courseObj = enrolledCourses.find(c => String(c.course || c.id || c.subject_id) === String(selectedSubjectId));
     const code = courseObj?.course_code || courseObj?.code || 'SUBJ';
     const name = courseObj?.course_name || courseObj?.name || 'Subject';
+    const facId = courseObj?.faculty_id || (typeof courseObj?.faculty === 'object' ? courseObj?.faculty?.id || courseObj?.faculty?.faculty_id : null);
 
     try {
       setIsSubmitting(true);
@@ -137,6 +171,8 @@ export default function Doubts() {
         subject_name: name,
         subject_code: code,
         question: questionText.trim(),
+        assigned_faculty_id: facId,
+        faculty_id: facId,
         status: 'open',
         submitted_at: new Date().toISOString(),
         sla_deadline: slaDeadline.toISOString()
@@ -300,9 +336,12 @@ export default function Doubts() {
               <option value="">Choose Course...</option>
               {enrolledCourses.map((e, idx) => {
                 const c = e.course || e;
+                const subjId = c.id || c.subject_id;
+                const subjName = c.name || c.course_name || 'Subject';
+                const subjCode = c.code || c.course_code || '';
                 return (
-                  <option value={c.id} key={idx}>
-                    {c.name} ({c.code || c.course_code})
+                  <option value={subjId} key={idx}>
+                    {subjName} {subjCode ? `(${subjCode})` : ''}
                   </option>
                 );
               })}

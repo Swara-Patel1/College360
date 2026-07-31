@@ -1279,7 +1279,7 @@ export const SupaAPI = {
   },
 
   users: {
-    all:           ()          => API.get('users?order=id.asc&limit=500'),
+    all:           ()          => API.get('users?limit=2000'),
     setActive:     (id, active) => API.patch(`users?id=eq.${id}`, { is_active: active }),
     setRole:       (id, role)  => API.patch(`users?id=eq.${id}`, { roles: role }),
     resetPassword: (id, pw)    => API.patch(`users?id=eq.${id}`, { new_password: pw }),
@@ -1448,7 +1448,7 @@ export const Utils = {
     const cleanStatus = s === 'p' ? 'present' : s === 'a' ? 'absent' : s === 'l' ? 'late' : s === 'e' ? 'excused' : s;
     const map = {
       active: 'success', inactive: 'muted', graduated: 'info',
-      paid: 'success', pending: 'warning', overdue: 'danger', waived: 'muted',
+      paid: 'success', pending: 'warning', overdue: 'danger', partial: 'info', waived: 'muted',
       present: 'success', absent: 'danger', late: 'warning', excused: 'info',
       approved: 'success', rejected: 'danger',
       ai_answered: 'primary', under_review: 'info', open: 'warning',

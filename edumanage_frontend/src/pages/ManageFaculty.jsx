@@ -40,12 +40,92 @@ export default function ManageFaculty() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [facData, deptData] = await Promise.all([
-        API.get('faculty'),
-        API.get('departments'),
+
+      let filterDeptId = user?.department_id || user?.department?.id || user?.department?.department_id || '';
+      let filterDeptName = user?.department_name || user?.department?.name || user?.dept_name || '';
+
+      if (!isAdmin) {
+        try {
+          const hodInfo = await API.get('hod/check');
+          if (hodInfo && (hodInfo.isHod || hodInfo.hod)) {
+            filterDeptId = hodInfo.hod?.department_id || hodInfo.department_id || filterDeptId;
+            filterDeptName = hodInfo.hod?.dept_name || hodInfo.dept_name || filterDeptName;
+          }
+        } catch (_) {}
+
+        if (!filterDeptId) {
+          try {
+            const prof = await API.get('faculty/my_profile');
+            if (prof) {
+              filterDeptId = prof.department_id || prof.department?.id || (typeof prof.department === 'string' ? prof.department : '') || filterDeptId;
+              filterDeptName = prof.department_name || prof.department?.name || filterDeptName;
+            }
+          } catch (_) {}
+        }
+      }
+
+      const facultyEndpoint = (!isAdmin && filterDeptId)
+        ? `faculty?department_id=${filterDeptId}&limit=1000`
+        : 'faculty?limit=1000';
+
+      const [facData, deptData, hodData] = await Promise.all([
+        API.get(facultyEndpoint).catch(() => []),
+        API.get('departments').catch(() => []),
+        API.get('hod').catch(() => [])
       ]);
-      setFaculty(Array.isArray(facData) ? facData : []);
-      setDepartments(Array.isArray(deptData) ? deptData : []);
+
+      let allowedFaculty = Array.isArray(facData) ? facData : [];
+      const deptsList = Array.isArray(deptData) ? deptData : [];
+      const hodList = Array.isArray(hodData) ? hodData : [];
+
+      if (!isAdmin && (filterDeptId || filterDeptName)) {
+        const targetId = String(filterDeptId || '').toLowerCase();
+        const targetName = String(filterDeptName || '').toLowerCase();
+
+        allowedFaculty = allowedFaculty.filter(f => {
+          const fDeptId = String(f.department_id || f.department?.department_id || f.department?.id || f.department || '').toLowerCase();
+          const fDeptName = String(f.department_name || f.department?.name || f.dept_name || '').toLowerCase();
+
+          if (targetId && fDeptId && fDeptId === targetId) return true;
+          if (targetName && fDeptName && fDeptName === targetName) return true;
+          return false;
+        });
+
+        const deptHod = hodList.find(h => {
+          const hDeptId = String(h.department_id || h.department?.department_id || h.department?.id || '').toLowerCase();
+          const hDeptName = String(h.department_name || h.department?.name || '').toLowerCase();
+          return (targetId && hDeptId === targetId) || (targetName && hDeptName === targetName);
+        });
+
+        if (deptHod) {
+          const alreadyListed = allowedFaculty.some(f => 
+            String(f.id || f.faculty_id) === String(deptHod.id || deptHod.faculty_id || deptHod.user_id) ||
+            String(f.user_id) === String(deptHod.user_id)
+          );
+          if (!alreadyListed) {
+            allowedFaculty.unshift({
+              id: deptHod.id || deptHod.hod_id || deptHod.user_id,
+              faculty_id: deptHod.employee_id || 'HOD',
+              employee_id: deptHod.employee_id || 'HOD',
+              first_name: deptHod.first_name || deptHod.name || 'HOD',
+              last_name: deptHod.last_name || '',
+              email: deptHod.email || '',
+              department_id: deptHod.department_id,
+              department_name: deptHod.department_name || 'Department',
+              status: 'active',
+              designation: 'Head of Department (HOD)',
+              isHod: true,
+              user: { roles: 'hod', role: 'hod' }
+            });
+          }
+        }
+      }
+
+      setFaculty(allowedFaculty);
+      setDepartments(deptsList);
+      if (!isAdmin && filterDeptId) {
+        setSelectedDept(filterDeptId);
+      }
     } catch (e) {
       console.error(e);
       Toast.error('Failed to load faculty data.');
@@ -171,8 +251,8 @@ export default function ManageFaculty() {
       {/* ── Page Header ── */}
       <div className="page-header">
         <div className="page-header-left">
-          <h1><i className="bi bi-person-video3"></i> Manage Faculty</h1>
-          <p>Manage faculty profiles, departments, and employment status.</p>
+          <h1><i className="bi bi-person-video3"></i> {isAdmin ? 'Manage Faculty' : 'View Department Faculty'}</h1>
+          <p>{isAdmin ? 'Manage faculty profiles, departments, and employment status.' : 'View faculty members and HOD belonging to your department.'}</p>
         </div>
         {isAdmin && (
           <div className="page-header-right">
@@ -200,13 +280,6 @@ export default function ManageFaculty() {
           </div>
         </div>
         <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(139,92,246,0.2)' }}><i className="bi bi-building"></i></div>
-          <div>
-            <div className="stats-mini-val" style={{ color: '#8b5cf6' }}>{hodCount}</div>
-            <div className="stats-mini-lbl">HODs</div>
-          </div>
-        </div>
-        <div className="stats-mini-card">
           <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}><i className="bi bi-pause"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#FF6B6B' }}>{inactiveCount}</div>
@@ -226,15 +299,19 @@ export default function ManageFaculty() {
               value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
-          <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
-            <option value="">All Departments</option>
-            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <select className="form-input" style={{ flex: 1, minWidth: '130px' }} value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}>
-            <option value="">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+          {isAdmin && (
+            <>
+              <select className="form-input" style={{ flex: 1, minWidth: '150px' }} value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
+                <option value="">All Departments</option>
+                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+              <select className="form-input" style={{ flex: 1, minWidth: '130px' }} value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}>
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </>
+          )}
         </div>
 
         {/* Table */}
@@ -424,18 +501,23 @@ export default function ManageFaculty() {
             </div>
 
             {/* Details grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
-              {[
-                { label: 'Employee ID', value: viewingFaculty.employee_id || '—' },
-                { label: 'Email', value: viewingFaculty.email || '—' },
-                { label: 'Department', value: viewingFaculty.department_name || '—' },
-                { label: 'Role', value: (viewingFaculty.user?.roles || viewingFaculty.user?.role || 'faculty').toUpperCase() },
-              ].map(({ label, value }) => (
-                <div key={label}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>{label}</span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{value}</strong>
-                </div>
-              ))}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 20px' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Employee ID</span>
+                <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{viewingFaculty.employee_id || '—'}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Role</span>
+                <strong style={{ color: '#a78bfa', fontSize: '0.95rem' }}>{(viewingFaculty.designation || viewingFaculty.user?.roles || viewingFaculty.user?.role || 'faculty').toUpperCase()}</strong>
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Address</span>
+                <strong style={{ color: 'var(--text-primary)', fontSize: '0.92rem', wordBreak: 'break-all' }}>{viewingFaculty.email || '—'}</strong>
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Department</span>
+                <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{viewingFaculty.department_name || '—'}</strong>
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>

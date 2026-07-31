@@ -33,12 +33,34 @@ export default function Attendance() {
         if (!isMounted) return;
         setProfile(profData);
         const studUuid = profData?.id;
+        const deptId = profData?.department_id || profData?.department?.department_id || profData?.department?.id;
+        const semId = profData?.current_semester_id || profData?.current_semester?.semester_id || profData?.semester;
 
-        // Fetch general stats, enrollments and logs in parallel
-        const [statsData, enrollData, logsData] = await Promise.all([
-          API.get(`attendance/stats?student=${studUuid}`),
-          API.get(`courses/enrollments?student=${studUuid}`),
-          API.get(`attendance?student=${studUuid}`)
+        // Fetch current semester subjects of student's department
+        let currentSubjs = [];
+        if (deptId && semId) {
+          currentSubjs = await API.get(`subjects?department_id=${deptId}&semester_id=${semId}`).catch(() => []);
+        }
+        if (!Array.isArray(currentSubjs) || currentSubjs.length === 0) {
+          currentSubjs = await API.get(`courses/enrollments?student=${studUuid}`).catch(() => []);
+        }
+
+        const rawList = Array.isArray(currentSubjs) ? currentSubjs : (currentSubjs?.results || []);
+        const targetCourses = rawList.filter(c => {
+          const cDept = c.department_id || c.department?.department_id || c.department?.id || c.department;
+          const cSem = c.semester_id || c.semester?.semester_id || c.semester?.id || c.semester;
+          const deptMatch = !deptId || !cDept || String(cDept) === String(deptId);
+          const semMatch = !semId || !cSem || String(cSem) === String(semId) || String(cSem) === String(profData?.semester);
+          return deptMatch && semMatch;
+        });
+
+        // Fetch general stats and logs for current semester in parallel
+        const statsQuery = semId ? `attendance/stats?student=${studUuid}&semester_id=${semId}` : `attendance/stats?student=${studUuid}`;
+        const logsQuery = semId ? `attendance?student=${studUuid}&semester_id=${semId}` : `attendance?student=${studUuid}`;
+
+        const [statsData, logsData] = await Promise.all([
+          API.get(statsQuery),
+          API.get(logsQuery)
         ]);
 
         if (!isMounted) return;
@@ -51,21 +73,33 @@ export default function Attendance() {
           excused: statsData?.excused || 0
         });
 
-        setEnrolledCourses(enrollData || []);
         setLogs(logsData || []);
         setFilteredLogs(logsData || []);
 
-        // Load stats for each individual course
-        if (enrollData?.length) {
+        // Map enrolledCourses for dropdown filter
+        const formattedEnrolled = targetCourses.map(c => ({
+          course: c.subject_id || c.id,
+          course_code: c.code || c.course_code,
+          course_name: c.name || c.course_name
+        }));
+        setEnrolledCourses(formattedEnrolled);
+
+        // Load stats for each individual course in the current semester
+        if (targetCourses.length) {
           const breakdown = await Promise.all(
-            enrollData.map(async (e) => {
+            targetCourses.map(async (c) => {
+              const courseId = c.subject_id || c.id;
               try {
-                const courseId = typeof e.course === 'object' ? (e.course?.id || e.course?.subject_id || e.course?.course_id) : (e.course || e.subject_id || e.course_id || e.id);
                 const cStats = await API.get(`attendance/stats?student=${studUuid}&course=${courseId}`);
-                return { ...e, stats: cStats };
+                return {
+                  course_code: c.code || c.course_code || 'SUB',
+                  course_name: c.name || c.course_name || 'Subject',
+                  stats: cStats
+                };
               } catch {
                 return {
-                  ...e,
+                  course_code: c.code || c.course_code || 'SUB',
+                  course_name: c.name || c.course_name || 'Subject',
                   stats: { total: 0, present: 0, absent: 0, late: 0, percentage: 0 }
                 };
               }
@@ -100,7 +134,7 @@ export default function Attendance() {
     let result = [...logs];
 
     if (selectedCourse) {
-      result = result.filter(log => log.course == selectedCourse);
+      result = result.filter(log => log.course == selectedCourse || log.subject_id == selectedCourse || log.course_id == selectedCourse);
     }
 
     if (selectedStatus) {

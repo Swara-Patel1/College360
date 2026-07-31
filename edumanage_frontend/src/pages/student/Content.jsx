@@ -18,20 +18,49 @@ export default function Content() {
 
     const fetchContent = async () => {
       try {
-        // Load enrollments first to know which subjects the student belongs to
-        let enrolledIds = null;
+        let currentSemSubjectIds = null;
         if (user.role === 'student') {
-          const enrollData = await API.get('enrollments').catch(() => []);
-          enrolledIds = new Set((enrollData || []).map(e => e.course || e.course_id || e.subject_id).filter(Boolean));
-          if (isMounted) setEnrolledSubjectIds(enrolledIds);
+          let currentSem = null;
+          const cached = localStorage.getItem('student_profile');
+          if (cached) {
+            try {
+              const p = JSON.parse(cached);
+              currentSem = p.semester || p.current_semester;
+            } catch (e) {}
+          }
+          if (!currentSem) {
+            try {
+              const profile = await API.get('students/my_profile');
+              currentSem = profile?.semester || profile?.current_semester;
+            } catch (e) {}
+          }
+
+          const [enrollData, coursesData] = await Promise.all([
+            API.get('enrollments').catch(() => []),
+            API.get('courses').catch(() => [])
+          ]);
+
+          const myCourseIds = new Set((enrollData || []).map(e => String(e.course || e.course_id || e.subject_id)).filter(Boolean));
+
+          const currentSemCourses = (coursesData || []).filter(c => {
+            const isEnrolled = myCourseIds.has(String(c.id)) || myCourseIds.has(String(c.subject_id));
+            const isCurrentSem = !currentSem || String(c.semester) === String(currentSem);
+            return isEnrolled && isCurrentSem;
+          });
+
+          currentSemSubjectIds = new Set(
+            currentSemCourses.flatMap(c => [String(c.id), String(c.subject_id)]).filter(Boolean)
+          );
+
+          if (isMounted) setEnrolledSubjectIds(currentSemSubjectIds);
         }
 
         const data = await API.get('content');
         if (isMounted) {
           let content = Array.isArray(data) ? data : (data?.results || []);
-          // For students: only show content from their enrolled subjects
-          if (enrolledIds && enrolledIds.size > 0) {
-            content = content.filter(c => !c.subject_id || enrolledIds.has(c.subject_id));
+          // For students: only show content from their current semester subjects
+          if (user.role === 'student' && currentSemSubjectIds) {
+            content = content.filter(c => c.subject_id && currentSemSubjectIds.has(String(c.subject_id)));
           }
           setAllContent(content);
         }
@@ -55,12 +84,11 @@ export default function Content() {
     }[type] || { icon: <i className="bi bi-paperclip" />, label: type || 'Resource', cls: 'type-link', action: 'Open' };
   };
 
-  // Build subject map — for students, only enrolled subjects
+  // Build subject map — for students, only enrolled current semester subjects
   const subjectMap = new Map();
   allContent.forEach(c => {
     if (c.subject_id && c.subject_name && c.subject_name !== '—') {
-      // If we have enrollment data, only show enrolled subjects in the pills
-      if (!enrolledSubjectIds || enrolledSubjectIds.has(c.subject_id)) {
+      if (!enrolledSubjectIds || enrolledSubjectIds.has(String(c.subject_id))) {
         subjectMap.set(c.subject_id, c.subject_name);
       }
     }

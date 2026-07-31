@@ -150,31 +150,30 @@ export default function LibraryManagement() {
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         <button className={`btn ${tab === 'catalog' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab('catalog')}><i className="bi bi-book"></i> Catalog ({books.length})</button>
-        <button className={`btn ${tab === 'loans' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab('loans')}><i className="bi bi-arrow-repeat"></i> Loans ({activeLoans.length} active)</button>
+        <button className={`btn ${tab === 'loans' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab('loans')}><i className="bi bi-arrow-repeat"></i> Issued ({activeLoans.length} active)</button>
       </div>
 
       {tab === 'catalog' && (
         <div className="card col-12">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div className="card-title"><i className="bi bi-book"></i> Book Inventory</div>
-            <input className="form-control" style={{ maxWidth: '320px' }} placeholder="Search title, author, ISBN or barcode…"
+            <input className="form-control" style={{ maxWidth: '320px' }} placeholder="Search title, author, category…"
               value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             {filteredBooks.length ? (
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">
-                  <thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Barcode / ISBN</th><th>Availability</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Available Copies</th><th>Actions</th></tr></thead>
                   <tbody>
                     {filteredBooks.map(b => (
                       <tr key={b.id}>
                         <td><strong>{b.title}</strong>{b.edition && <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}> · {b.edition}</span>}</td>
                         <td>{b.author || '—'}</td>
                         <td>{b.category || '—'}</td>
-                        <td style={{ fontVariantNumeric: 'tabular-nums', fontSize: '0.8rem' }}>{b.barcode}<br /><span style={{ color: 'var(--text-muted)' }}>{b.isbn || '—'}</span></td>
                         <td>
-                          <span className={`badge ${b.is_available ? 'badge-success' : 'badge-danger'}`}>
-                            {b.is_available ? 'Available' : 'Not Available'}
+                          <span className={`badge ${b.available_copies > 0 ? 'badge-success' : 'badge-danger'}`}>
+                            {b.available_copies} AVAILABLE
                           </span>
                         </td>
                         <td style={{ display: 'flex', gap: '6px' }}>
@@ -246,8 +245,6 @@ export default function LibraryManagement() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
             <div className="form-group"><label className="form-label">Author</label><input className="form-control" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} /></div>
             <div className="form-group"><label className="form-label">Publisher</label><input className="form-control" value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} /></div>
-            <div className="form-group"><label className="form-label">ISBN</label><input className="form-control" value={form.isbn} onChange={(e) => setForm({ ...form, isbn: e.target.value })} /></div>
-            <div className="form-group"><label className="form-label">Barcode</label><input className="form-control" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="Auto-generated if blank" /></div>
             <div className="form-group"><label className="form-label">Category</label><input className="form-control" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="e.g. Algorithms" /></div>
             <div className="form-group"><label className="form-label">Edition</label><input className="form-control" value={form.edition} onChange={(e) => setForm({ ...form, edition: e.target.value })} placeholder="e.g. 3rd Ed." /></div>
             <div className="form-group">

@@ -46,12 +46,17 @@ export default function StudentDashboard() {
         setProfile(profData);
         const studUuid = profData?.id;
         const safeGet = (url) => API.get(url).catch((e) => { console.warn('fetch failed:', url, e); return null; });
-        const [gradesData, feesData, attData, noticesData, classesData] = await Promise.all([
+        const deptId = profData?.department_id || profData?.department?.department_id || profData?.department?.id || '';
+        const semId = profData?.current_semester_id || profData?.current_semester?.semester_id || profData?.semester || '';
+        const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+        const timetableUrl = `timetable?day=${todayDay}&user_id=${user.id}${deptId ? `&department_id=${deptId}` : ''}${semId ? `&semester_id=${semId}` : ''}`;
+        const [gradesData, feesData, attData, noticesData, classesData, subjsData] = await Promise.all([
           safeGet(`grades?student=${studUuid}`),
           safeGet(`fees?student=${studUuid}`),
-          safeGet(`attendance/stats?student=${studUuid}`),
+          safeGet(`attendance/stats?student=${studUuid}${semId ? `&semester_id=${semId}` : ''}`),
           safeGet('notices?audience=students'),
-          safeGet(`timetable?day=${new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()}`)
+          safeGet(timetableUrl),
+          deptId && semId ? safeGet(`subjects?department_id=${deptId}&semester_id=${semId}`) : safeGet(`courses/enrollments?student=${studUuid}`)
         ]);
         if (!isMounted) return;
         setGrades(gradesData || []);
@@ -59,6 +64,16 @@ export default function StudentDashboard() {
         setAttStats({ percentage: attData?.percentage || 0, present: attData?.present || 0, absent: attData?.absent || 0, late: attData?.late || 0 });
         setNotices((noticesData || []).slice(0, 5));
         setTodayClasses(classesData || []);
+
+        const subList = Array.isArray(subjsData) ? subjsData : (subjsData?.results || []);
+        const filteredSubs = subList.filter(c => {
+          const cDept = c.department_id || c.department?.department_id || c.department?.id || c.department;
+          const cSem = c.semester_id || c.semester?.semester_id || c.semester?.id || c.semester;
+          const deptMatch = !deptId || !cDept || String(cDept) === String(deptId);
+          const semMatch = !semId || !cSem || String(cSem) === String(semId) || String(cSem) === String(profData?.semester);
+          return deptMatch && semMatch;
+        });
+        setSubjCount(filteredSubs.length || subList.length || 3);
       } catch (err) {
         console.error('Failed to load student dashboard:', err);
       } finally {
@@ -69,7 +84,8 @@ export default function StudentDashboard() {
     return () => { isMounted = false; };
   }, [user]);
 
-  const enrolledCount = grades.length;
+  const [subjCount, setSubjCount] = useState(3);
+  const enrolledCount = subjCount;
   const gradeOrder = { 'O': 10, 'AA': 9, 'A+': 9, 'AB': 8, 'A': 8, 'BB': 7, 'B+': 7, 'BC': 6, 'B': 6, 'CC': 5, 'C': 5, 'CD': 4, 'D': 4, 'DD': 3, 'F': 0 };
   const bestGrade = grades.length
     ? [...grades].sort((a, b) => (gradeOrder[b.grade] ?? b.percentage ?? 0) - (gradeOrder[a.grade] ?? a.percentage ?? 0))[0]?.grade
@@ -89,7 +105,6 @@ export default function StudentDashboard() {
     { icon: <i className="bi bi-journal-text" />, label: 'Grades', path: '/student/grades', color: '#0ea5e9' },
     { icon: <i className="bi bi-calendar3" />, label: 'Timetable', path: '/student/timetable', color: '#ec4899' },
     { icon: <i className="bi bi-book-half" />, label: 'Library', path: '/student/library', color: '#14b8a6' },
-    { icon: <i className="bi bi-trophy" />, label: 'Portfolio', path: '/student/portfolio', color: '#f97316' },
     { icon: <i className="bi bi-question-circle" />, label: 'Doubts', path: '/student/doubts', color: '#a855f7' },
   ];
 
@@ -99,7 +114,7 @@ export default function StudentDashboard() {
       <section className="admin-dash-section">
         <h2 className="admin-section-heading"><i className="bi bi-speedometer2" /> Overview</h2>
         <div className="admin-stat-grid">
-          <StatCard icon={<i className="bi bi-book" />} label="Enrolled Courses" value={enrolledCount} sub="Active this semester" color="#6366f1" loading={loading} onClick={() => navigate('/student/courses')} />
+          <StatCard icon={<i className="bi bi-book" />} label="Current Subjects" value={enrolledCount} sub="Active this semester" color="#6366f1" loading={loading} onClick={() => navigate('/student/courses')} />
           <StatCard icon={<i className="bi bi-person-check" />} label="Attendance Rate" value={`${attStats.percentage}%`} sub={`${attStats.present} present · ${attStats.absent} absent`} color="#22c55e" loading={loading} onClick={() => navigate('/student/attendance')} />
           <StatCard icon={<i className="bi bi-award" />} label="Best Grade" value={bestGrade} sub="Highest this semester" color="#0ea5e9" loading={loading} onClick={() => navigate('/student/grades')} />
           <StatCard icon={<i className="bi bi-credit-card" />} label="Fees Due" value={Utils.formatCurrency(totalPendingFees)} sub={`${pendingFees.length} pending payment(s)`} color="#f59e0b" loading={loading} onClick={() => navigate('/student/fees')} />

@@ -16,7 +16,6 @@ export default function Sidebar() {
       { type: 'section', label: 'Academics' },
       { type: 'link', label: 'My Attendance', icon: 'bi-check2-square', to: '/student/attendance' },
       { type: 'link', label: 'My Grades', icon: 'bi-journal-text', to: '/student/grades' },
-      { type: 'link', label: 'Backlogs / KT', icon: 'bi-graph-down-arrow', to: '/student/backlogs' },
       { type: 'link', label: 'Timetable', icon: 'bi-calendar3', to: '/student/timetable' },
       { type: 'link', label: 'Exam Schedule', icon: 'bi-calendar-week', to: '/student/exams' },
       { type: 'link', label: 'Subjects', icon: 'bi-book', to: '/student/courses' },
@@ -30,7 +29,6 @@ export default function Sidebar() {
       { type: 'link', label: 'My Complaints', icon: 'bi-megaphone', to: '/student/complaints' },
       { type: 'link', label: 'Notices', icon: 'bi-broadcast', to: '/student/notices' },
       { type: 'section', label: 'Career' },
-      { type: 'link', label: 'My Portfolio', icon: 'bi-trophy', to: '/student/portfolio' },
       { type: 'link', label: 'Placement Predictor', icon: 'bi-graph-up', to: '/student/placement' },
     ];
   } else if (role === 'faculty' || role === 'hod') {
@@ -64,6 +62,7 @@ export default function Sidebar() {
     navItems.push(
       { type: 'section', label: 'Information' },
       { type: 'link', label: 'View Students', icon: 'bi-mortarboard', to: '/faculty/students' },
+      { type: 'link', label: 'View Faculty', icon: 'bi-person-video3', to: '/faculty/hod' },
       { type: 'link', label: 'Notices', icon: 'bi-broadcast', to: '/faculty/notices' }
     );
   } else if (role === 'parent') {
@@ -88,7 +87,6 @@ export default function Sidebar() {
       { type: 'link', label: 'HODs', icon: 'bi-person-badge', to: '/admin/hod' },
       { type: 'link', label: 'Subjects', icon: 'bi-book', to: '/admin/courses' },
       { type: 'link', label: 'Departments', icon: 'bi-building', to: '/admin/departments' },
-      { type: 'link', label: 'Student Records', icon: 'bi-trophy', to: '/admin/student-records' },
       { type: 'section', label: 'Academic' },
       { type: 'link', label: 'Attendance', icon: 'bi-check2-square', to: '/admin/attendance' },
       { type: 'link', label: 'Grades', icon: 'bi-journal-text', to: '/admin/grades' },

@@ -18,7 +18,8 @@ export default function Complaints() {
 
   const fetchComplaints = async () => {
     try {
-      const data = await API.get('complaints');
+      const emailParam = user?.email ? `?email=${encodeURIComponent(user.email)}` : '';
+      const data = await API.get(`complaints${emailParam}`);
       setComplaints(Array.isArray(data) ? data : (data.results || []));
     } catch (e) {
       console.error('Failed to load complaints:', e);

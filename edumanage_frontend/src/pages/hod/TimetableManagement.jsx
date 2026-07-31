@@ -9,17 +9,26 @@ const DAY_CANON = { mon: 'monday', tue: 'tuesday', wed: 'wednesday', thu: 'thurs
 const canonDay = (d) => DAY_CANON[(d || '').toLowerCase().slice(0, 3)] || (d || '').toLowerCase();
 
 /** Normalise a raw timetable slot into a flat, predictable shape. */
-const normalizeSlot = (r) => ({
-  ...r,
-  _day: canonDay(r.day_of_week || r.day),
-  _start: (r.start_time || '').slice(0, 5),
-  _end: (r.end_time || '').slice(0, 5),
-  _room: (r.room_no || r.room || '').trim(),
-  _facultyId: r.faculty_id ? String(r.faculty_id) : '',
-  _facultyName: r.faculty ? `${r.faculty.first_name || ''} ${r.faculty.last_name || ''}`.trim() : '',
-  _courseCode: r.course?.code || r.course_code || '',
-  _courseName: r.course?.name || r.course_name || '',
-});
+const normalizeSlot = (r) => {
+  let sem = r.semester || r.semester_id || r.course?.semester || r.course?.semester_id || '';
+  if (!sem && (r.course_code || r.course?.code)) {
+    const code = r.course_code || r.course?.code;
+    const match = code.match(/\d/);
+    if (match) sem = match[0];
+  }
+  return {
+    ...r,
+    _day: canonDay(r.day_of_week || r.day),
+    _start: (r.start_time || '').slice(0, 5),
+    _end: (r.end_time || '').slice(0, 5),
+    _room: (r.room_no || r.room || '').trim(),
+    _facultyId: r.faculty_id ? String(r.faculty_id) : '',
+    _facultyName: r.faculty ? `${r.faculty.first_name || ''} ${r.faculty.last_name || ''}`.trim() : '',
+    _courseCode: r.course?.code || r.course_code || '',
+    _courseName: r.course?.name || r.course_name || '',
+    _semester: String(sem),
+  };
+};
 
 /** Two slots overlap in time if each starts before the other ends. */
 const timeOverlaps = (a, b) => a._start && b._start && a._start < b._end && b._start < a._end;
@@ -54,6 +63,9 @@ export default function TimetableManagement() {
   const [faculty, setFaculty] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [sections, setSections] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState('all');
+  const [selectedSemesterFilter, setSelectedSemesterFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [deptId, setDeptId] = useState('');
 
@@ -91,32 +103,35 @@ export default function TimetableManagement() {
         if (hodInfo && hodInfo.isHod) {
           currentDeptId = hodInfo.hod?.department_id || hodInfo.department_id || '';
           setDeptId(currentDeptId);
+          setSelectedDeptFilter(String(currentDeptId));
         }
       } catch (_) {}
 
-      const [scheduleData, facData, coursesData, sectionsData] = await Promise.all([
+      const [scheduleData, facData, coursesData, sectionsData, deptsData] = await Promise.all([
         API.get('timetable').catch(() => []),
         API.get('faculty').catch(() => []),
         API.get('courses').catch(() => []),
         API.get('class_sections').catch(() => []),
+        API.get('departments').catch(() => []),
       ]);
 
       const rawSchedule = Array.isArray(scheduleData) ? scheduleData : [];
-      let deptSchedule = rawSchedule
-        .filter(item => {
-          const courseDept = item.course?.department_id || item.faculty?.department_id;
-          return !currentDeptId || !courseDept || String(courseDept) === String(currentDeptId);
-        })
-        .map(normalizeSlot);
+      const validDepts = Array.isArray(deptsData) ? deptsData : [];
 
-      if (deptSchedule.length === 0 && rawSchedule.length > 0) {
-        deptSchedule = rawSchedule.map(normalizeSlot);
-      }
-
-      setTimetable(deptSchedule);
-      setFaculty((facData || []).filter(f => !currentDeptId || String(f.department_id) === String(currentDeptId)));
-      setSubjects((coursesData || []).filter(c => !currentDeptId || String(c.department_id) === String(currentDeptId)));
+      setTimetable(rawSchedule.map(normalizeSlot));
+      setFaculty(facData || []);
+      setSubjects(coursesData || []);
       setSections(sectionsData || []);
+      setDepartments(validDepts);
+
+      if (!currentDeptId && validDepts.length > 0 && selectedDeptFilter === 'all') {
+        const ceDept = validDepts.find(d => 
+          (d.code || '').toUpperCase() === 'CE' || 
+          (d.name || '').toLowerCase().includes('computer')
+        );
+        const defaultDept = ceDept ? (ceDept.department_id || ceDept.id) : (validDepts[0].department_id || validDepts[0].id);
+        if (defaultDept) setSelectedDeptFilter(String(defaultDept));
+      }
     } catch (e) {
       console.error('Error loading timetable:', e);
     } finally {
@@ -126,8 +141,46 @@ export default function TimetableManagement() {
 
   useEffect(() => { if (user) loadData(); }, [user]);
 
-  // Clash detection over the currently loaded (department) timetable.
-  const { conflicts, slotIds: conflictIds } = useMemo(() => detectConflicts(timetable), [timetable]);
+  const filteredTimetable = useMemo(() => {
+    return timetable.filter(s => {
+      let matchDept = selectedDeptFilter === 'all' || !selectedDeptFilter;
+      if (!matchDept) {
+        const dId = s.department_id || s.course?.department_id || s.faculty?.department_id;
+        const targetDept = departments.find(d => String(d.department_id || d.id) === String(selectedDeptFilter));
+        const targetName = (targetDept?.name || '').toLowerCase();
+        const targetCode = (targetDept?.code || '').toLowerCase();
+
+        const matchId = dId && String(dId) === String(selectedDeptFilter);
+        const matchName = s.department_name && (
+          s.department_name.toLowerCase() === selectedDeptFilter.toLowerCase() ||
+          (targetName && s.department_name.toLowerCase() === targetName)
+        );
+        const matchCode = s._courseCode && targetCode && s._courseCode.toLowerCase().startsWith(targetCode);
+        matchDept = matchId || matchName || matchCode;
+      }
+
+      let matchSem = selectedSemesterFilter === 'all' || !selectedSemesterFilter;
+      if (!matchSem) {
+        matchSem = String(s._semester) === String(selectedSemesterFilter);
+      }
+
+      return matchDept && matchSem;
+    });
+  }, [timetable, selectedDeptFilter, selectedSemesterFilter, departments]);
+
+  // Clash detection over the currently loaded timetable.
+  const { conflicts, slotIds: conflictIds } = useMemo(() => detectConflicts(filteredTimetable), [filteredTimetable]);
+
+  // Filter faculty and subjects for Add/Edit modal based on selected department filter
+  const modalFaculty = useMemo(() => {
+    if (!selectedDeptFilter || selectedDeptFilter === 'all') return faculty;
+    return faculty.filter(f => !f.department_id || String(f.department_id) === String(selectedDeptFilter));
+  }, [faculty, selectedDeptFilter]);
+
+  const modalSubjects = useMemo(() => {
+    if (!selectedDeptFilter || selectedDeptFilter === 'all') return subjects;
+    return subjects.filter(c => !c.department_id || String(c.department_id) === String(selectedDeptFilter));
+  }, [subjects, selectedDeptFilter]);
 
   // Live pre-save check: would the slot in the form clash with an existing one?
   const liveClash = useMemo(() => {
@@ -144,9 +197,11 @@ export default function TimetableManagement() {
   }, [isOpen, dayOfWeek, startTime, endTime, roomNo, selectedFaculty, timetable, selectedSlot, faculty]);
 
   const handleOpenAdd = () => {
+    const defaultSubj = modalSubjects[0]?.subject_id || modalSubjects[0]?.id || subjects[0]?.subject_id || subjects[0]?.id || '';
+    const defaultFac = modalFaculty[0]?.faculty_id || modalFaculty[0]?.id || faculty[0]?.faculty_id || faculty[0]?.id || '';
     setSelectedSlot(null);
-    setSelectedSubject(subjects[0]?.subject_id || subjects[0]?.id || '');
-    setSelectedFaculty(faculty[0]?.faculty_id || faculty[0]?.id || '');
+    setSelectedSubject(defaultSubj);
+    setSelectedFaculty(defaultFac);
     setSelectedSection(sections[0]?.section_id || sections[0]?.id || '');
     setDayOfWeek('MON'); setStartTime('09:00'); setEndTime('10:00'); setRoomNo('');
     setIsOpen(true);
@@ -218,7 +273,7 @@ export default function TimetableManagement() {
   // Group normalized slots by day for the grid.
   const byDay = {};
   days.forEach(d => byDay[d.toLowerCase()] = []);
-  timetable.forEach(s => { if (byDay[s._day]) byDay[s._day].push(s); });
+  filteredTimetable.forEach(s => { if (byDay[s._day]) byDay[s._day].push(s); });
 
   const reasonLabel = (r) => (r === 'room' ? 'Room' : 'Faculty');
 
@@ -243,6 +298,125 @@ export default function TimetableManagement() {
             {conflicts.length ? <><i className="bi bi-exclamation-octagon me-1"></i>{conflicts.length} Clash{conflicts.length > 1 ? 'es' : ''}</> : <><i className="bi bi-check-circle me-1"></i>No Clashes</>}
           </button>
           <button className="btn btn-primary" onClick={handleOpenAdd}><i className="bi bi-plus-lg"></i> Add Slot</button>
+        </div>
+      </div>
+
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '16px',
+        marginBottom: '20px',
+        padding: '12px 18px',
+        background: 'linear-gradient(135deg, rgba(26, 31, 55, 0.85) 0%, rgba(19, 23, 46, 0.85) 100%)',
+        border: '1px solid rgba(108, 99, 255, 0.25)',
+        borderRadius: '14px',
+        backdropFilter: 'blur(12px)',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+          {/* Department Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              background: 'rgba(108, 99, 255, 0.15)',
+              color: '#6C63FF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.9rem'
+            }}>
+              <i className="bi bi-building"></i>
+            </div>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Department:</span>
+            <select
+              className="form-control"
+              style={{
+                minWidth: '220px',
+                background: 'rgba(20, 24, 40, 0.8)',
+                color: '#FFFFFF',
+                border: '1px solid rgba(108, 99, 255, 0.3)',
+                borderRadius: '8px',
+                padding: '7px 12px',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+              value={selectedDeptFilter}
+              onChange={(e) => setSelectedDeptFilter(e.target.value)}
+            >
+              {departments.map(d => (
+                <option key={d.department_id || d.id} value={d.department_id || d.id} style={{ background: '#141828', color: '#FFF' }}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Semester Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              background: 'rgba(0, 212, 170, 0.15)',
+              color: '#00D4AA',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.9rem'
+            }}>
+              <i className="bi bi-layers"></i>
+            </div>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Semester:</span>
+            <select
+              className="form-control"
+              style={{
+                minWidth: '160px',
+                background: 'rgba(20, 24, 40, 0.8)',
+                color: '#FFFFFF',
+                border: '1px solid rgba(0, 212, 170, 0.35)',
+                borderRadius: '8px',
+                padding: '7px 12px',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+              value={selectedSemesterFilter}
+              onChange={(e) => setSelectedSemesterFilter(e.target.value)}
+            >
+              <option value="all" style={{ background: '#141828', color: '#FFF' }}>All Semesters</option>
+              <option value="1" style={{ background: '#141828', color: '#FFF' }}>Semester 1</option>
+              <option value="2" style={{ background: '#141828', color: '#FFF' }}>Semester 2</option>
+              <option value="3" style={{ background: '#141828', color: '#FFF' }}>Semester 3</option>
+              <option value="4" style={{ background: '#141828', color: '#FFF' }}>Semester 4</option>
+              <option value="5" style={{ background: '#141828', color: '#FFF' }}>Semester 5</option>
+              <option value="6" style={{ background: '#141828', color: '#FFF' }}>Semester 6</option>
+              <option value="7" style={{ background: '#141828', color: '#FFF' }}>Semester 7</option>
+              <option value="8" style={{ background: '#141828', color: '#FFF' }}>Semester 8</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span className="badge badge-info" style={{ padding: '6px 12px', fontSize: '0.78rem', borderRadius: '8px', background: 'rgba(108, 99, 255, 0.2)', border: '1px solid rgba(108, 99, 255, 0.4)', color: 'var(--primary-light)' }}>
+            {filteredTimetable.length} {filteredTimetable.length === 1 ? 'Slot' : 'Slots'}
+          </span>
+
+          {selectedSemesterFilter !== 'all' && (
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ borderRadius: '8px', color: 'var(--primary-light)', borderColor: 'rgba(108, 99, 255, 0.4)', fontSize: '0.8rem' }}
+              onClick={() => setSelectedSemesterFilter('all')}
+            >
+              <i className="bi bi-arrow-counterclockwise me-1"></i> Reset Semester
+            </button>
+          )}
         </div>
       </div>
 

@@ -1342,34 +1342,43 @@ select.form-control {
   pointer-events: all;
 }
 
+.modal-container,
 .modal {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--border-radius-lg);
   width: 100%;
-  max-width: 560px;
-  max-height: 90vh;
-  overflow-y: auto;
-  transform: scale(0.9) translateY(20px);
+  max-width: 680px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(0.95);
   transition: var(--transition);
   box-shadow: var(--shadow-lg);
+  margin: auto;
 }
 
+.modal-overlay.open .modal-container,
 .modal-overlay.open .modal {
-  transform: scale(1) translateY(0);
+  transform: scale(1);
 }
 
 .modal-header {
-  padding: 24px 28px;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .modal-title {
   font-size: 1.125rem;
   font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
 }
 
 .modal-close {
@@ -1384,6 +1393,7 @@ select.form-control {
   align-items: center;
   justify-content: center;
   transition: var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .modal-close:hover {
@@ -1392,15 +1402,18 @@ select.form-control {
 }
 
 .modal-body {
-  padding: 28px;
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .modal-footer {
-  padding: 20px 28px;
+  padding: 16px 24px;
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 /* ---- Toast Notifications ---- */
