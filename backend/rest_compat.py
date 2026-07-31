@@ -2135,11 +2135,6 @@ def handle_notices(request, params, body):
                 VALUES (%s, %s, 'admin', %s, %s, %s, %s, NOW(), TRUE, %s)
             """, [notice_id, author_id, title, content, target_audience, priority, notice_dept_id])
 
-            cur.execute("""
-                INSERT INTO notices_notice (id, posted_by_id, title, content, audience, notice_type, created_at, updated_at, is_active, department_id)
-                VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW(), TRUE, %s)
-            """, [notice_id, author_id, title, content, target_audience, raw_type, notice_dept_id])
-
         return {
             'notice_id': notice_id,
             'id': notice_id,
@@ -2774,11 +2769,6 @@ def handle_notices(request, params, body):
                 INSERT INTO notices (notice_id, author_id, author_role, title, content, target_audience, priority, published_at, is_active, department_id)
                 VALUES (%s, %s, 'admin', %s, %s, %s, %s, NOW(), TRUE, %s)
             """, [notice_id, author_id, title, content, target_audience, priority, notice_dept_id])
-
-            cur.execute("""
-                INSERT INTO notices_notice (id, posted_by_id, title, content, audience, notice_type, created_at, updated_at, is_active, department_id)
-                VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW(), TRUE, %s)
-            """, [notice_id, author_id, title, content, target_audience, raw_type, notice_dept_id])
 
         return {
             'notice_id': notice_id,
@@ -5611,6 +5601,17 @@ def handle_library_loans(request, params, body):
     from django.db import connection
     if request.method == 'GET':
         student_id = params.get('student_id', '').replace('eq.', '')
+        # Caller may pass the auth users.id or the students.student_id — normalize to students.student_id
+        if student_id:
+            with connection.cursor() as cur0:
+                cur0.execute("""
+                    SELECT student_id FROM students
+                    WHERE CAST(student_id AS TEXT) = %s OR CAST(user_id AS TEXT) = %s
+                    LIMIT 1
+                """, [student_id, student_id])
+                rr = cur0.fetchone()
+                if rr:
+                    student_id = str(rr[0])
         sql = """
             SELECT l.book_id AS id, l.book_id, l.student_id, l.book_name AS title, l.author, l.category,
                    l.taken_date AS issued_at, l.return_date AS due_date, l.is_returned, l.is_available,
@@ -5678,14 +5679,42 @@ def handle_library_loans(request, params, body):
         due = today + datetime.timedelta(days=int(body.get('loan_days', 14)))
         if book_id and student_id:
             with connection.cursor() as cur:
+                # Caller may pass the auth users.id or the students.student_id — normalize to students.student_id
                 cur.execute("""
-                    SELECT book_id FROM library 
-                    WHERE (CAST(book_id AS TEXT) = %s OR book_name = (SELECT book_name FROM library WHERE CAST(book_id AS TEXT) = %s LIMIT 1))
-                      AND is_available = TRUE 
+                    SELECT student_id FROM students
+                    WHERE CAST(student_id AS TEXT) = %s OR CAST(user_id AS TEXT) = %s
                     LIMIT 1
-                """, [book_id, book_id])
+                """, [student_id, student_id])
+                srow = cur.fetchone()
+                if srow:
+                    student_id = str(srow[0])
+
+                # Resolve the title of the requested book
+                cur.execute("SELECT book_name FROM library WHERE CAST(book_id AS TEXT) = %s LIMIT 1", [book_id])
+                trow = cur.fetchone()
+                book_title = trow[0] if trow else None
+
+                # Don't let the same student borrow the same title twice while it's still out
+                if book_title:
+                    cur.execute("""
+                        SELECT 1 FROM library
+                        WHERE book_name = %s AND CAST(student_id AS TEXT) = %s AND is_returned = FALSE
+                        LIMIT 1
+                    """, [book_title, student_id])
+                    if cur.fetchone():
+                        return {'error': 'You already have this book issued.'}
+
+                # Find an available copy of this title
+                cur.execute("""
+                    SELECT book_id FROM library
+                    WHERE (CAST(book_id AS TEXT) = %s OR book_name = %s)
+                      AND is_available = TRUE
+                    LIMIT 1
+                """, [book_id, book_title])
                 target = cur.fetchone()
-                target_id = str(target[0]) if target else book_id
+                if not target:
+                    return {'error': 'No copies of this book are currently available.'}
+                target_id = str(target[0])
 
                 cur.execute("""
                     UPDATE library
@@ -5726,6 +5755,49 @@ def handle_library_stats(request, params, body):
             'overdue': r[3] or 0,
             'outstanding_fine': 0.0
         }
+
+
+@handler('notifications')
+def handle_notifications(request, params, body):
+    """Surfaces recent active notices as notifications for the header bell.
+    There is no dedicated notifications table, so we derive them from `notices`."""
+    from django.db import connection
+    if request.method == 'GET':
+        recipient = params.get('recipient_id', '').replace('eq.', '')
+        try:
+            limit = int(params.get('limit', 10))
+        except (TypeError, ValueError):
+            limit = 10
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT n.notice_id, n.title, n.content, n.published_at
+                FROM notices n
+                WHERE n.is_active = TRUE
+                ORDER BY n.published_at DESC
+                LIMIT %s
+            """, [limit])
+            cols = [c[0] for c in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        out = []
+        for r in rows:
+            out.append({
+                'notification_id': str(r['notice_id']),
+                'id': str(r['notice_id']),
+                'recipient_id': recipient,
+                'title': r.get('title') or 'Notice',
+                'message': r.get('content') or '',
+                'type': 'notice',
+                'sent_at': _dt(r.get('published_at')),
+                'created_at': _dt(r.get('published_at')),
+                'is_read': False,
+            })
+        return out
+
+    if request.method == 'PATCH':
+        # No notifications table to persist to; the client updates its local store.
+        return {'message': 'ok'}
+
+    return []
 
 
 BASE_EXAMS_SQL = """

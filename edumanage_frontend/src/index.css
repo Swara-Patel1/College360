@@ -69,7 +69,10 @@ h1,
 h2 {
   font-family: var(--heading);
   font-weight: 500;
-  color: var(--text-h);
+  /* Follow the app's theme (light/dark toggle), not the OS color scheme.
+     --text-h was tied to prefers-color-scheme and turned headings white in the
+     app's light theme when the OS was in dark mode. */
+  color: var(--text-primary);
 }
 
 h1 {

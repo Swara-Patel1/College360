@@ -1,5 +1,14 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { useAuthStore } from '../store/useAuthStore.js';
+
+const DASH_BY_ROLE = {
+  admin: '/dashboard/admin',
+  hod: '/hod/dashboard',
+  faculty: '/dashboard/faculty',
+  student: '/dashboard/student',
+  parent: '/dashboard/parent',
+};
 
 const FEATURES = [
   { icon: <i className="bi bi-speedometer2" />, title: 'Unified Dashboards', desc: 'Role-aware dashboards for students, faculty, HODs and admins — the right data, the moment you log in.' },
@@ -26,7 +35,9 @@ const STATS = [
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { isLoggedIn, user } = useAuthStore();
   const [scrolled, setScrolled] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -34,7 +45,27 @@ export default function Landing() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const goLogin = () => navigate('/login');
+  // Apply + persist the theme (same mechanism the dashboard Header uses)
+  useEffect(() => {
+    const isLight = theme === 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.classList.toggle('light-theme', isLight);
+    document.body.classList.toggle('light-theme', isLight);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
+
+  // CTA sends logged-in users to their dashboard, everyone else to login
+  const goPrimary = () => {
+    if (isLoggedIn) {
+      navigate(DASH_BY_ROLE[user?.role?.toLowerCase()] || '/login');
+    } else {
+      navigate('/login');
+    }
+  };
+  const goLogin = goPrimary;
+  const ctaLabel = isLoggedIn ? 'Go to Dashboard' : 'Sign In';
 
   return (
     <div className="lp">
@@ -57,7 +88,15 @@ export default function Landing() {
             <a href="#roles">For Everyone</a>
             <a href="#how">How it works</a>
           </nav>
-          <button className="lp-btn lp-btn-primary lp-btn-sm" onClick={goLogin}>Sign In →</button>
+          <button
+            className="lp-theme-toggle"
+            onClick={toggleTheme}
+            title={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+            aria-label="Toggle theme"
+          >
+            {theme === 'light' ? <i className="bi bi-moon-stars"></i> : <i className="bi bi-sun"></i>}
+          </button>
+          <button className="lp-btn lp-btn-primary lp-btn-sm" onClick={goPrimary}>{ctaLabel} →</button>
         </div>
       </header>
 
@@ -140,7 +179,7 @@ export default function Landing() {
       <section className="lp-cta">
         <h2 className="lp-h2">Ready to bring your campus online?</h2>
         <p className="lp-section-sub">Log in with your institute credentials and pick up right where your college left off.</p>
-        <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={goLogin}>Sign In to College360</button>
+        <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={goPrimary}>{isLoggedIn ? 'Go to Dashboard' : 'Sign In to College360'}</button>
       </section>
 
       {/* Footer */}
@@ -191,7 +230,7 @@ const LP_STYLES = `
 .lp-hero { position:relative; z-index:1; max-width:900px; margin:0 auto; padding:180px 24px 90px; text-align:center; }
 .lp-pill { display:inline-block; padding:8px 18px; border-radius:999px; font-size:.8rem; font-weight:600;
   background:rgba(108,99,255,.12); border:1px solid var(--lp-border); color:#8B85FF; margin-bottom:28px; }
-.lp-h1 { font-size:clamp(2.4rem,6vw,4rem); line-height:1.08; font-weight:800; letter-spacing:-1.5px; margin:0 0 24px; }
+.lp-h1 { font-size:clamp(2.4rem,6vw,4rem); line-height:1.08; font-weight:800; letter-spacing:-1.5px; margin:0 0 24px; color:var(--lp-text); }
 .lp-grad { background:linear-gradient(120deg,#8B85FF,#06B6D4,#00D4AA); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
 .lp-sub { font-size:clamp(1rem,2vw,1.2rem); color:var(--lp-muted); max-width:640px; margin:0 auto 40px; line-height:1.6; }
 .lp-hero-cta { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
@@ -204,7 +243,7 @@ const LP_STYLES = `
 .lp-section { position:relative; z-index:1; max-width:1180px; margin:0 auto; padding:70px 24px; }
 .lp-section-head { text-align:center; max-width:620px; margin:0 auto 50px; }
 .lp-eyebrow { display:block; text-transform:uppercase; letter-spacing:2px; font-size:.72rem; font-weight:700; color:var(--lp-teal); margin-bottom:14px; }
-.lp-h2 { font-size:clamp(1.7rem,4vw,2.6rem); font-weight:800; letter-spacing:-.8px; margin:0 0 14px; }
+.lp-h2 { font-size:clamp(1.7rem,4vw,2.6rem); font-weight:800; letter-spacing:-.8px; margin:0 0 14px; color:var(--lp-text); }
 .lp-section-sub { color:var(--lp-muted); font-size:1.02rem; line-height:1.6; margin:0; }
 
 .lp-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:22px; }
@@ -237,6 +276,47 @@ const LP_STYLES = `
 .lp-footer { position:relative; z-index:1; border-top:1px solid var(--lp-border); padding:40px 24px; text-align:center; }
 .lp-footer .lp-brand { justify-content:center; margin-bottom:12px; }
 .lp-footer p { color:var(--lp-muted); font-size:.85rem; margin:0; }
+
+.lp-theme-toggle { width:40px; height:40px; border-radius:10px; margin-left:4px; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; font-size:1rem;
+  background:rgba(255,255,255,.06); border:1px solid var(--lp-border); color:var(--lp-text);
+  transition:background .2s ease, transform .2s ease; }
+.lp-theme-toggle:hover { background:rgba(108,99,255,.16); transform:translateY(-1px); }
+
+/* ==========================================================================
+   LIGHT THEME — driven by the app-wide theme toggle (body.light-theme / [data-theme])
+   ========================================================================== */
+body.light-theme .lp, [data-theme="light"] .lp {
+  --lp-bg:#F5F7FB; --lp-card:#FFFFFF; --lp-text:#0F172A; --lp-muted:#5B6478;
+  --lp-border:rgba(37,99,235,.16);
+}
+body.light-theme .lp-nav.scrolled, [data-theme="light"] .lp-nav.scrolled {
+  background:rgba(255,255,255,.85); border-bottom:1px solid var(--lp-border); }
+body.light-theme .lp-orb, [data-theme="light"] .lp-orb { opacity:.20; }
+body.light-theme .lp-pill, [data-theme="light"] .lp-pill { color:#4F46E5; }
+body.light-theme .lp-theme-toggle, [data-theme="light"] .lp-theme-toggle {
+  background:#FFFFFF; }
+body.light-theme .lp-btn-ghost, [data-theme="light"] .lp-btn-ghost {
+  background:#FFFFFF; border:1px solid var(--lp-border); color:var(--lp-text); }
+body.light-theme .lp-btn-ghost:hover, [data-theme="light"] .lp-btn-ghost:hover {
+  background:#EEF2F7; }
+body.light-theme .lp-card, [data-theme="light"] .lp-card {
+  background:#FFFFFF; box-shadow:0 4px 16px rgba(15,23,42,.05); }
+body.light-theme .lp-step, [data-theme="light"] .lp-step {
+  background:#FFFFFF; box-shadow:0 4px 16px rgba(15,23,42,.05); }
+body.light-theme .lp-cta, [data-theme="light"] .lp-cta {
+  background:linear-gradient(135deg,rgba(108,99,255,.10),rgba(6,182,212,.08)); }
+
+/* Gradient & accent text turns invisible on white — darken the stops for contrast */
+body.light-theme .lp-grad, [data-theme="light"] .lp-grad {
+  background:linear-gradient(120deg,#6D28D9,#0891B2,#0F766E);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+body.light-theme .lp-stat-value, [data-theme="light"] .lp-stat-value {
+  background:linear-gradient(120deg,#6D28D9,#0E7490);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+body.light-theme .lp-eyebrow, [data-theme="light"] .lp-eyebrow { color:#0F766E; }
+body.light-theme .lp-step-num, [data-theme="light"] .lp-step-num { color:#FFFFFF; }
+body.light-theme .lp-brand-text, [data-theme="light"] .lp-brand-text { color:var(--lp-text); }
 
 @media (max-width:640px){
   .lp-nav-links { display:none; }

@@ -9,6 +9,19 @@
 </head>
 
 <body>
+  <script>
+    // Apply the saved theme before React renders so every page (including the
+    // login/logout screen) is consistent — prevents the half-dark/half-light flash.
+    (function () {
+      try {
+        var t = localStorage.getItem('theme') || 'dark';
+        var isLight = t === 'light';
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.classList.toggle('light-theme', isLight);
+        document.body.classList.toggle('light-theme', isLight);
+      } catch (e) {}
+    })();
+  </script>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
 </body>

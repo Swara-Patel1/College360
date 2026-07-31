@@ -448,3 +448,45 @@ body.light-theme .badge-primary,
   color: #3730A3 !important;
   border: 1px solid #C7D2FE !important;
 }
+
+/* ==========================================================================
+   LOGIN PAGE — LIGHT THEME
+   The login page has hardcoded-dark panels/inputs in main.css. Without these
+   overrides the right panel (var-based) turns light while the left panel stays
+   dark — the "half dark / half light" bug. These make the whole page coherent.
+   ========================================================================== */
+body.light-theme .left-panel,
+[data-theme="light"] .left-panel {
+  background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 50%, #DBEAFE 100%) !important;
+}
+
+/* Brand wordmark: keep the coloured gradient, fall back to primary (not white) */
+body.light-theme .brand-name,
+[data-theme="light"] .brand-name {
+  color: var(--primary) !important;
+}
+
+/* Form inputs are hardcoded #12121F — flip to a light field */
+body.light-theme .form-input,
+[data-theme="light"] .form-input {
+  background: var(--bg-input) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Feature bullet icons: soften the purple tint for a light background */
+body.light-theme .feature-icon,
+[data-theme="light"] .feature-icon {
+  background: rgba(37, 99, 235, 0.10) !important;
+  border-color: rgba(37, 99, 235, 0.25) !important;
+  color: var(--primary) !important;
+}
+
+/* Radial glow blobs read harsh on light — tone them down */
+body.light-theme .left-panel::before,
+[data-theme="light"] .left-panel::before {
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.10) 0%, transparent 70%) !important;
+}
+body.light-theme .left-panel::after,
+[data-theme="light"] .left-panel::after {
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%) !important;
+}

@@ -78,27 +78,11 @@ const MainLayout = ({ children, title }) => {
 };
 
 export const AppRoutes = () => {
-  const { user, isLoggedIn } = useAuthStore();
-
-  const getRootRedirect = () => {
-    if (!isLoggedIn) return '/login';
-    const role = user?.role?.toLowerCase();
-    if (role === 'admin') return '/dashboard/admin';
-    if (role === 'hod') return '/hod/dashboard';
-    if (role === 'faculty') return '/dashboard/faculty';
-    if (role === 'student') return '/dashboard/student';
-    if (role === 'parent') return '/dashboard/parent';
-    return '/login';
-  };
-
   return (
     <Routes>
-      {/* Public Routes */}
+      {/* Public Routes — the landing page is always the entry point ("/") */}
       <Route path="/login" element={<Login />} />
-      <Route
-        path="/"
-        element={isLoggedIn ? <Navigate to={getRootRedirect()} replace /> : <Landing />}
-      />
+      <Route path="/" element={<Landing />} />
 
       {/* Student Protected Routes */}
       <Route element={<ProtectedRoute allowedRoles={['student']} />}>
