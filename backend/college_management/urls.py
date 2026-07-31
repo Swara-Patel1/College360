@@ -20,4 +20,7 @@ urlpatterns = [
     path('api/notices/', include('notices.urls')),
     path('api/complaints/', include('complaints.urls')),
     path('api/chat/', include('chatbot.urls')),
+    path('api/placement/', include('placement.urls')),
+    path('api/reports/', include('reports.urls')),
+    path('api/analytics/', include('analytics.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

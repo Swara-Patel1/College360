@@ -9,6 +9,7 @@ export default function HODComplaints() {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deptId, setDeptId] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // all | pending | resolved | rejected
   
   // Modal States
   const [isResolveOpen, setIsResolveOpen] = useState(false);
@@ -81,6 +82,26 @@ export default function HODComplaints() {
     return new Date(b.created_at || b.submitted_at) - new Date(a.created_at || a.submitted_at);
   });
 
+  // Apply the active stat-card filter to the list shown in the table.
+  const visibleComplaints = sortedComplaints.filter((c) => {
+    if (statusFilter === 'all') return true;
+    const st = c.status?.toUpperCase();
+    if (statusFilter === 'pending') return st !== 'RESOLVED' && st !== 'REJECTED';
+    if (statusFilter === 'resolved') return st === 'RESOLVED';
+    if (statusFilter === 'rejected') return st === 'REJECTED';
+    return true;
+  });
+
+  // Clicking a stat card toggles that filter (click again to clear back to "all").
+  const toggleFilter = (key) => setStatusFilter((prev) => (prev === key ? 'all' : key));
+  const cardStyle = (key) => ({
+    cursor: 'pointer',
+    outline: statusFilter === key ? '2px solid var(--primary)' : '2px solid transparent',
+    outlineOffset: '2px',
+    borderRadius: '12px',
+    transition: 'outline-color 0.15s ease',
+  });
+
   const handleResolveSubmit = async (e) => {
     e.preventDefault();
     if (!resolutionText.trim()) {
@@ -137,6 +158,7 @@ export default function HODComplaints() {
     return st !== 'RESOLVED' && st !== 'REJECTED';
   }).length;
   const resolvedCount = complaints.filter(c => c.status?.toUpperCase() === 'RESOLVED').length;
+  const rejectedCount = complaints.filter(c => c.status?.toUpperCase() === 'REJECTED').length;
 
   if (loading && !complaints.length) {
     return (
@@ -155,34 +177,38 @@ export default function HODComplaints() {
         </div>
       </div>
 
-      {/* Mini Stats */}
+      {/* Mini Stats — click a card to filter the list below */}
       <div className="stats-mini">
-        <div className="stats-mini-card">
+        <div className="stats-mini-card" style={cardStyle('all')} onClick={() => setStatusFilter('all')}
+             title="Show all grievances">
           <div className="stats-mini-icon" style={{ background: 'rgba(108,99,255,0.2)' }}><i className="bi bi-megaphone"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: 'var(--primary)' }}>{totalCount}</div>
             <div className="stats-mini-lbl">Total Problems</div>
           </div>
         </div>
-        <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}><i className="bi bi-hourglass-split"></i></div>
+        <div className="stats-mini-card" style={cardStyle('pending')} onClick={() => toggleFilter('pending')}
+             title="Show pending only">
+          <div className="stats-mini-icon" style={{ background: 'rgba(255,159,67,0.2)' }}><i className="bi bi-hourglass-split"></i></div>
           <div>
-            <div className="stats-mini-val" style={{ color: '#FF6B6B' }}>{pendingCount}</div>
+            <div className="stats-mini-val" style={{ color: '#FF9F43' }}>{pendingCount}</div>
             <div className="stats-mini-lbl">Pending</div>
           </div>
         </div>
-        <div className="stats-mini-card">
+        <div className="stats-mini-card" style={cardStyle('resolved')} onClick={() => toggleFilter('resolved')}
+             title="Show resolved only">
           <div className="stats-mini-icon" style={{ background: 'rgba(0,212,170,0.2)' }}><i className="bi bi-check-circle-fill"></i></div>
           <div>
             <div className="stats-mini-val" style={{ color: '#00D4AA' }}>{resolvedCount}</div>
             <div className="stats-mini-lbl">Resolved</div>
           </div>
         </div>
-        <div className="stats-mini-card">
-          <div className="stats-mini-icon" style={{ background: 'rgba(84,160,255,0.2)' }}><i className="bi bi-building"></i></div>
+        <div className="stats-mini-card" style={cardStyle('rejected')} onClick={() => toggleFilter('rejected')}
+             title="Show rejected only">
+          <div className="stats-mini-icon" style={{ background: 'rgba(255,107,107,0.2)' }}><i className="bi bi-x-circle-fill"></i></div>
           <div>
-            <div className="stats-mini-val" style={{ color: '#54A0FF' }}>{Object.keys(categoryCounts).length}</div>
-            <div className="stats-mini-lbl">Active Categories</div>
+            <div className="stats-mini-val" style={{ color: '#FF6B6B' }}>{rejectedCount}</div>
+            <div className="stats-mini-lbl">Rejected</div>
           </div>
         </div>
       </div>
@@ -208,11 +234,23 @@ export default function HODComplaints() {
 
       {/* Main Complaints List */}
       <div className="card">
-        <div className="card-header" style={{ padding: '15px 20px', borderBottom: '1px solid var(--border)' }}>
-          <h3 style={{ margin: 0 }}>Grievances Log</h3>
+        <div className="card-header" style={{ padding: '15px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <h3 style={{ margin: 0 }}>
+            Grievances Log
+            {statusFilter !== 'all' && (
+              <span style={{ marginLeft: '10px', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                · filtered: {statusFilter} ({visibleComplaints.length})
+              </span>
+            )}
+          </h3>
+          {statusFilter !== 'all' && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setStatusFilter('all')}>
+              <i className="bi bi-x-lg"></i> Clear filter
+            </button>
+          )}
         </div>
         <div className="card-body" style={{ padding: 0 }}>
-          {sortedComplaints.length > 0 ? (
+          {visibleComplaints.length > 0 ? (
             <table className="table">
               <thead>
                 <tr>
@@ -225,7 +263,7 @@ export default function HODComplaints() {
                 </tr>
               </thead>
               <tbody>
-                {sortedComplaints.map((c) => {
+                {visibleComplaints.map((c) => {
                   const st = c.status?.toUpperCase();
                   const isCritical = criticalCategories.includes(c.category) && st !== 'RESOLVED' && st !== 'REJECTED';
                   const isAnon = Boolean(c.is_anonymous);
@@ -299,7 +337,14 @@ export default function HODComplaints() {
           ) : (
             <div className="empty-state" style={{ padding: '40px' }}>
               <div className="empty-state-icon"><i className="bi bi-megaphone"></i></div>
-              <p>No complaints reported in your department.</p>
+              <p>
+                {statusFilter === 'all'
+                  ? 'No complaints reported in your department.'
+                  : `No ${statusFilter} grievances.`}
+              </p>
+              {statusFilter !== 'all' && (
+                <button className="btn btn-ghost btn-sm" onClick={() => setStatusFilter('all')}>Clear filter</button>
+              )}
             </div>
           )}
         </div>

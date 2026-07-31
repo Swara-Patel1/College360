@@ -1,75 +1,26 @@
-import { io } from 'socket.io-client';
-import { useAuthStore } from '../store/useAuthStore.js';
-import { useNotifStore, Toast } from '../store/useNotifStore.js';
+/**
+ * Real-time socket integration — DISABLED.
+ *
+ * The standalone Socket.io server (formerly `../../../realtime`, port 3001) has
+ * been removed. These are no-op stubs that preserve this module's public API
+ * (`initSocket` / `disconnectSocket` / `getSocket`) so existing callers keep
+ * working without change.
+ *
+ * Live-push features are therefore inactive: the app fetches data on page load
+ * and after user actions instead of receiving server pushes. The `socket:*`
+ * window CustomEvents that a few components still listen for simply never fire,
+ * which is harmless.
+ *
+ * To re-enable real-time, restore a Socket.io server and reinstate the
+ * `socket.io-client` connection here.
+ */
 
 let socket = null;
 
 export const getSocket = () => socket;
 
-export const initSocket = () => {
-  const token = localStorage.getItem('access_token');
-  if (!token) return null;
-
-  if (socket?.connected) return socket;
-
-  let userId = 'guest';
-  let role = 'guest';
-  try {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      userId = user.id || 'guest';
-      role = user.role || 'guest';
-    }
-  } catch (e) {
-    console.error('Failed to parse user for socket auth:', e);
-  }
-
-  socket = io('http://localhost:3001', {
-    auth: { token, userId, role },
-    timeout: 2000,
-    transports: ['websocket']
-  });
-
-  socket.on('connect', () => {
-    console.log('Connected to real-time Socket.io server.');
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Disconnected from Socket.io server.');
-  });
-
-  socket.on('online_count', (count) => {
-    // We can store this count globally or let pages check it
-    window.dispatchEvent(new CustomEvent('socket:online_count', { detail: count }));
-  });
-
-  socket.on('notification:new', (notif) => {
-    Toast.info(notif.message, notif.title || 'New Notification');
-    // Fetch notifications again or append it
-    window.dispatchEvent(new CustomEvent('socket:notification:new', { detail: notif }));
-  });
-
-  socket.on('notice:new', (notice) => {
-    Toast.info(`Announcement: ${notice.title}`, 'New Notice Posted');
-    window.dispatchEvent(new CustomEvent('socket:notice:new', { detail: notice }));
-  });
-
-  socket.on('attendance:updated', (data) => {
-    window.dispatchEvent(new CustomEvent('socket:attendance:updated', { detail: data }));
-  });
-
-  socket.on('grade:new', (grade) => {
-    Toast.success(`Grade entered for ${grade.course_name || 'Subject'}: ${grade.grade}`, 'New Grade Posted');
-    window.dispatchEvent(new CustomEvent('socket:grade:new', { detail: grade }));
-  });
-
-  return socket;
-};
+export const initSocket = () => null;
 
 export const disconnectSocket = () => {
-  if (socket) {
-    socket.disconnect();
-    socket = null;
-  }
+  socket = null;
 };

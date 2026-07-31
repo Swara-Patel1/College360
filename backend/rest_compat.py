@@ -3225,7 +3225,15 @@ def handle_grievances(request, params, body):
         if gid.startswith('eq.'):
             gid = gid[3:]
 
-        status_val = body.get('status') or 'resolved'
+        # `grievances.status` is a Postgres enum with lowercase labels. The
+        # frontend sends values like "RESOLVED"/"REJECTED" — normalise them so
+        # the UPDATE does not fail with an invalid-enum error.
+        _VALID_STATUS = {'open', 'in_review', 'resolved', 'sla_breached', 'esalated', 'submitted', 'rejected'}
+        _STATUS_SYNONYMS = {'pending': 'open', 'in review': 'in_review', 'escalated': 'esalated', 'closed': 'resolved'}
+        raw_status = (body.get('status') or 'resolved').strip().lower()
+        status_val = _STATUS_SYNONYMS.get(raw_status, raw_status)
+        if status_val not in _VALID_STATUS:
+            status_val = 'resolved'
         res_note = body.get('resolution_note') or body.get('resolved_note') or body.get('hod_response') or ''
         resolved_by = body.get('resolved_by')
 

@@ -1,14 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { useAuthStore } from '../store/useAuthStore.js';
-
-const DASH_BY_ROLE = {
-  admin: '/dashboard/admin',
-  hod: '/hod/dashboard',
-  faculty: '/dashboard/faculty',
-  student: '/dashboard/student',
-  parent: '/dashboard/parent',
-};
 
 const FEATURES = [
   { icon: <i className="bi bi-speedometer2" />, title: 'Unified Dashboards', desc: 'Role-aware dashboards for students, faculty, HODs and admins — the right data, the moment you log in.' },
@@ -35,7 +26,6 @@ const STATS = [
 
 export default function Landing() {
   const navigate = useNavigate();
-  const { isLoggedIn, user } = useAuthStore();
   const [scrolled, setScrolled] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
 
@@ -56,16 +46,10 @@ export default function Landing() {
 
   const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
 
-  // CTA sends logged-in users to their dashboard, everyone else to login
-  const goPrimary = () => {
-    if (isLoggedIn) {
-      navigate(DASH_BY_ROLE[user?.role?.toLowerCase()] || '/login');
-    } else {
-      navigate('/login');
-    }
-  };
+  // The CTAs always take the user to the login screen — no silent auto-login.
+  const goPrimary = () => navigate('/login');
   const goLogin = goPrimary;
-  const ctaLabel = isLoggedIn ? 'Go to Dashboard' : 'Sign In';
+  const ctaLabel = 'Sign In';
 
   return (
     <div className="lp">
@@ -179,7 +163,7 @@ export default function Landing() {
       <section className="lp-cta">
         <h2 className="lp-h2">Ready to bring your campus online?</h2>
         <p className="lp-section-sub">Log in with your institute credentials and pick up right where your college left off.</p>
-        <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={goPrimary}>{isLoggedIn ? 'Go to Dashboard' : 'Sign In to College360'}</button>
+        <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={goPrimary}>Sign In to College360</button>
       </section>
 
       {/* Footer */}

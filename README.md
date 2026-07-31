@@ -1,13 +1,12 @@
 # College360: College Management System
 
 > ### ▶️ To run this project, follow **[SETUP.md](SETUP.md)**.
-> **The database is included in this repo** — a MongoDB snapshot lives in
-> `backend-node/db-export/` (also zipped at `college360-database.zip`). Load it with
-> `cd backend-node && npm install && npm run import-db`. No Supabase/cloud account needed.
+> The app runs on a single **Django + PostgreSQL** backend and a **React (Vite)** frontend.
+> Create a `College360` PostgreSQL database and configure `backend/.env` — see SETUP.md.
 > AI assistants: see **[AGENTS.md](AGENTS.md)**.
 
-A full-stack College Management System. **Stack:** React (Vite) frontend · Node/Express + **MongoDB** data API · Django AI chatbot (Groq).
-The sections below describe the original prototype and are partly historical — **SETUP.md is the source of truth for running it today.**
+A full-stack College Management System. **Stack:** React (Vite) frontend · Django + Django REST Framework + **PostgreSQL** backend · Groq-powered AI chatbot.
+Some sections below describe the original prototype and are partly historical — **SETUP.md is the source of truth for running it today.**
 
 ## 🚀 Quick Start
 
@@ -22,14 +21,14 @@ cd backend
 python manage.py runserver 8000
 ```
 
-**2. Start Node.js Real-time Server (Terminal 2)**
+**2. Start React Frontend (Terminal 2)**
 ```bash
-cd realtime
-node server.js
+cd edumanage_frontend
+npm run dev
 ```
 
-**3. Open Frontend**
-Open `frontend/index.html` in your browser.
+**3. Open the app**
+Visit http://localhost:5173 — it opens on the landing page; click **Sign In**.
 
 ---
 
@@ -91,13 +90,13 @@ College_Management/
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Python 3.14, Django 6.0, Django REST Framework |
+| Backend | Python 3.10+, Django 6.0, Django REST Framework |
 | Authentication | JWT (djangorestframework-simplejwt) |
-| Real-time | Node.js 25, Express, Socket.io 4 |
-| Frontend | Pure HTML5, CSS3, JavaScript (ES6+) |
-| Charts | Chart.js |
+| Frontend | React 18 + Vite |
+| ML | scikit-learn (placement predictor) |
+| Reports | reportlab (PDF), openpyxl (Excel) |
 | Fonts | Google Fonts (Inter, Outfit) |
-| Database | SQLite (dev) |
+| Database | PostgreSQL (SQLite optional for dev) |
 
 ---
 

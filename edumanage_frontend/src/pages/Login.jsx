@@ -13,29 +13,13 @@ export default function Login() {
 
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
-  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
-  const user = useAuthStore((state) => state.user);
-  const userRole = user?.role;
 
   const canvasRef = useRef(null);
-  const hasNavigated = useRef(false);
 
-  // Redirect if already logged in — use primitive `userRole` (string) not the
-  // full `user` object to avoid infinite re-render loop (object ref changes each render).
-  useEffect(() => {
-    if (isLoggedIn && userRole && !hasNavigated.current) {
-      hasNavigated.current = true;
-      const role = userRole.toLowerCase();
-      const destinations = {
-        admin: '/dashboard/admin',
-        hod: '/hod/dashboard',
-        faculty: '/dashboard/faculty',
-        student: '/dashboard/student',
-        parent: '/dashboard/parent',
-      };
-      navigate(destinations[role] || '/dashboard/admin', { replace: true });
-    }
-  }, [isLoggedIn, userRole, navigate]);
+  // NOTE: we intentionally do NOT auto-redirect an already-logged-in visitor to
+  // their dashboard here. The login form should always show when this page is
+  // opened (e.g. from the landing "Sign In" button). Navigation happens only
+  // after a successful login submit (see handleLoginSubmit).
 
   // Particle background animation
   useEffect(() => {
@@ -104,7 +88,16 @@ export default function Login() {
     setError('');
 
     try {
-      await login(email, password);
+      const loggedInUser = await login(email, password);
+      const role = (loggedInUser?.role || '').toLowerCase();
+      const destinations = {
+        admin: '/dashboard/admin',
+        hod: '/hod/dashboard',
+        faculty: '/dashboard/faculty',
+        student: '/dashboard/student',
+        parent: '/dashboard/parent',
+      };
+      navigate(destinations[role] || '/dashboard/admin', { replace: true });
     } catch (err) {
       setError(err?.message || err?.error || 'Invalid credentials or connection issue.');
       setLoading(false);

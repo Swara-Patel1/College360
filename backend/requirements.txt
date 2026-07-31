@@ -11,4 +11,13 @@ python-dotenv==1.0.1
 # ML placement predictor
 numpy==2.4.1
 scikit-learn>=1.4.0
+joblib>=1.3.0
+
+# Reports & exports (PDF / Excel)
+reportlab>=4.0.0
+openpyxl>=3.1.0
+
+# Testing
+pytest>=8.0.0
+pytest-django>=4.8.0
 

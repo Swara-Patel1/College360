@@ -1,65 +1,90 @@
 # College360 — Setup Guide (fresh machine)
 
-> **📀 The database is INCLUDED in this repo.** You do **not** need Supabase or any
-> cloud account. A full snapshot of the MongoDB data (25 collections, ~1138
-> documents) lives in **`backend-node/db-export/`** as JSON, and there's also a
-> copy zipped at **`college360-database.zip`**. Step 2 below loads it into MongoDB
-> with one command.
+> **The app runs on a single Django backend (PostgreSQL + DRF) and a React
+> frontend.** There is no MongoDB, Node data API, or separate real-time server
+> anymore — those legacy pieces have been removed.
 
-This project has **three runnable parts**:
+This project has **two runnable parts**:
 
 | Part | Folder | Port | Tech | Purpose |
 |------|--------|------|------|---------|
-| Data API | `backend-node/` | 4000 | Node + Express + **MongoDB** | Main data API (students, faculty, fees, …) |
-| Chatbot API | `backend/` | 8000 | Python + **Django** | AI student assistant (uses Groq) |
+| Backend | `backend/` | 8000 | Python · Django · DRF · **PostgreSQL** | All data + AI chatbot |
 | Frontend | `edumanage_frontend/` | 5173 | React + Vite | The web app UI |
 
----
-
-## Prerequisites (install these first)
-
-1. **Node.js** v18+ — https://nodejs.org
-2. **MongoDB Community Server** — https://www.mongodb.com/try/download/community
-   - On Windows it installs as a service named **MongoDB** and starts automatically.
-   - Verify it's running (default port 27017).
-3. **Python** 3.10+ — https://www.python.org  (only needed for the AI chatbot)
+The React client talks to Django on **:8000** — both the DRF endpoints under
+`/api/…` and a PostgREST-compatible shim at `/rest/v1/<table>`
+(`backend/rest_compat.py`) used by the frontend's `SupaFetch` client.
 
 ---
 
-## Step 1 — Data API (MongoDB)
+## Prerequisites
 
-```bash
-cd backend-node
-npm install
+1. **Python** 3.10+ — https://www.python.org
+2. **Node.js** v18+ — https://nodejs.org
+3. **PostgreSQL** 14+ — https://www.postgresql.org/download/
+   - Create a database named **`College360`**.
+
+---
+
+## Step 1 — Database
+
+Create the database (via pgAdmin, or on the command line):
+
+```sql
+CREATE DATABASE "College360";
 ```
 
-## Step 2 — Load the included database  ⬅️ THE DATABASE IS HERE
+If you have a SQL dump, load it:
 
 ```bash
-# still in backend-node/  — imports backend-node/db-export/*.json into MongoDB
-npm run import-db
-```
-You should see `✓ Imported 1138 docs across 25 collections.`
-*(If you only have the standalone `college360-database.zip`, unzip it and run
-`npm install && node import-db.mjs` inside it instead.)*
-
-Now start the Data API:
-```bash
-npm start          # -> http://localhost:4000   (leave running)
+psql -U postgres -d College360 -f your_dump.sql
 ```
 
-## Step 3 — Chatbot API (Django) — optional, only for the AI assistant
+---
+
+## Step 2 — Backend (Django + PostgreSQL)
 
 ```bash
-cd ../backend
-pip install django djangorestframework django-cors-headers groq python-dotenv djangorestframework-simplejwt
-python manage.py migrate            # creates the local chat-history SQLite DB
-copy .env.example .env              # (Windows)   /   cp .env.example .env  (mac/linux)
-#   then edit backend/.env and set GROQ_API_KEY=gsk_...   (free key: https://console.groq.com/keys)
-python manage.py runserver 8000     # -> http://localhost:8000   (leave running)
+cd backend
+pip install -r requirements.txt
+
+# Configure the database + keys
+copy .env.example .env        # Windows   (cp .env.example .env on mac/linux)
 ```
 
-## Step 4 — Frontend
+Edit **`backend/.env`** to point at your PostgreSQL instance:
+
+```ini
+DB_ENGINE=django.db.backends.postgresql
+DB_NAME=College360
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_HOST=localhost
+DB_PORT=5432                  # use your server's port (e.g. 5433 for a second instance)
+
+# AI chatbot (free key: https://console.groq.com/keys)
+GROQ_API_KEY=gsk_...
+```
+
+> To use SQLite instead of PostgreSQL, set `DB_ENGINE=django.db.backends.sqlite3`
+> and `DB_NAME=db.sqlite3`.
+
+Apply migrations and start the server:
+
+```bash
+python manage.py migrate
+python manage.py runserver 8000      # -> http://localhost:8000   (leave running)
+```
+
+Optionally, train the placement-prediction ML model:
+
+```bash
+python manage.py train_placement_model --all
+```
+
+---
+
+## Step 3 — Frontend (React)
 
 ```bash
 cd ../edumanage_frontend
@@ -67,34 +92,42 @@ npm install
 npm run dev          # -> http://localhost:5173
 ```
 
-Open the printed URL in a browser.
+Open the printed URL. The app opens on the **landing page**; click **Sign In**.
 
 ---
 
-## Login credentials (they come with the imported data)
+## Login credentials (demo accounts)
 
 | Role | Email | Password |
 |------|-------|----------|
 | Admin | `admin@lju.edu.in` | `admin123` |
-| Student | `student.ce1@edumanagepro.edu` | (see users data) |
-
-The admin can manage students, faculty, HODs, courses, departments, and fees.
+| Faculty | `faculty1@lju.edu.in` | `fac123` |
+| HOD | `hod@lju.edu.in` | `hod123` |
+| Student | `rushi@lju.edu.in` | `rushi123` |
 
 ---
 
-## How it fits together
-- The frontend talks to the **Data API on :4000** (configured in
-  `edumanage_frontend/src/api/client.js` — `SUPABASE_URL` points to `http://localhost:4000`).
-- The Data API speaks a PostgREST-compatible dialect over MongoDB, so the frontend
-  needed no rewrite when the project moved off Supabase.
-- The chatbot (student panel) calls the **Django API on :8000**, which uses Groq for AI.
+## Windows one-click
+
+`start.bat` in the repo root launches the Django backend and the React frontend
+together, then opens the browser.
+
+---
+
+## Tests
+
+```bash
+cd backend
+python -m pytest          # unit + API integration tests (server must be running for API tests)
+```
+
+---
 
 ## Notes / troubleshooting
-- **`.env` files are NOT in the repo** (gitignored). Create `backend/.env` from
-  `backend/.env.example` and add your own Groq key. The Data API works without any
-  `.env` (defaults to local MongoDB).
-- **No data after Step 2?** Make sure MongoDB is actually running before importing.
-- **To use a cloud DB (MongoDB Atlas) instead of local:** set `MONGO_URL` in
-  `backend-node/.env` to your Atlas connection string, then run `npm run import-db`.
-- Windows users can start everything at once with **`start.bat`** in the repo root
-  (it assumes the DB is already imported via Step 2).
+- **`.env` is not committed** (gitignored). Create `backend/.env` from
+  `backend/.env.example`.
+- **Two PostgreSQL instances?** Make sure `DB_PORT` matches the one holding
+  `College360` (a default install is `5432`; a second one is often `5433`).
+- **Chatbot not answering?** Set a valid `GROQ_API_KEY` in `backend/.env`.
+- Real-time push (Socket.io) has been removed; the UI refreshes on load and
+  after actions instead.

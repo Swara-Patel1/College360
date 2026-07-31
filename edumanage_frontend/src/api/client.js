@@ -864,6 +864,10 @@ export const API = {
             title: body.title,
             content: body.content,
             target_audience: dbAudience,
+            // The backend derives the stored priority from `notice_type`; send it
+            // explicitly so "urgent"/"exam"/etc. are preserved (previously only
+            // `priority` was sent, so every notice fell back to general/normal).
+            notice_type: body.notice_type,
             priority: dbPriority
           });
           const created = Array.isArray(row) ? row[0] : row;
