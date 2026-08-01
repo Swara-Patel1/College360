@@ -82,8 +82,6 @@ def _tips(cpi, attendance_pct, backlogs, extra_count, category):
         tips.append(f'Attendance is {attendance_pct}% — most companies require ≥75%. Attend regularly.')
     if backlogs > 0:
         tips.append(f'Clear your {backlogs} active backlog(s); many recruiters allow zero.')
-    if extra_count < 2:
-        tips.append('Add projects, certifications or club activity to strengthen your profile.')
     if category in ('high', 'medium'):
         tips.append('Practice aptitude and mock interviews to convert eligibility into offers.')
     return tips[:5]

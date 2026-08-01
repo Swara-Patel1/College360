@@ -2677,6 +2677,9 @@ select.form-control {
 }
 
 .brand-name {
+  display: inline-block;
+  line-height: 1.25;
+  padding: 4px 2px;
   font-family: 'Outfit', sans-serif;
   font-size: 1.6rem;
   font-weight: 800;
@@ -2697,12 +2700,15 @@ select.form-control {
   font-family: 'Outfit', sans-serif;
   font-size: 3.2rem;
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1.15;
   margin-bottom: 20px;
   color: var(--text-primary);
 }
 
 .left-content h1 span {
+  display: inline-block;
+  line-height: 1.25;
+  padding: 4px 2px;
   background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -2755,6 +2761,9 @@ select.form-control {
 }
 
 .stat-num {
+  display: inline-block;
+  line-height: 1.25;
+  padding: 4px 0;
   font-family: 'Outfit', sans-serif;
   font-size: 2rem;
   font-weight: 800;

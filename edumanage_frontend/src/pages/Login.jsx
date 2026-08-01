@@ -95,7 +95,6 @@ export default function Login() {
         hod: '/hod/dashboard',
         faculty: '/dashboard/faculty',
         student: '/dashboard/student',
-        parent: '/dashboard/parent',
       };
       navigate(destinations[role] || '/dashboard/admin', { replace: true });
     } catch (err) {
@@ -143,24 +142,7 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="stats-row">
-            <div className="stat-item">
-              <div className="stat-num">15+</div>
-              <div className="stat-lbl">Students</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-num">6</div>
-              <div className="stat-lbl">Faculty</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-num">12</div>
-              <div className="stat-lbl">Courses</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-num">5</div>
-              <div className="stat-lbl">Departments</div>
-            </div>
-          </div>
+
         </div>
       </div>
 

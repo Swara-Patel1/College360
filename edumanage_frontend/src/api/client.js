@@ -1,7 +1,9 @@
-// Data API — now served by the Django DRF backend (backend/),
+// Data API — served by the Django DRF backend (backend/),
 // which exposes all data via REST endpoints on port 8000.
-export const SUPABASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-export const SUPABASE_ANON = 'local-django'; // kept for header compatibility
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export const API_KEY = 'local-django';
+export const SUPABASE_URL = API_URL;
+export const SUPABASE_ANON = API_KEY;
 
 export const Auth = {
   getToken: () => localStorage.getItem('access_token'),
@@ -1258,7 +1260,7 @@ export const API = {
   delete: (url) => API.request(url, { method: 'DELETE' }),
 };
 
-export const SupaAPI = {
+export const DataAPI = {
   content: {
     bySubject: (subjId)  => API.get(`content?select=*,subject:subjects(code,name),faculty:faculty(first_name,last_name)&subject_id=eq.${subjId}&is_active=eq.true&order=uploaded_at.desc`),
     byFaculty: (facId)   => API.get(`content?select=*,subject:subjects(code,name),faculty:faculty(first_name,last_name)&faculty_id=eq.${facId}&is_active=eq.true&order=uploaded_at.desc`),
@@ -1313,12 +1315,9 @@ export const SupaAPI = {
     submit:    (data)   => API.post('faculty_feedback', data),
   },
 
-  alumni: {
-    all:    ()      => API.get('alumni?order=graduation_year.desc'),
-    byYear: (year)  => API.get(`alumni?graduation_year=eq.${year}&order=first_name.asc`),
-    add:    (data)  => API.post('alumni', data),
-    delete: (id)    => API.delete(`alumni?id=eq.${id}`),
-  },
+  sendEmail: (data) => API.post('send-email', data),
+
+
 
   payments: {
     config:       ()        => API.get('payments/config'),
@@ -1470,3 +1469,5 @@ export const Utils = {
     return `badge badge-${map[grade] || 'muted'}`;
   }
 };
+
+export const SupaAPI = DataAPI;

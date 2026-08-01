@@ -230,24 +230,6 @@ export default function Placement() {
                     ></div>
                   </div>
                 </div>
-
-                {/* Extra Factor */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                    <span style={{ fontWeight: 600 }}>Extracurriculars & Skills</span>
-                    <span id="fb-extra">{scoreData.extra_activities ? <><i className="bi bi-check-lg me-1"></i>Activities</> : 'None'} → {scoreData.extra_score?.toFixed(1)} pts</span>
-                  </div>
-                  <div className="progress-bar-container" style={{ height: '8px' }}>
-                    <div 
-                      className="progress-bar-fill" 
-                      id="fb-extra-bar" 
-                      style={{ 
-                        width: `${Math.min(100, (scoreData.extra_score / 15) * 100)}%`, 
-                        background: '#FF9F43' 
-                      }}
-                    ></div>
-                  </div>
-                </div>
               </>
             ) : (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>

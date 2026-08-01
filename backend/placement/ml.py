@@ -7,8 +7,6 @@ activities) to a placement-readiness probability and category.
 
 Supported algorithms (selectable at train / predict time):
   - random_forest      → RandomForestClassifier   (default)
-  - gradient_boost     → GradientBoostingClassifier
-  - logistic           → LogisticRegression (scaled)
   - decision_tree      → DecisionTreeClassifier
   - knn                → KNeighborsClassifier (scaled)
   - linear_regression  → LinearRegression (scaled, continuous readiness)
@@ -24,10 +22,10 @@ import threading
 from datetime import datetime, timezone as _tz
 
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import train_test_split, cross_val_score
@@ -95,10 +93,6 @@ def _synthesize(n=4000, seed=42):
 def _make_estimator(model_type):
     if model_type == 'decision_tree':
         return DecisionTreeClassifier(max_depth=6, min_samples_split=10, random_state=42)
-    if model_type == 'gradient_boost':
-        return GradientBoostingClassifier(n_estimators=120, max_depth=3, random_state=42)
-    if model_type == 'logistic':
-        return make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
     if model_type == 'knn':
         return make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=15))
     if model_type == 'linear_regression':
@@ -107,8 +101,7 @@ def _make_estimator(model_type):
 
 
 SUPPORTED_MODELS = [
-    'random_forest', 'gradient_boost', 'logistic',
-    'decision_tree', 'knn', 'linear_regression',
+    'random_forest', 'decision_tree', 'knn', 'linear_regression',
 ]
 
 

@@ -1,16 +1,13 @@
 /**
  * Chat API Client — Handles communication with the Django chatbot backend.
  * All requests include JWT authentication token from localStorage.
- * 
- * The chatbot API runs on the Django backend (port 8000),
- * separate from the Supabase-based main API.
  */
 
 const CHAT_API_BASE = 'http://localhost:8000/api/chat';
 
 /**
  * Helper to build headers with JWT auth token and user identification.
- * Sends user info headers so the Django backend can identify Supabase users.
+ * Sends user info headers so the Django backend can identify authenticated users.
  */
 function getAuthHeaders() {
   const token = localStorage.getItem('access_token');

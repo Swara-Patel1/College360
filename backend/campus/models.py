@@ -120,18 +120,6 @@ class Backlog(models.Model):
         return f'{self.student} — {self.course.code} ({self.status})'
 
 
-class Parent(models.Model):
-    """A read-only guardian account linked to one student."""
-    RELATION_CHOICES = [('father', 'Father'), ('mother', 'Mother'), ('guardian', 'Guardian')]
-    user = models.OneToOneField('accounts.User', on_delete=models.CASCADE, related_name='parent_profile')
-    student = models.ForeignKey('students.Student', on_delete=models.CASCADE, related_name='parents')
-    relation = models.CharField(max_length=10, choices=RELATION_CHOICES, default='guardian')
-    phone = models.CharField(max_length=15, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f'{self.user.get_full_name()} → {self.student}'
-
 
 class FacultyFeedback(models.Model):
     """Anonymous-capable student feedback survey for a faculty member."""
@@ -342,28 +330,3 @@ class BookLoan(models.Model):
         return f'{self.book.title} → {self.student} ({self.status})'
 
 
-class Alumnus(models.Model):
-    """Graduated student record for the alumni directory."""
-    # Optionally linked to the original student record (kept even if student row is removed).
-    student = models.OneToOneField('students.Student', on_delete=models.SET_NULL, null=True, blank=True,
-                                   related_name='alumnus')
-    department = models.ForeignKey('faculty.Department', on_delete=models.SET_NULL, null=True, blank=True,
-                                   related_name='alumni')
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100, blank=True)
-    email = models.EmailField(blank=True)
-    graduation_year = models.PositiveSmallIntegerField()
-    degree = models.CharField(max_length=100, blank=True)
-    current_company = models.CharField(max_length=150, blank=True)
-    designation = models.CharField(max_length=150, blank=True)
-    location = models.CharField(max_length=150, blank=True)
-    linkedin_url = models.URLField(max_length=300, blank=True)
-    available_for_mentorship = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-graduation_year', 'first_name']
-        verbose_name_plural = 'Alumni'
-
-    def __str__(self):
-        return f'{self.first_name} {self.last_name} ({self.graduation_year})'

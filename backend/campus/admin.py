@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import StudyMaterial, Doubt, Alumnus, FacultyFeedback, Parent, Backlog, Exam
+from .models import StudyMaterial, Doubt, FacultyFeedback, Backlog, Exam
 
 
 @admin.register(Exam)
@@ -16,10 +16,6 @@ class BacklogAdmin(admin.ModelAdmin):
     search_fields = ('student__student_id', 'course__code')
 
 
-@admin.register(Parent)
-class ParentAdmin(admin.ModelAdmin):
-    list_display = ('user', 'student', 'relation', 'phone')
-    search_fields = ('user__first_name', 'user__last_name', 'student__student_id')
 
 
 @admin.register(StudyMaterial)
@@ -42,8 +38,3 @@ class FacultyFeedbackAdmin(admin.ModelAdmin):
     list_filter = ('is_anonymous', 'academic_year')
 
 
-@admin.register(Alumnus)
-class AlumnusAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'graduation_year', 'department', 'current_company', 'available_for_mentorship')
-    list_filter = ('graduation_year', 'department', 'available_for_mentorship')
-    search_fields = ('first_name', 'last_name', 'current_company')

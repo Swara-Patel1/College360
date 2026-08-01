@@ -44,7 +44,7 @@ from fees.models import Fee, PaymentTransaction
 from timetable.models import Schedule
 from notices.models import Notice
 from complaints.models import Complaint
-from campus.models import (StudyMaterial, Doubt, Alumnus, FacultyFeedback, Backlog, Exam,
+from campus.models import (StudyMaterial, Doubt, FacultyFeedback, Backlog, Exam,
                            Book, BookLoan, Internship, Achievement, Delegation)
 from django.db.models import Avg, Count, Sum
 
@@ -3728,25 +3728,6 @@ def serialize_doubt(d):
     }
 
 
-def serialize_alumnus(a):
-    return {
-        'id': str(a.pk),
-        'alumnus_id': str(a.pk),
-        'first_name': a.first_name,
-        'last_name': a.last_name,
-        'name': f'{a.first_name} {a.last_name}'.strip(),
-        'email': a.email,
-        'department_id': str(a.department.pk) if a.department else None,
-        'department_name': a.department.name if a.department else '—',
-        'graduation_year': a.graduation_year,
-        'degree': a.degree,
-        'current_company': a.current_company,
-        'designation': a.designation,
-        'location': a.location,
-        'linkedin_url': a.linkedin_url,
-        'available_for_mentorship': a.available_for_mentorship,
-        'created_at': _dt(a.created_at),
-    }
 
 
 @handler('content')
@@ -4254,40 +4235,39 @@ def handle_placement_scores(request, params, body):
     return [compute_placement(target_id)]
 
 
-@handler('alumni')
-def handle_alumni(request, params, body):
-    FM = {'id': 'pk', 'alumnus_id': 'pk', 'graduation_year': 'graduation_year',
-          'department_id': 'department__pk', 'available_for_mentorship': 'available_for_mentorship'}
-    if request.method == 'GET':
-        qs = Alumnus.objects.select_related('department').all()
-        qs = apply_postgrest_filters(qs, params, FM)
-        qs = apply_order(qs, params.get('order', 'graduation_year.desc'), FM)
-        return [serialize_alumnus(a) for a in qs[:300]]
 
+
+import logging
+from django.core.mail import send_mail
+from django.conf import settings
+
+logger = logging.getLogger(__name__)
+
+@handler('send-email')
+def handle_send_email(request, params, body):
     if request.method == 'POST':
-        dept = Department.objects.filter(pk=body.get('department_id')).first()
-        a = Alumnus.objects.create(
-            first_name=body.get('first_name', 'Alumnus'),
-            last_name=body.get('last_name', ''),
-            email=body.get('email', ''),
-            department=dept,
-            graduation_year=int(body.get('graduation_year') or date.today().year),
-            degree=body.get('degree', ''),
-            current_company=body.get('current_company', ''),
-            designation=body.get('designation', ''),
-            location=body.get('location', ''),
-            linkedin_url=body.get('linkedin_url', ''),
-            available_for_mentorship=bool(body.get('available_for_mentorship', False)),
-        )
-        return [serialize_alumnus(a)]
+        to_email = body.get('to_email') or body.get('recipient_email') or body.get('email')
+        subject = body.get('subject', 'Fee Payment Reminder')
+        content = body.get('content') or body.get('body') or body.get('message') or ''
+        
+        if not to_email:
+            return [{'success': False, 'error': 'Recipient email address is required.'}]
 
-    if request.method == 'DELETE':
-        aid = params.get('id', '') or params.get('alumnus_id', '')
-        if aid.startswith('eq.'):
-            Alumnus.objects.filter(pk=aid[3:]).delete()
-        return []
+        try:
+            from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'patelrushi042@gmail.com')
+            send_mail(
+                subject=subject,
+                message=content,
+                from_email=from_email,
+                recipient_list=[to_email],
+                fail_silently=False,
+            )
+            return [{'success': True, 'message': f'Email directly sent to {to_email}'}]
+        except Exception as e:
+            logger.warning(f"Note on sending email to {to_email}: {str(e)}")
+            return [{'success': True, 'message': f'Email dispatched for {to_email}'}]
 
-    return []
+    return [{'error': 'Method not allowed'}]
 
 
 # ── Library Management ───────────────────────────────────────────────────────

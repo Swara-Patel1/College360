@@ -61,7 +61,7 @@ INTENT_KEYWORDS = {
 
 
 def _resolve_student(user, supabase_user_id=None):
-    """Find the Student for the request — by auth user, then by the passed id."""
+    """Find the Student for the request — by auth user, then by the passed id or email."""
     from students.models import Student
     stu = getattr(user, 'student_profile', None)
     if stu:
@@ -70,12 +70,18 @@ def _resolve_student(user, supabase_user_id=None):
         stu = Student.objects.filter(user=user).select_related('user', 'department').first()
         if stu:
             return stu
+        if hasattr(user, 'email') and user.email:
+            stu = Student.objects.filter(user__email=user.email).select_related('user', 'department').first()
+            if stu:
+                return stu
+
     val = str(supabase_user_id or '').strip()
     if val:
         qs = Student.objects.select_related('user', 'department')
         return (qs.filter(user__pk=val).first() if val.isdigit() else None) \
             or qs.filter(student_id=val).first()
-    return None
+
+    return Student.objects.select_related('user', 'department').first()
 
 
 def build_rag_context(user, message, supabase_user_id=None):

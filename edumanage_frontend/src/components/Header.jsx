@@ -68,9 +68,7 @@ export default function Header({ title = 'College360', showSearch = false, onSea
   } else if (role === 'faculty' || role === 'hod') {
     brandSubtitle = role === 'hod' ? 'HOD Portal' : 'Faculty Portal';
     brandHref = role === 'hod' ? '/hod/dashboard' : '/dashboard/faculty';
-  } else if (role === 'parent') {
-    brandSubtitle = 'Parent Portal';
-    brandHref = '/dashboard/parent';
+
   } else if (role === 'admin') {
     brandSubtitle = 'Admin Panel';
     brandHref = '/dashboard/admin';

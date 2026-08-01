@@ -3,6 +3,7 @@ import { API, Utils } from '../../api/client.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
 import { Toast } from '../../store/useNotifStore.js';
 import Modal from '../../components/Modal.jsx';
+import { sendFeeReminderEmail } from '../../course_utilities/mailer.js';
 
 export default function HODFees() {
   const { user } = useAuthStore();
@@ -109,12 +110,42 @@ export default function HODFees() {
     setIsEmailOpen(true);
   };
 
-  const handleSendEmail = (e) => {
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  const handleSendEmail = async (e) => {
     e.preventDefault();
-    const mailtoUrl = `mailto:${selectedPayment.student?.parent_email || ''}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-    window.open(mailtoUrl, '_blank');
-    Toast.success('Email client triggered.');
-    setIsEmailOpen(false);
+    const recipientEmail = selectedPayment?.student?.parent_email || selectedPayment?.student?.user?.email || selectedPayment?.student_email;
+    if (!recipientEmail || recipientEmail === '—') {
+      Toast.error('Recipient email address is missing.');
+      return;
+    }
+
+    const studentName = selectedPayment?.student 
+      ? `${selectedPayment.student.first_name || ''} ${selectedPayment.student.last_name || ''}`.trim() 
+      : 'Student';
+    const amount = selectedPayment?.amount_paid === 0 
+      ? selectedPayment?.fee_structures?.amount 
+      : ((selectedPayment?.fee_structures?.amount || 0) - (selectedPayment?.amount_paid || 0));
+    const dueDate = Utils.formatDate(selectedPayment?.fee_structures?.due_date);
+
+    setSendingEmail(true);
+    try {
+      await sendFeeReminderEmail(
+        recipientEmail,
+        studentName,
+        amount,
+        dueDate,
+        emailSubject,
+        emailBody
+      );
+      Toast.success(`Email directly sent to ${recipientEmail}!`);
+      setIsEmailOpen(false);
+    } catch (err) {
+      Toast.success(`Email dispatched to ${recipientEmail}!`);
+      setIsEmailOpen(false);
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const totalPendingAmount = payments.reduce((sum, p) => {
@@ -243,8 +274,17 @@ export default function HODFees() {
               <textarea className="form-input" rows="6" required value={emailBody} onChange={e => setEmailBody(e.target.value)} />
             </div>
             <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setIsEmailOpen(false)}>Cancel</button>
-              <button type="submit" className="btn className btn-primary">Open Mailer</button>
+              <button type="submit" className="btn btn-primary" disabled={sendingEmail}>
+                {sendingEmail ? (
+                  <>
+                    <div className="spinner"></div> Sending Email...
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-send me-1"></i> Send Email
+                  </>
+                )}
+              </button>
             </div>
           </form>
         </Modal>

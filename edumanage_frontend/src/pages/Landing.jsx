@@ -5,13 +5,13 @@ const FEATURES = [
   { icon: <i className="bi bi-speedometer2" />, title: 'Unified Dashboards', desc: 'Role-aware dashboards for students, faculty, HODs and admins — the right data, the moment you log in.' },
   { icon: <i className="bi bi-check-circle" />, title: 'Smart Attendance', desc: 'Bulk-mark attendance, auto-computed percentages, and low-attendance alerts pushed straight to HODs.' },
   { icon: <i className="bi bi-journal-text" />, title: 'Grades & Analytics', desc: 'Server-computed grades on the Indian scale and performance insights in real time.' },
-  { icon: <i className="bi bi-mortarboard" />, title: 'Alumni Network', desc: 'A living directory of graduates — filter by batch, company and mentors open to guiding students.' },
+  { icon: <i className="bi bi-robot" />, title: 'AI Student Assistant', desc: 'Smart RAG chatbot providing real-time queries for CGPA, attendance %, timetable & study notes.' },
   { icon: <i className="bi bi-question-circle" />, title: 'Doubts with SLA', desc: 'Students raise conceptual doubts; faculty resolve them within a tracked 72-hour service window.' },
   { icon: <i className="bi bi-cash-stack" />, title: 'Fees & Finance', desc: 'Track collections, pending dues and payment history across every department from one console.' },
 ];
 
 const ROLES = [
-  { tag: 'Students', color: '#6C63FF', points: ['Attendance, grades & timetable at a glance', 'Ask doubts and get faculty answers', 'Placement score & alumni mentorship'] },
+  { tag: 'Students', color: '#6C63FF', points: ['Attendance, grades & timetable at a glance', 'Ask doubts and get faculty answers', 'Placement score & AI chatbot support'] },
   { tag: 'Faculty', color: '#00D4AA', points: ['One-tap bulk attendance marking', 'Grade entry with instant analytics', 'Leave requests & lecture interchange'] },
   { tag: 'HOD', color: '#FF9F43', points: ['Approve leaves & manage timetables', 'Academic alerts & department analytics', 'Resolve grievances department-wide'] },
   { tag: 'Admin', color: '#54A0FF', points: ['Master CRUD for the whole institute', 'Fee management & finance overview', 'Broadcast notices to any audience'] },
@@ -92,7 +92,7 @@ export default function Landing() {
           from <span className="lp-grad">one intelligent portal</span>
         </h1>
         <p className="lp-sub">
-          College360 Pro unifies attendance, grades, fees, timetables, doubts and alumni into a single
+          College360 Pro unifies attendance, grades, fees, timetables, doubts and placement readiness into a single
           fast, role-aware platform — powered by a Django backend and a modern React interface.
         </p>
         <div className="lp-hero-cta">
@@ -220,7 +220,8 @@ const LP_STYLES = `
 .lp-hero-cta { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
 
 .lp-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; margin-top:72px; }
-.lp-stat-value { font-size:clamp(1.6rem,3vw,2.4rem); font-weight:800;
+.lp-stat { display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.lp-stat-value { display:inline-block; line-height:1.25; padding:6px 2px; font-size:clamp(1.6rem,3vw,2.5rem); font-weight:800;
   background:linear-gradient(120deg,#8B85FF,#06B6D4); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
 .lp-stat-label { font-size:.8rem; color:var(--lp-muted); margin-top:4px; }
 

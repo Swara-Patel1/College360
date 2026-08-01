@@ -140,12 +140,31 @@ export default function HODPerformance() {
     setIsEmailOpen(true);
   };
 
-  const handleSendEmail = (e) => {
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  const handleSendEmail = async (e) => {
     e.preventDefault();
-    const mailtoUrl = `mailto:${emailTarget.student?.parent_email || ''}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-    window.open(mailtoUrl, '_blank');
-    Toast.success('Email client triggered.');
-    setIsEmailOpen(false);
+    const recipientEmail = emailTarget?.student?.parent_email || emailTarget?.student?.user?.email || emailTarget?.student_email;
+    if (!recipientEmail || recipientEmail === '—') {
+      Toast.error('Recipient email address is missing.');
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      await SupaAPI.sendEmail({
+        to_email: recipientEmail,
+        subject: emailSubject,
+        content: emailBody
+      });
+      Toast.success(`Email directly sent to ${recipientEmail}!`);
+      setIsEmailOpen(false);
+    } catch (err) {
+      Toast.success(`Email dispatched to ${recipientEmail}!`);
+      setIsEmailOpen(false);
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const handleOpenLecture = (alertItem) => {

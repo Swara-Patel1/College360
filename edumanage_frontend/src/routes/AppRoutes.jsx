@@ -24,10 +24,7 @@ import StudentLibrary from '../pages/student/Library.jsx';
 import StudentPlacement from '../pages/student/Placement.jsx';
 import StudentFees from '../pages/student/Fees.jsx';
 import HODFeedback from '../pages/hod/Feedback.jsx';
-import ParentDashboard from '../pages/parent/Dashboard.jsx';
-import ParentAttendance from '../pages/parent/Attendance.jsx';
-import ParentGrades from '../pages/parent/Grades.jsx';
-import ParentFees from '../pages/parent/Fees.jsx';
+
 
 import FacultyDashboard from '../pages/faculty/Dashboard.jsx';
 import AttendanceMarking from '../pages/faculty/Attendance.jsx';
@@ -86,6 +83,7 @@ export const AppRoutes = () => {
 
       {/* Student Protected Routes */}
       <Route element={<ProtectedRoute allowedRoles={['student']} />}>
+        <Route path="/student" element={<Navigate to="/dashboard/student" replace />} />
         <Route path="/dashboard/student" element={<MainLayout><StudentDashboard /></MainLayout>} />
         <Route path="/student/attendance" element={<MainLayout><StudentAttendance /></MainLayout>} />
         <Route path="/student/grades" element={<MainLayout><StudentGrades /></MainLayout>} />
@@ -104,6 +102,7 @@ export const AppRoutes = () => {
 
       {/* Faculty & HOD Protected Routes */}
       <Route element={<ProtectedRoute allowedRoles={['faculty', 'hod']} />}>
+        <Route path="/faculty" element={<Navigate to="/dashboard/faculty" replace />} />
         <Route path="/hod/dashboard" element={<MainLayout title="HOD Dashboard"><HODDashboard /></MainLayout>} />
         <Route path="/dashboard/hod" element={<Navigate to="/hod/dashboard" replace />} />
         <Route path="/dashboard/faculty" element={<MainLayout><FacultyDashboard /></MainLayout>} />
@@ -131,17 +130,9 @@ export const AppRoutes = () => {
         <Route path="/hod/timetable" element={<MainLayout><TimetableManagement /></MainLayout>} />
       </Route>
 
-      {/* Parent Protected Routes */}
-      <Route element={<ProtectedRoute allowedRoles={['parent']} />}>
-        <Route path="/dashboard/parent" element={<MainLayout><ParentDashboard /></MainLayout>} />
-        <Route path="/parent/attendance" element={<MainLayout><ParentAttendance /></MainLayout>} />
-        <Route path="/parent/grades" element={<MainLayout><ParentGrades /></MainLayout>} />
-        <Route path="/parent/fees" element={<MainLayout><ParentFees /></MainLayout>} />
-        <Route path="/parent/notices" element={<MainLayout><Notices /></MainLayout>} />
-      </Route>
-
       {/* Admin Protected Routes */}
       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+        <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
         <Route path="/dashboard/admin" element={<MainLayout><AdminDashboard /></MainLayout>} />
         <Route path="/admin/users" element={<MainLayout><ManageUsers /></MainLayout>} />
         <Route path="/admin/students" element={<MainLayout><ManageStudents /></MainLayout>} />

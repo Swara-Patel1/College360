@@ -65,17 +65,7 @@ export default function Sidebar() {
       { type: 'link', label: 'View Faculty', icon: 'bi-person-video3', to: '/faculty/hod' },
       { type: 'link', label: 'Notices', icon: 'bi-broadcast', to: '/faculty/notices' }
     );
-  } else if (role === 'parent') {
-    navItems = [
-      { type: 'section', label: 'Main' },
-      { type: 'link', label: 'Overview', icon: 'bi-speedometer2', to: '/dashboard/parent' },
-      { type: 'section', label: 'My Child' },
-      { type: 'link', label: 'Attendance', icon: 'bi-check2-square', to: '/parent/attendance' },
-      { type: 'link', label: 'Grades', icon: 'bi-journal-text', to: '/parent/grades' },
-      { type: 'link', label: 'Fee Status', icon: 'bi-cash-coin', to: '/parent/fees' },
-      { type: 'section', label: 'Info' },
-      { type: 'link', label: 'Notices', icon: 'bi-broadcast', to: '/parent/notices' },
-    ];
+
   } else if (role === 'admin') {
     navItems = [
       { type: 'section', label: 'Main' },

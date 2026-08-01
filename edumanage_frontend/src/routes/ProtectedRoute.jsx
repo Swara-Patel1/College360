@@ -20,7 +20,6 @@ export const ProtectedRoute = ({ allowedRoles, delegationScope }) => {
       faculty: '/dashboard/faculty',
       hod: '/dashboard/faculty', // HOD and Faculty share the faculty dashboard base
       student: '/dashboard/student',
-      parent: '/dashboard/parent',
     };
     const defaultDest = roleDestinations[user?.role?.toLowerCase()] || '/login';
     return <Navigate to={defaultDest} replace />;
