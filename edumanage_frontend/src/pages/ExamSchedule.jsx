@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { API, SupaAPI, Utils } from '../api/client.js';
 import { useAuthStore } from '../store/useAuthStore.js';
+import { Toast } from '../store/useNotifStore.js';
 import Modal from '../components/Modal.jsx';
+import DownloadDropdown from '../components/DownloadDropdown.jsx';
+import { downloadExamsCSV, downloadExamsExcel, downloadExamsPDF } from '../course_utilities/dataExport.js';
 
 const TYPE_LABEL = { endsem: 'End-Sem', midterm: 'Mid-Term', practical: 'Practical', quiz: 'Quiz', viva: 'Viva' };
 
@@ -14,6 +17,7 @@ export default function ExamSchedule() {
   const [profile, setProfile] = useState(studentProfile);
   const [loading, setLoading] = useState(true);
   const [seatPlan, setSeatPlan] = useState(null);
+  const [dlOpen, setDlOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -24,27 +28,71 @@ export default function ExamSchedule() {
         setLoading(true);
         let data = [];
         let deptId = '';
+        let deptCode = '';
 
-        if (isFaculty) {
-          const prof = await API.get('faculty/my_profile').catch(() => null);
+        if (role === 'hod') {
+          try {
+            const hodInfo = await API.get('hod/check').catch(() => null);
+            if (hodInfo) {
+              deptId = hodInfo.department_id || hodInfo.hod?.department_id || '';
+              deptCode = hodInfo.hod?.dept_code || hodInfo.dept_code || hodInfo.hod?.department?.code || '';
+              const dName = hodInfo.dept_name || hodInfo.hod?.dept_name || hodInfo.hod?.department?.name || 'Department';
+              if (isMounted) {
+                setProfile({
+                  department_id: deptId,
+                  department_name: dName,
+                  department_code: deptCode,
+                });
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (!deptId && isFaculty) {
+          const prof = await API.get(`faculty/my_profile?user_id=${user.id}`).catch(() => null);
           if (isMounted && prof) setProfile(prof);
-          data = prof?.id ? await SupaAPI.exams.byFaculty(prof.id) : [];
-        } else {
+          deptId = prof?.department_id || prof?.department?.department_id || prof?.department?.id || '';
+          deptCode = prof?.department_code || prof?.department?.code || prof?.dept_code || '';
+        }
+
+        if (!deptId && !isFaculty) {
           let prof = studentProfile;
           if (!prof) {
-            prof = await API.get('students/my_profile').catch(() => null);
+            prof = await API.get(`students/my_profile?user_id=${user.id}`).catch(() => null);
           }
           if (isMounted && prof) setProfile(prof);
           deptId = prof?.department_id || prof?.department?.department_id || prof?.department?.id || '';
+          deptCode = prof?.department_code || prof?.department?.code || prof?.dept_code || '';
           const semId = prof?.current_semester_id || prof?.current_semester?.semester_id || prof?.semester || '';
 
           const url = `exams?student_id=${user.id}${deptId ? `&department_id=${deptId}` : ''}${semId ? `&semester_id=${semId}` : ''}`;
           data = await API.get(url).catch(() => []);
+        } else {
+          data = deptId 
+            ? await API.get(`exams?department_id=${deptId}`).catch(() => []) 
+            : await API.get('exams').catch(() => []);
         }
 
         if (!isMounted) return;
-        const rawExams = Array.isArray(data) ? data : (data.results || []);
+        let rawExams = Array.isArray(data) ? data : (data.results || []);
+
+        if (deptId || deptCode) {
+          rawExams = rawExams.filter(e => {
+            const eDeptId = e.department_id || e.department?.department_id || e.department?.id;
+            const eDeptCode = e.department_code || e.dept_code || e.department?.code || '';
+            const eCourseCode = e.course_code || e.code || '';
+
+            const matchDeptId = deptId && eDeptId && String(eDeptId).toLowerCase() === String(deptId).toLowerCase();
+            const matchDeptCode = deptCode && eDeptCode && String(eDeptCode).toLowerCase() === String(deptCode).toLowerCase();
+            const matchCourseCode = deptCode && eCourseCode && String(eCourseCode).toUpperCase().startsWith(String(deptCode).toUpperCase());
+
+            return matchDeptId || matchDeptCode || matchCourseCode;
+          });
+        }
+
         setExams(rawExams);
+      } catch (err) {
+        console.error('Error loading exams:', err);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -78,11 +126,17 @@ export default function ExamSchedule() {
           <div>
             <h1>Exam Schedule</h1>
             <p>
-              {isFaculty
-                ? 'Examinations for the courses you teach.'
-                : (deptName ? `${deptName} Department Examinations` : 'Your department upcoming examinations.')}
+              {deptName ? `${deptName} Department Examination Schedule` : 'Your department examination schedule.'}
             </p>
           </div>
+        </div>
+        <div className="page-header-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <DownloadDropdown
+            open={dlOpen} setOpen={setDlOpen}
+            onCSV={() => { setDlOpen(false); downloadExamsCSV(exams, Toast); }}
+            onExcel={() => { setDlOpen(false); downloadExamsExcel(exams, Toast); }}
+            onPDF={async () => { setDlOpen(false); await downloadExamsPDF(exams, Toast); }}
+          />
         </div>
       </div>
 

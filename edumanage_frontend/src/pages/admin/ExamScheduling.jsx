@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { API, SupaAPI, Utils } from '../../api/client.js';
 import { Toast } from '../../store/useNotifStore.js';
 import Modal from '../../components/Modal.jsx';
+import DownloadDropdown from '../../components/DownloadDropdown.jsx';
+import { downloadExamsCSV, downloadExamsExcel, downloadExamsPDF } from '../../course_utilities/dataExport.js';
 
 const EXAM_TYPES = [
   { value: 'endsem', label: 'End-Semester' },
@@ -27,6 +29,7 @@ export default function ExamScheduling() {
   const [selectedType, setSelectedType] = useState('all');
   const [selectedSem, setSelectedSem] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [dlOpen, setDlOpen] = useState(false);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -260,7 +263,15 @@ export default function ExamScheduling() {
     <>
       <div className="page-header">
         <div className="page-header-left"><h1><i className="bi bi-calendar-week"></i> Examination Scheduling</h1><p>Create the exam timetable and generate seat plans.</p></div>
-        <div className="page-header-right"><button className="btn btn-primary" onClick={openCreate}><i className="bi bi-plus-lg"></i> Schedule Exam</button></div>
+        <div className="page-header-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <DownloadDropdown
+            open={dlOpen} setOpen={setDlOpen}
+            onCSV={() => { setDlOpen(false); downloadExamsCSV(filteredExams, Toast); }}
+            onExcel={() => { setDlOpen(false); downloadExamsExcel(filteredExams, Toast); }}
+            onPDF={async () => { setDlOpen(false); await downloadExamsPDF(filteredExams, Toast); }}
+          />
+          <button className="btn btn-primary" onClick={openCreate}><i className="bi bi-plus-lg"></i> Schedule Exam</button>
+        </div>
       </div>
 
       {/* ── Sleek Filter Bar ── */}

@@ -22,7 +22,7 @@ export default function Attendance() {
   const [filterCourse, setFilterCourse] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [viewTab, setViewTab] = useState('summary');
+  const [viewTab, setViewTab] = useState((user?.role === 'admin' || user?.role === 'hod') ? 'summary' : 'detailed');
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -55,29 +55,81 @@ export default function Attendance() {
       setDepartments(deptArr);
       setTimetableEntries(Array.isArray(ttList) ? ttList : []);
 
-      if (isAdmin || !prof) {
+      if (isAdmin) {
         setCourses(courseArr);
         setHistory(attArr);
         calculateStats(attArr);
         return;
       }
 
-      let myCoursesList = (courseArr || []).filter(c => 
-        c.faculty_id === facId || 
-        c.faculty?.faculty_id === facId || 
-        c.faculty?.id === facId ||
-        (subjId && (c.subject_id === subjId || c.id === subjId))
-      );
+      if (user?.role === 'hod') {
+        const hodInfo = await API.get('hod/check').catch(() => null);
+        const hodDeptId = hodInfo?.department_id || hodInfo?.hod?.department_id || prof?.department_id;
+
+        let deptCourses = (courseArr || []).filter(c => {
+          const cDeptId = String(c.department_id || c.department?.department_id || c.department?.id || '');
+          return hodDeptId && cDeptId === String(hodDeptId);
+        });
+
+        if (deptCourses.length === 0 && prof?.department_id) {
+          deptCourses = (courseArr || []).filter(c => String(c.department_id) === String(prof.department_id));
+        }
+
+        setCourses(deptCourses);
+
+        const deptSubjIds = deptCourses.map(c => String(c.subject_id || c.id));
+        const hodAttendance = (attArr || []).filter(r => {
+          const rDeptId = String(r.department_id || r.department?.department_id || r.department?.id || '');
+          const rSubjId = String(r.subject_id || r.course?.subject_id || r.course?.id || r.course || r.subject || '');
+          return (hodDeptId && rDeptId === String(hodDeptId)) || deptSubjIds.includes(rSubjId);
+        });
+
+        setHistory(hodAttendance);
+        calculateStats(hodAttendance);
+
+        if (deptCourses.length > 0) {
+          const defaultSubj = String(deptCourses[0].subject_id || deptCourses[0].id || '');
+          setSelectedCourse(defaultSubj);
+          loadStudentsForCourse(defaultSubj);
+        }
+        return;
+      }
+
+      // Collect all assigned subject IDs from timetable for this faculty
+      const ttSubjectIds = (Array.isArray(ttList) ? ttList : [])
+        .map(t => String(t.subject_id || t.subject?.subject_id || t.subject?.id || t.subject || ''))
+        .filter(Boolean);
+
+      let myCoursesList = (courseArr || []).filter(c => {
+        const cSubjId = String(c.subject_id || c.id || '');
+        const cFacId = String(c.faculty_id || c.faculty?.faculty_id || c.faculty?.id || '');
+        
+        return (
+          (facId && cFacId === String(facId)) ||
+          (subjId && cSubjId === String(subjId)) ||
+          (ttSubjectIds.length > 0 && ttSubjectIds.includes(cSubjId))
+        );
+      });
 
       if (myCoursesList.length === 0 && subjId) {
-        const matched = (courseArr || []).find(c => c.subject_id === subjId || c.id === subjId);
+        const matched = (courseArr || []).find(c => String(c.subject_id || c.id) === String(subjId));
         if (matched) myCoursesList.push(matched);
       }
 
       setCourses(myCoursesList);
 
-      const mySubjectIds = myCoursesList.map(c => c.subject_id || c.id);
-      const myAttendance = (attArr || []).filter(r => mySubjectIds.includes(r.subject_id || r.course));
+      // Auto-select the subject the faculty teaches
+      if (myCoursesList.length > 0) {
+        const defaultSubj = String(myCoursesList[0].subject_id || myCoursesList[0].id || '');
+        setSelectedCourse(defaultSubj);
+        loadStudentsForCourse(defaultSubj);
+      }
+
+      const mySubjectIds = myCoursesList.map(c => String(c.subject_id || c.id));
+      const myAttendance = (attArr || []).filter(r => {
+        const rSubjId = String(r.subject_id || r.course?.subject_id || r.course?.id || r.course || r.subject || '');
+        return mySubjectIds.includes(rSubjId);
+      });
       setHistory(myAttendance);
       calculateStats(myAttendance);
     } catch (e) {
@@ -111,6 +163,9 @@ export default function Attendance() {
 
   useEffect(() => {
     if (!user) return;
+    if (user?.role !== 'admin' && user?.role !== 'hod') {
+      setViewTab('detailed');
+    }
     loadInitialData();
   }, [user]);
 
@@ -389,7 +444,7 @@ export default function Attendance() {
         }
       }
 
-      if (!entry && (r.subject_name || r.course_code)) {
+      if (!entry && (user?.role === 'admin') && (r.subject_name || r.course_code)) {
         entry = {
           subject_id: sId || r.course_code,
           code: r.course_code || '—',
@@ -446,11 +501,22 @@ export default function Attendance() {
       list = list.filter(item => item.subject_id === filterCourse || item.code === filterCourse);
     }
 
+    if (user?.role === 'hod') {
+      list = list.filter(item => {
+        return courses.some(c => String(c.subject_id || c.id) === String(item.subject_id));
+      });
+    } else if (user?.role !== 'admin') {
+      list = list.filter(item => {
+        const isAssigned = courses.some(c => String(c.subject_id || c.id) === String(item.subject_id));
+        return isAssigned && item.sessionsCount > 0;
+      });
+    }
+
     list.sort((a, b) => a.department_name.localeCompare(b.department_name) || a.code.localeCompare(b.code));
     return list;
   }, [history, courses, departments, filterDept, filterCourse]);
 
-  const selectedSubjectObj = courses.find(c => (c.subject_id || c.id) === selectedCourse);
+  const selectedSubjectObj = courses.find(c => String(c.subject_id || c.id) === String(selectedCourse)) || courses[0];
   const dayNameStr = new Date(attendanceDate).toLocaleDateString('en-US', { weekday: 'long' });
 
   if (loading && !students.length && !history.length) {
@@ -556,14 +622,20 @@ export default function Attendance() {
           </div>
           <div className="card-body">
             <div className="form-row" style={{ display: 'flex', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
-              <div className="form-group" style={{ flex: 1, minWidth: '220px' }}>
+              <div className="form-group" style={{ flex: 1, minWidth: '240px' }}>
                 <label className="form-label">Subject</label>
-                <select className="form-input" value={selectedCourse} onChange={handleCourseChange}>
-                  <option value="">Select Subject</option>
-                  {courses.map(c => (
-                    <option key={c.subject_id || c.id} value={c.subject_id || c.id}>{c.code} — {c.name}</option>
-                  ))}
-                </select>
+                {(user?.role === 'admin' || user?.role === 'hod') && courses.length > 1 ? (
+                  <select className="form-input" value={selectedCourse} onChange={handleCourseChange}>
+                    {courses.map(c => (
+                      <option key={c.subject_id || c.id} value={c.subject_id || c.id}>{c.code} — {c.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="form-input" style={{ display: 'flex', alignItems: 'center', fontWeight: '600', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '8px', padding: '10px 14px', cursor: 'default' }}>
+                    <i className="bi bi-journal-bookmark-fill me-2" style={{ color: '#38bdf8' }}></i>
+                    {selectedSubjectObj ? `${selectedSubjectObj.code} — ${selectedSubjectObj.name}` : (courses[0] ? `${courses[0].code} — ${courses[0].name}` : 'No Subject Assigned')}
+                  </div>
+                )}
               </div>
 
               <div className="form-group" style={{ flex: 1, minWidth: '180px' }}>
@@ -726,22 +798,24 @@ export default function Attendance() {
               <div className="card-title" style={{ margin: 0 }}>
                 <i className="bi bi-bar-chart-fill me-2"></i> Attendance Overview
               </div>
-              <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.06)', borderRadius: '8px', padding: '3px' }}>
-                <button
-                  className={`btn btn-sm ${viewTab === 'summary' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ borderRadius: '6px', padding: '4px 12px', fontSize: '0.78rem' }}
-                  onClick={() => setViewTab('summary')}
-                >
-                  <i className="bi bi-grid-3x3-gap-fill me-1"></i> Subject Summary
-                </button>
-                <button
-                  className={`btn btn-sm ${viewTab === 'detailed' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ borderRadius: '6px', padding: '4px 12px', fontSize: '0.78rem' }}
-                  onClick={() => setViewTab('detailed')}
-                >
-                  <i className="bi bi-person-lines-fill me-1"></i> Detailed Logs
-                </button>
-              </div>
+              {(user?.role === 'admin' || user?.role === 'hod') && (
+                <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.06)', borderRadius: '8px', padding: '3px' }}>
+                  <button
+                    className={`btn btn-sm ${viewTab === 'summary' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ borderRadius: '6px', padding: '4px 12px', fontSize: '0.78rem' }}
+                    onClick={() => setViewTab('summary')}
+                  >
+                    <i className="bi bi-grid-3x3-gap-fill me-1"></i> Subject Summary
+                  </button>
+                  <button
+                    className={`btn btn-sm ${viewTab === 'detailed' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ borderRadius: '6px', padding: '4px 12px', fontSize: '0.78rem' }}
+                    onClick={() => setViewTab('detailed')}
+                  >
+                    <i className="bi bi-person-lines-fill me-1"></i> Detailed Logs
+                  </button>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>

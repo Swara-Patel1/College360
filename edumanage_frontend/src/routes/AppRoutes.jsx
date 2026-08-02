@@ -1,8 +1,6 @@
-import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute.jsx';
 import { useAuthStore } from '../store/useAuthStore.js';
-import { initSocket, disconnectSocket } from '../api/socket.js';
 import Login from '../pages/Login.jsx';
 import Landing from '../pages/Landing.jsx';
 import Sidebar from '../components/Sidebar.jsx';
@@ -19,6 +17,7 @@ import Notices from '../pages/Notices.jsx';
 import StudentFeedback from '../pages/student/Feedback.jsx';
 import ExamSchedule from '../pages/ExamSchedule.jsx';
 import ExamScheduling from '../pages/admin/ExamScheduling.jsx';
+import AdminGrades from '../pages/admin/Grades.jsx';
 import LibraryManagement from '../pages/admin/LibraryManagement.jsx';
 import StudentLibrary from '../pages/student/Library.jsx';
 import StudentPlacement from '../pages/student/Placement.jsx';
@@ -38,7 +37,6 @@ import HODDashboard from '../pages/hod/Dashboard.jsx';
 import HODComplaints from '../pages/hod/Complaints.jsx';
 import HODPerformance from '../pages/hod/Performance.jsx';
 import HODFees from '../pages/hod/Fees.jsx';
-import HODSeminars from '../pages/hod/Seminars.jsx';
 import HODLeaves from '../pages/hod/Leaves.jsx';
 import TimetableManagement from '../pages/hod/TimetableManagement.jsx';
 
@@ -51,15 +49,6 @@ import FeeManagement from '../pages/FeeManagement.jsx';
 
 const MainLayout = ({ children, title }) => {
   const { isLoggedIn, user } = useAuthStore();
-
-  useEffect(() => {
-    if (isLoggedIn) {
-      initSocket();
-    }
-    return () => {
-      disconnectSocket();
-    };
-  }, [isLoggedIn]);
 
   return (
     <div className="app-layout">
@@ -124,7 +113,6 @@ export const AppRoutes = () => {
         <Route path="/hod/complaints" element={<MainLayout><HODComplaints /></MainLayout>} />
         <Route path="/hod/performance" element={<MainLayout><HODPerformance /></MainLayout>} />
         <Route path="/hod/fees" element={<MainLayout><HODFees /></MainLayout>} />
-        <Route path="/hod/seminars" element={<MainLayout><HODSeminars /></MainLayout>} />
         <Route path="/hod/feedback" element={<MainLayout><HODFeedback /></MainLayout>} />
         <Route path="/hod/leaves" element={<MainLayout><HODLeaves /></MainLayout>} />
         <Route path="/hod/timetable" element={<MainLayout><TimetableManagement /></MainLayout>} />
@@ -141,7 +129,7 @@ export const AppRoutes = () => {
         <Route path="/admin/courses" element={<MainLayout><Courses /></MainLayout>} />
         <Route path="/admin/departments" element={<MainLayout><ManageDepartments /></MainLayout>} />
         <Route path="/admin/attendance" element={<MainLayout><AttendanceMarking /></MainLayout>} />
-        <Route path="/admin/grades" element={<MainLayout><GradesEntry /></MainLayout>} />
+        <Route path="/admin/grades" element={<MainLayout><AdminGrades /></MainLayout>} />
         <Route path="/admin/timetable" element={<MainLayout><TimetableManagement /></MainLayout>} />
         <Route path="/admin/fees" element={<MainLayout><FeeManagement /></MainLayout>} />
         <Route path="/admin/notices" element={<MainLayout><Notices /></MainLayout>} />

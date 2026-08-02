@@ -7,12 +7,14 @@ export default function Grades() {
   const { user } = useAuthStore();
   const [profile, setProfile] = useState(null);
   const [courses, setCourses] = useState([]);
+  const [semesters, setSemesters] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState('');
   const [students, setStudents] = useState([]);
   const [marks, setMarks] = useState({}); // student_id -> marks_obtained
   const [totalMarks, setTotalMarks] = useState(100);
   const [gradesLog, setGradesLog] = useState([]);
   const [filterCourse, setFilterCourse] = useState('');
+  const [filterSemester, setFilterSemester] = useState('');
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -25,37 +27,100 @@ export default function Grades() {
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      const prof = await API.get(`faculty/my_profile?user_id=${user.id}`).catch(() => null);
+
+      // Determine if user is HOD or Faculty
+      const isHod = user?.role === 'hod' || (Array.isArray(user?.roles) ? user.roles.includes('hod') : user?.roles === 'hod');
+
+      // Resolve Faculty profile
+      let prof = await API.get(`faculty/my_profile?user_id=${user.id}`).catch(() => null);
       setProfile(prof);
-      if (!prof) return;
 
-      const facId = prof.id || prof.faculty_id;
-      const subjId = prof.subject_id;
+      // Resolve HOD Department ID
+      let hodDeptId = user?.department_id || user?.department?.id || user?.department?.department_id || '';
+      
+      if (isHod || !hodDeptId) {
+        const allHods = await API.get('hod').catch(() => []);
+        if (Array.isArray(allHods)) {
+          const match = allHods.find(h => 
+            String(h.user_id || h.user?.id || h.user?.user_id || '').toLowerCase() === String(user.id).toLowerCase() ||
+            (user.email && String(h.email || h.user?.email || '').toLowerCase() === String(user.email).toLowerCase())
+          );
+          if (match) {
+            hodDeptId = match.department_id || match.department?.department_id || match.department?.id || hodDeptId;
+          }
+        }
+      }
 
-      const [allCourses, allGrades] = await Promise.all([
-        API.get('courses').catch(() => []),
-        API.get('grades').catch(() => [])
+      if (!hodDeptId && prof) {
+        hodDeptId = prof.department_id || prof.department?.department_id || prof.department?.id || '';
+      }
+
+      // Fetch all subjects, grades, department students, and semesters
+      const [allCoursesRes, allGradesRes, deptStudentsRes, semestersRes] = await Promise.all([
+        fetch('http://localhost:8000/rest/v1/subjects').catch(() => null),
+        fetch('http://localhost:8000/rest/v1/marks?limit=5000').catch(() => null),
+        hodDeptId
+          ? fetch(`http://localhost:8000/rest/v1/students?department_id=eq.${hodDeptId}&limit=2000`).catch(() => null)
+          : fetch('http://localhost:8000/rest/v1/students?limit=2000').catch(() => null),
+        fetch('http://localhost:8000/rest/v1/semesters').catch(() => null)
       ]);
 
-      let myCoursesList = (allCourses || []).filter(c => 
-        c.faculty_id === facId || 
-        c.faculty?.faculty_id === facId || 
-        c.faculty?.id === facId ||
-        (subjId && (c.subject_id === subjId || c.id === subjId))
-      );
+      const allCourses = allCoursesRes && allCoursesRes.ok ? await allCoursesRes.json() : [];
+      const allGrades = allGradesRes && allGradesRes.ok ? await allGradesRes.json() : [];
+      const deptStudents = deptStudentsRes && deptStudentsRes.ok ? await deptStudentsRes.json() : [];
+      const semestersData = semestersRes && semestersRes.ok ? await semestersRes.json() : [];
 
-      if (myCoursesList.length === 0 && subjId) {
-        const matched = (allCourses || []).find(c => c.subject_id === subjId || c.id === subjId);
-        if (matched) myCoursesList.push(matched);
+      const deptStudentIds = new Set((deptStudents || []).map(s => String(s.student_id || s.id)));
+
+      setSemesters(Array.isArray(semestersData) ? semestersData : []);
+
+      // Courses for HOD: ONLY subjects where subject department_id matches HOD department_id
+      let myCoursesList = [];
+      if (isHod && hodDeptId) {
+        myCoursesList = (allCourses || []).filter(c => {
+          const cDeptId = String(c.department_id || c.department?.department_id || c.department?.id || c.department || '').toLowerCase();
+          return cDeptId === String(hodDeptId).toLowerCase();
+        });
+      } else if (prof) {
+        const facId = prof.id || prof.faculty_id;
+        const subjId = prof.subject_id;
+        myCoursesList = (allCourses || []).filter(c => 
+          c.faculty_id === facId || 
+          c.faculty?.faculty_id === facId || 
+          c.faculty?.id === facId ||
+          (subjId && (c.subject_id === subjId || c.id === subjId))
+        );
+      } else {
+        myCoursesList = allCourses || [];
       }
 
       setCourses(myCoursesList);
-      
-      const mySubjectIds = myCoursesList.map(c => c.subject_id || c.id);
-      const myGradesLog = (allGrades || []).filter(g => 
-        mySubjectIds.includes(g.subject_id || g.course?.subject_id) ||
-        (subjId && (g.subject_id === subjId || g.course?.subject_id === subjId))
-      );
+
+      const mySubjectIds = new Set(myCoursesList.map(c => String(c.subject_id || c.id)));
+
+      // Filter Grades Log for HOD
+      let myGradesLog = [];
+      if (isHod && hodDeptId) {
+        myGradesLog = (allGrades || []).filter(g => {
+          const subId = String(g.subject_id || g.course?.subject_id || g.course_id || '');
+          const studId = String(g.student_id || g.student?.student_id || g.student?.id || '');
+          const gDeptId = String(g.student?.department_id || g.department_id || '');
+
+          return (
+            mySubjectIds.has(subId) ||
+            (gDeptId && gDeptId.toLowerCase() === String(hodDeptId).toLowerCase()) ||
+            (deptStudentIds.size > 0 && deptStudentIds.has(studId))
+          );
+        });
+      } else if (prof) {
+        const subjId = prof.subject_id;
+        myGradesLog = (allGrades || []).filter(g => 
+          mySubjectIds.has(String(g.subject_id || g.course?.subject_id || g.course_id)) ||
+          (subjId && (g.subject_id === subjId || g.course?.subject_id === subjId))
+        );
+      } else {
+        myGradesLog = allGrades || [];
+      }
 
       setGradesLog(myGradesLog);
     } catch (e) {
@@ -205,9 +270,16 @@ export default function Grades() {
   };
 
   const filteredGrades = gradesLog.filter(g => {
-    return filterCourse 
+    const matchesCourse = filterCourse 
       ? (g.subject_id === filterCourse || g.course?.subject_id === filterCourse || g.course_code === filterCourse) 
       : true;
+
+    const semVal = String(g.semester || g.sem_number || g.semester_number || g.semester_id || '');
+    const matchesSemester = filterSemester
+      ? (semVal === String(filterSemester) || String(g.semester_id) === String(filterSemester))
+      : true;
+
+    return matchesCourse && matchesSemester;
   });
 
   if (loading && !students.length && !gradesLog.length) {
@@ -258,12 +330,12 @@ export default function Grades() {
                   type="number" 
                   className="form-input" 
                   value={totalMarks} 
-                  onChange={(e) => setTotalMarks(e.target.value)} 
+                  onChange={e => setTotalMarks(e.target.value)} 
                 />
               </div>
             </div>
 
-            {/* Bulk CSV import */}
+            {/* CSV Import */}
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
@@ -359,11 +431,17 @@ export default function Grades() {
         <div className="card col-12">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div className="card-title"><i className="bi bi-clipboard"></i> Grades Log</div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <select className="form-input" style={{ width: '220px', padding: '6px 10px', fontSize: '0.8rem' }} value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
-                <option value="">All Subjects</option>
+                <option value="" style={{ background: '#141828', color: '#FFF' }}>All Subjects ({courses.length})</option>
                 {courses.map(c => (
-                  <option key={c.subject_id || c.id} value={c.subject_id || c.id}>{c.code} — {c.name}</option>
+                  <option key={c.subject_id || c.id} value={c.subject_id || c.id} style={{ background: '#141828', color: '#FFF' }}>{c.code} — {c.name}</option>
+                ))}
+              </select>
+              <select className="form-input" style={{ width: '160px', padding: '6px 10px', fontSize: '0.8rem' }} value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
+                <option value="" style={{ background: '#141828', color: '#FFF' }}>All Semesters</option>
+                {semesters.map(s => (
+                  <option key={s.semester_id || s.id} value={s.number || s.semester_id} style={{ background: '#141828', color: '#FFF' }}>Semester {s.number || s.name?.replace('Semester ', '')}</option>
                 ))}
               </select>
             </div>
@@ -376,26 +454,35 @@ export default function Grades() {
                     <th>Student Name</th>
                     <th>Subject Code</th>
                     <th>Subject Name</th>
+                    <th>Semester</th>
                     <th>Marks Obtained</th>
                     <th>Percentage</th>
                     <th>Grade</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredGrades.map((g, idx) => (
-                    <tr key={g.mark_id || idx}>
-                      <td style={{ fontWeight: 600 }}>{g.student_name || (g.student ? `${g.student.first_name || ''} ${g.student.last_name || ''}`.trim() : 'Student')}</td>
-                      <td><strong>{g.course_code || g.course?.code || 'CE204'}</strong></td>
-                      <td>{g.subject_name || g.course_name || g.course?.name || 'Data Structures'}</td>
-                      <td>{g.marks_obtained} / {g.total_marks || 100}</td>
-                      <td>{g.percentage}%</td>
-                      <td>
-                        <span className={`badge badge-${g.grade === 'F' ? 'danger' : 'primary'}`}>
-                          {g.grade || 'A'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredGrades.map((g, idx) => {
+                    const semNumber = g.semester || g.sem_number || '—';
+                    return (
+                      <tr key={g.mark_id || idx}>
+                        <td style={{ fontWeight: 600 }}>{g.student_name || (g.student ? `${g.student.first_name || ''} ${g.student.last_name || ''}`.trim() : 'Student')}</td>
+                        <td><strong>{g.course_code || g.course?.code || 'CE204'}</strong></td>
+                        <td>{g.subject_name || g.course_name || g.course?.name || 'Data Structures'}</td>
+                        <td>
+                          <span className="badge badge-muted" style={{ fontSize: '0.78rem', padding: '3px 8px' }}>
+                            Sem {semNumber}
+                          </span>
+                        </td>
+                        <td>{g.marks_obtained} / {g.total_marks || 100}</td>
+                        <td>{g.percentage}%</td>
+                        <td>
+                          <span className={`badge badge-${g.grade === 'F' ? 'danger' : 'primary'}`}>
+                            {g.grade || 'A'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : (

@@ -3,6 +3,8 @@ import { API } from '../api/client.js';
 import { useAuthStore } from '../store/useAuthStore.js';
 import { Toast } from '../store/useNotifStore.js';
 import Modal from '../components/Modal.jsx';
+import DownloadDropdown from '../components/DownloadDropdown.jsx';
+import { downloadDepartmentsCSV, downloadDepartmentsExcel, downloadDepartmentsPDF } from '../course_utilities/dataExport.js';
 
 const emptyFaculty = () => ({ first_name: '', last_name: '', email: '', employee_id: '' });
 const emptyStudent = () => ({ first_name: '', last_name: '', email: '', roll_number: '', semester_id: '' });
@@ -17,6 +19,7 @@ export default function ManageDepartments() {
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [dlOpen, setDlOpen] = useState(false);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -42,8 +45,8 @@ export default function ManageDepartments() {
       setLoading(true);
       const [deptData, facData, studData, hodData, semData] = await Promise.all([
         API.get('departments'),
-        API.get('faculty').catch(() => []),
-        API.get('students').catch(() => []),
+        API.get('faculty?limit=2000&ignore_hod_scope=true').catch(() => []),
+        API.get('students?limit=2000&ignore_hod_scope=true').catch(() => []),
         API.get('hod').catch(() => []),
         API.get('semesters').catch(() => []),
       ]);
@@ -182,18 +185,75 @@ export default function ManageDepartments() {
   const handleViewClick = (d) => { setViewing(d); setIsViewOpen(true); };
 
   // ─── derived ────────────────────────────────────────────────────────────
-  const deptFaculty = (deptId) => faculty.filter(f => f.department_id === deptId);
-  const deptStudents = (deptId) => students.filter(s => s.department_id === deptId);
-  const hodFor = (deptId) => hods.find(h => h.department_id === deptId);
-  const hodName = (deptId) => {
-    const h = hodFor(deptId);
-    return h ? (`${h.first_name || ''} ${h.last_name || ''}`.trim() || h.email) : null;
+  const deptFaculty = (dept) => {
+    if (!dept) return [];
+    const targetId = String(typeof dept === 'object' ? (dept.id || dept.department_id || '') : dept).toLowerCase();
+    const targetName = String(typeof dept === 'object' ? (dept.name || '') : '').toLowerCase();
+    const targetCode = String(typeof dept === 'object' ? (dept.code || '') : '').toLowerCase();
+
+    return faculty.filter(f => {
+      const fDeptId = String(f.department_id || f.department?.id || f.department?.department_id || (typeof f.department !== 'object' ? f.department : '') || '').toLowerCase();
+      const fDeptName = String(f.department_name || f.department?.name || f.dept_name || '').toLowerCase();
+      const fDeptCode = String(f.department_code || f.department?.code || f.dept_code || '').toLowerCase();
+
+      if (targetId && fDeptId && fDeptId === targetId) return true;
+      if (targetName && fDeptName && fDeptName === targetName) return true;
+      if (targetCode && fDeptCode && fDeptCode === targetCode) return true;
+      return false;
+    });
+  };
+
+  const deptStudents = (dept) => {
+    if (!dept) return [];
+    const targetId = String(typeof dept === 'object' ? (dept.id || dept.department_id || '') : dept).toLowerCase();
+    const targetName = String(typeof dept === 'object' ? (dept.name || '') : '').toLowerCase();
+    const targetCode = String(typeof dept === 'object' ? (dept.code || '') : '').toLowerCase();
+
+    return students.filter(s => {
+      const sDeptId = String(s.department_id || s.department?.id || s.department?.department_id || (typeof s.department !== 'object' ? s.department : '') || '').toLowerCase();
+      const sDeptName = String(s.department_name || s.department?.name || s.dept_name || '').toLowerCase();
+      const sDeptCode = String(s.department_code || s.department?.code || s.dept_code || '').toLowerCase();
+
+      if (targetId && sDeptId && sDeptId === targetId) return true;
+      if (targetName && sDeptName && sDeptName === targetName) return true;
+      if (targetCode && sDeptCode && sDeptCode === targetCode) return true;
+      return false;
+    });
+  };
+
+  const hodFor = (dept) => {
+    if (!dept) return null;
+    const targetId = String(typeof dept === 'object' ? (dept.id || dept.department_id || '') : dept).toLowerCase();
+    const targetName = String(typeof dept === 'object' ? (dept.name || '') : '').toLowerCase();
+
+    return hods.find(h => {
+      const hDeptId = String(h.department_id || h.department?.id || h.department?.department_id || (typeof h.department !== 'object' ? h.department : '') || '').toLowerCase();
+      const hDeptName = String(h.department_name || h.department?.name || h.dept_name || '').toLowerCase();
+
+      if (targetId && hDeptId && hDeptId === targetId) return true;
+      if (targetName && hDeptName && hDeptName === targetName) return true;
+      return false;
+    });
+  };
+
+  const hodName = (dept) => {
+    const h = hodFor(dept);
+    if (!h) return null;
+    const name = `${h.first_name || h.user?.first_name || ''} ${h.last_name || h.user?.last_name || ''}`.trim();
+    return name || h.email || h.user?.email || null;
   };
 
   const filtered = departments.filter(d => {
     const q = searchQuery.toLowerCase();
     return (d.name || '').toLowerCase().includes(q) || (d.code || '').toLowerCase().includes(q);
   });
+
+  const exportData = filtered.map(d => ({
+    ...d,
+    hod_name: hodName(d) || 'Not assigned',
+    faculty_count: deptFaculty(d).length,
+    student_count: deptStudents(d).length,
+  }));
 
   if (loading && !departments.length) {
     return (
@@ -211,7 +271,13 @@ export default function ManageDepartments() {
           <p>Create departments with their HOD, faculty, and students — all in one place.</p>
         </div>
         {isAdmin && (
-          <div className="page-header-right">
+          <div className="page-header-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <DownloadDropdown
+              open={dlOpen} setOpen={setDlOpen}
+              onCSV={() => { setDlOpen(false); downloadDepartmentsCSV(exportData, Toast); }}
+              onExcel={() => { setDlOpen(false); downloadDepartmentsExcel(exportData, Toast); }}
+              onPDF={async () => { setDlOpen(false); await downloadDepartmentsPDF(exportData, Toast); }}
+            />
             <button className="btn btn-primary" onClick={() => { resetForm(); setIsAddOpen(true); }}>
               <i className="bi bi-plus-lg"></i> Add Department
             </button>
@@ -276,9 +342,9 @@ export default function ManageDepartments() {
                   <tr key={d.id}>
                     <td style={{ fontWeight: 600 }}>{d.name}</td>
                     <td><span className="badge badge-info">{d.code}</span></td>
-                    <td>{hodName(d.id) || <span style={{ color: 'var(--text-muted)' }}>Not assigned</span>}</td>
-                    <td style={{ textAlign: 'center' }}>{deptFaculty(d.id).length}</td>
-                    <td style={{ textAlign: 'center' }}>{deptStudents(d.id).length}</td>
+                    <td>{hodName(d) || <span style={{ color: 'var(--text-muted)' }}>Not assigned</span>}</td>
+                    <td style={{ textAlign: 'center' }}>{deptFaculty(d).length}</td>
+                    <td style={{ textAlign: 'center' }}>{deptStudents(d).length}</td>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                         <button className="btn btn-ghost btn-sm" onClick={() => handleViewClick(d)}><i className="bi bi-search"></i> View</button>
@@ -425,25 +491,25 @@ export default function ManageDepartments() {
           <div style={{ display: 'grid', gap: '18px', padding: '5px 0' }}>
             <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
               <div><span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>HOD</span>
-                <strong>{hodName(viewing.id) || 'Not assigned'}</strong></div>
+                <strong>{hodName(viewing) || 'Not assigned'}</strong></div>
               <div><span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Faculty</span>
-                <strong>{deptFaculty(viewing.id).length}</strong></div>
+                <strong>{deptFaculty(viewing).length}</strong></div>
               <div><span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Students</span>
-                <strong>{deptStudents(viewing.id).length}</strong></div>
+                <strong>{deptStudents(viewing).length}</strong></div>
             </div>
 
             <div>
-              <h4 style={{ margin: '0 0 8px', color: 'var(--primary-light)' }}><i className="bi bi-person-video3"></i> Faculty ({deptFaculty(viewing.id).length})</h4>
-              {deptFaculty(viewing.id).length ? (
+              <h4 style={{ margin: '0 0 8px', color: 'var(--primary-light)' }}><i className="bi bi-person-video3"></i> Faculty ({deptFaculty(viewing).length})</h4>
+              {deptFaculty(viewing).length ? (
                 <table className="table" style={{ fontSize: '0.85rem' }}>
                   <thead><tr><th>Name</th><th>Emp ID</th><th>Email</th><th>Role</th></tr></thead>
                   <tbody>
-                    {deptFaculty(viewing.id).map(f => (
+                    {deptFaculty(viewing).map(f => (
                       <tr key={f.id}>
                         <td>{f.first_name} {f.last_name}</td>
                         <td>{f.employee_id || '—'}</td>
                         <td style={{ color: 'var(--text-secondary)' }}>{f.email || '—'}</td>
-                        <td>{hodFor(viewing.id)?.user_id === f.user_id
+                        <td>{hodFor(viewing)?.user_id === f.user_id
                           ? <span className="badge badge-info">HOD</span>
                           : <span className="badge badge-muted">Faculty</span>}</td>
                       </tr>
@@ -454,12 +520,12 @@ export default function ManageDepartments() {
             </div>
 
             <div>
-              <h4 style={{ margin: '0 0 8px', color: 'var(--primary-light)' }}><i className="bi bi-mortarboard"></i> Students ({deptStudents(viewing.id).length})</h4>
-              {deptStudents(viewing.id).length ? (
+              <h4 style={{ margin: '0 0 8px', color: 'var(--primary-light)' }}><i className="bi bi-mortarboard"></i> Students ({deptStudents(viewing).length})</h4>
+              {deptStudents(viewing).length ? (
                 <table className="table" style={{ fontSize: '0.85rem' }}>
                   <thead><tr><th>Name</th><th>Enrollment</th><th>Semester</th><th>Status</th></tr></thead>
                   <tbody>
-                    {deptStudents(viewing.id).map(s => (
+                    {deptStudents(viewing).map(s => (
                       <tr key={s.id}>
                         <td>{s.first_name} {s.last_name}</td>
                         <td style={{ color: 'var(--text-secondary)' }}>{s.enrollment_no || s.roll_number || '—'}</td>

@@ -36,14 +36,20 @@ export default function Sidebar() {
       { type: 'section', label: 'Main' },
       { type: 'link', label: 'My Dashboard', icon: 'bi-speedometer2', to: role === 'hod' ? '/hod/dashboard' : '/dashboard/faculty' },
       { type: 'section', label: 'My Classes' },
-      { type: 'link', label: 'Mark Attendance', icon: 'bi-check2-square', to: '/faculty/attendance' },
-      { type: 'link', label: 'Enter Grades', icon: 'bi-journal-text', to: '/faculty/grades' },
-      { type: 'link', label: 'My Timetable', icon: 'bi-calendar3', to: '/faculty/timetable' },
+      { type: 'link', label: role === 'hod' ? 'Students Attendance' : 'Mark Attendance', icon: 'bi-check2-square', to: '/faculty/attendance' },
+      { type: 'link', label: role === 'hod' ? 'Students Grades' : 'Enter Grades', icon: 'bi-journal-text', to: '/faculty/grades' },
+      ...(role !== 'hod' ? [
+        { type: 'link', label: 'My Timetable', icon: 'bi-calendar3', to: '/faculty/timetable' },
+      ] : []),
       { type: 'link', label: 'Exam Schedule', icon: 'bi-calendar-week', to: '/faculty/exams' },
-      { type: 'link', label: 'Solve Doubts', icon: 'bi-patch-question-fill', to: '/faculty/doubts' },
-      { type: 'section', label: 'Leave & Schedule' },
-      { type: 'link', label: 'Apply Leave', icon: 'bi-airplane', to: '/faculty/leaves' },
-      { type: 'link', label: 'Lecture Interchange', icon: 'bi-arrow-repeat', to: '/faculty/interchange' }
+      ...(role !== 'hod' ? [
+        { type: 'link', label: 'Solve Doubts', icon: 'bi-patch-question-fill', to: '/faculty/doubts' },
+      ] : []),
+      ...(role !== 'hod' ? [
+        { type: 'section', label: 'Leave & Schedule' },
+        { type: 'link', label: 'Apply Leave', icon: 'bi-airplane', to: '/faculty/leaves' },
+        { type: 'link', label: 'Lecture Interchange', icon: 'bi-arrow-repeat', to: '/faculty/interchange' }
+      ] : [])
     ];
 
     if (role === 'hod') {
@@ -53,8 +59,6 @@ export default function Sidebar() {
         { type: 'link', label: 'Student Complaints', icon: 'bi-megaphone', to: '/hod/complaints' },
         { type: 'link', label: 'Academic Alerts', icon: 'bi-exclamation-triangle', to: '/hod/performance' },
         { type: 'link', label: 'Pending Fees', icon: 'bi-cash-coin', to: '/hod/fees' },
-        { type: 'link', label: 'Manage Timetable', icon: 'bi-calendar-week', to: '/hod/timetable' },
-        { type: 'link', label: 'Seminars', icon: 'bi-mic', to: '/hod/seminars' },
         { type: 'link', label: 'Faculty Feedback', icon: 'bi-star', to: '/hod/feedback' }
       );
     }

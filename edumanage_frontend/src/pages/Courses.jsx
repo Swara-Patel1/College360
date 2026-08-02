@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { API, Utils } from '../api/client.js';
 import { useAuthStore } from '../store/useAuthStore.js';
+import { Toast } from '../store/useNotifStore.js';
 import Modal from '../components/Modal.jsx';
+import DownloadDropdown from '../components/DownloadDropdown.jsx';
+import { downloadSubjectsCSV, downloadSubjectsExcel, downloadSubjectsPDF } from '../course_utilities/dataExport.js';
 
 export default function Courses() {
   const { user } = useAuthStore();
@@ -19,6 +22,7 @@ export default function Courses() {
   const [selectedSem, setSelectedSem] = useState('');
   const [selectedActive, setSelectedActive] = useState('');
   const [enrollSearchQuery, setEnrollSearchQuery] = useState('');
+  const [dlOpen, setDlOpen] = useState(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,9 +45,11 @@ export default function Courses() {
   const [editingCourseId, setEditingCourseId] = useState(null);
   const [deletingCourse, setDeletingCourse] = useState(null);
 
-  const isAdmin = user?.role === 'admin';
-  const isFaculty = user?.role === 'faculty';
-  const isStudent = user?.role === 'student';
+  const userRole = (user?.role || user?.roles || '').toLowerCase();
+  const isAdmin = userRole === 'admin' || userRole === 'hod';
+  const isHod = userRole === 'hod';
+  const isFaculty = userRole === 'faculty';
+  const isStudent = userRole === 'student';
 
   const loadData = async () => {
     try {
@@ -83,29 +89,35 @@ export default function Courses() {
         }
       }
 
+      // Check HOD department if HOD user
+      if (isHod) {
+        try {
+          const hodInfo = await API.get('hod/check');
+          if (hodInfo && (hodInfo.isHod || hodInfo.hod)) {
+            const hDept = hodInfo.hod?.department_id || hodInfo.department_id;
+            if (hDept && !selectedDept) {
+              setSelectedDept(String(hDept));
+            }
+          }
+        } catch (_) {}
+      }
+
       // Role-based filtering
       if (isStudent) {
         const enrollData = await API.get('enrollments');
         const myCourseIds = new Set((enrollData || []).map(e => String(e.course || e.course_id || e.subject_id || '')));
         loadedCourses = loadedCourses.filter(c => myCourseIds.has(String(c.id)) || myCourseIds.has(String(c.subject_id)));
-        // Filter to show only current_semester subjects for students
         if (currentSem && currentSem !== '—') {
           loadedCourses = loadedCourses.filter(c => String(c.semester) === String(currentSem));
         }
-      } else if (isFaculty) {
+      } else if (isFaculty && !isHod) {
         const facProfile = await API.get('faculty/my_profile');
         const facId = facProfile?.id;
-        loadedCourses = loadedCourses.filter(c => c.faculty === facId || c.faculty_id === facId);
-        // Filter by semester for faculty/admin
-        if (currentSem && currentSem !== '—') {
-          loadedCourses = loadedCourses.filter(c => String(c.semester) === String(currentSem));
-        }
-      } else {
-        // Filter by semester for admin
-        if (currentSem && currentSem !== '—') {
-          loadedCourses = loadedCourses.filter(c => String(c.semester) === String(currentSem));
+        if (facId) {
+          loadedCourses = loadedCourses.filter(c => c.faculty === facId || c.faculty_id === facId);
         }
       }
+      // Note: Admin and HOD retain all loaded courses so dropdown filters (dept, sem, search) work dynamically
 
       setCourses(loadedCourses);
     } catch (e) {
@@ -142,34 +154,26 @@ export default function Courses() {
       const code = (c.code || c.course_code || '').toLowerCase();
       const query = searchQuery.toLowerCase().trim();
       const matchSearch = !query || name.includes(query) || code.includes(query);
-      const matchDept = !selectedDept || String(c.department) === selectedDept || String(c.department_id) === selectedDept;
-      const matchSem = !selectedSem || String(c.semester) === selectedSem;
-      const matchActive = !selectedActive || (selectedActive === 'true' ? c.is_active !== false : c.is_active === false);
-      return matchSearch && matchDept && matchSem && matchActive;
-    });
-  };
 
-  // Filter Enrollments
-  const getFilteredEnrollments = () => {
-    const query = enrollSearchQuery.toLowerCase().trim();
-    return enrollments.filter(e => {
-      const studentName = e.student_name || `${e.student?.user?.first_name || ''} ${e.student?.user?.last_name || ''}`.toLowerCase();
-      const courseName = (e.course_name || e.course?.name || '').toLowerCase();
-      return !query || studentName.includes(query) || courseName.includes(query);
+      const cDeptId = String(c.department?.id || c.department_id || c.department || '');
+      const cDeptName = String(c.department_name || c.department?.name || '').toLowerCase();
+      const selDept = String(selectedDept || '').toLowerCase();
+
+      const matchDept = !selectedDept || 
+        cDeptId === selDept || 
+        cDeptName === selDept ||
+        (departments.find(d => String(d.id) === selDept || String(d.department_id) === selDept || String(d.code || '').toLowerCase() === selDept)?.name || '').toLowerCase() === cDeptName;
+
+      const matchSem = !selectedSem || String(c.semester) === String(selectedSem);
+      const matchActive = !selectedActive || (selectedActive === 'true' ? c.is_active !== false : c.is_active === false);
+
+      return matchSearch && matchDept && matchSem && matchActive;
     });
   };
 
   const filtered = getFilteredCourses();
   const paginatedCourses = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
   const totalPages = Math.ceil(filtered.length / perPage);
-
-  const clearFilters = () => {
-    setSearchQuery('');
-    setSelectedDept('');
-    setSelectedSem('');
-    setSelectedActive('');
-    setCurrentPage(1);
-  };
 
   // CRUD Actions
   const handleOpenAdd = () => {
@@ -278,15 +282,19 @@ export default function Courses() {
             <h1>Subject Catalog</h1>
             <p id="pageDesc">
               {isStudent 
-                ? `You are enrolled in ${courses.length} subject${courses.length !== 1 ? 's' : ''} for your current semester (Semester ${activeSemesterNumber}).`
-                : isFaculty
-                  ? `You are teaching ${courses.length} subject${courses.length !== 1 ? 's' : ''} in the current active semester (Semester ${activeSemesterNumber}).`
-                  : `Showing ${courses.length} subject${courses.length !== 1 ? 's' : ''} for the current active semester (Semester ${activeSemesterNumber}).`}
+                ? `You are enrolled in ${filtered.length} subject${filtered.length !== 1 ? 's' : ''} for your current semester.`
+                : `Showing ${filtered.length} subject${filtered.length !== 1 ? 's' : ''} in catalog.`}
             </p>
           </div>
         </div>
         {isAdmin && (
-          <div className="page-header-right" id="addCourseWrap">
+          <div className="page-header-right" id="addCourseWrap" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <DownloadDropdown
+              open={dlOpen} setOpen={setDlOpen}
+              onCSV={() => { setDlOpen(false); downloadSubjectsCSV(filtered, Toast); }}
+              onExcel={() => { setDlOpen(false); downloadSubjectsExcel(filtered, Toast); }}
+              onPDF={async () => { setDlOpen(false); await downloadSubjectsPDF(filtered, Toast); }}
+            />
             <button className="btn btn-primary" onClick={handleOpenAdd}><i className="bi bi-plus-lg"></i> Add Subject</button>
           </div>
         )}

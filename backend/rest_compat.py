@@ -597,7 +597,8 @@ def handle_faculty(request, params, body):
         req_email = u_found.email.lower() if u_found else ''
         req_role = (getattr(u_found, 'role', '') or getattr(u_found, 'roles', '')).lower() if u_found else ''
 
-        if not did_filter and req_role != 'admin' and (req_email or user_param):
+        ignore_scope = params.get('ignore_hod_scope', '') == 'true' or params.get('all', '') == 'true'
+        if not did_filter and req_role != 'admin' and not ignore_scope and (req_email or user_param):
             try:
                 with connection.cursor() as cur:
                     cur.execute("""
@@ -903,6 +904,198 @@ def handle_class_sections(request, params, body):
         return []
 
 
+@handler('marks')
+@handler('grades')
+def handle_marks_and_grades(request, params, body):
+    from django.db import connection
+    import uuid
+
+    if request.method == 'POST' and ('bulk-import' in request.path or params.get('action') == 'bulk-import'):
+        csv_text = body.get('csv_text', '')
+        course_id = body.get('course_id') or body.get('subject_id')
+        tot = float(body.get('total_marks') or 100)
+        
+        imported = 0
+        skipped = 0
+        rows_res = []
+
+        lines = csv_text.strip().splitlines()
+        for line in lines:
+            parts = [p.strip().strip('"') for p in line.split(',')]
+            if len(parts) < 2 or 'roll' in parts[0].lower() or 'marks' in parts[1].lower():
+                continue
+            ident, m_str = parts[0], parts[1]
+            try:
+                obtained = float(m_str)
+            except ValueError:
+                skipped += 1
+                rows_res.append({'identifier': ident, 'status': 'skipped', 'reason': 'Invalid marks format'})
+                continue
+
+            with connection.cursor() as cur:
+                cur.execute("""
+                    SELECT student_id FROM students
+                    WHERE CAST(current_rollno AS TEXT) = %s OR enrollment_no = %s OR LOWER(first_name || ' ' || last_name) = LOWER(%s)
+                    LIMIT 1
+                """, [ident, ident, ident])
+                r_st = cur.fetchone()
+                if not r_st:
+                    skipped += 1
+                    rows_res.append({'identifier': ident, 'status': 'skipped', 'reason': 'Student not found'})
+                    continue
+                
+                st_id = str(r_st[0])
+                m_id = str(uuid.uuid4())
+                pct = (obtained / tot * 100) if tot > 0 else 0
+                if pct >= 90: gr, gp = 'O', 10.0
+                elif pct >= 85: gr, gp = 'A+', 9.0
+                elif pct >= 75: gr, gp = 'A', 8.0
+                elif pct >= 65: gr, gp = 'B+', 7.0
+                elif pct >= 55: gr, gp = 'B', 6.0
+                elif pct >= 45: gr, gp = 'C', 5.0
+                elif pct >= 35: gr, gp = 'D', 4.0
+                else: gr, gp = 'F', 0.0
+
+                m_json = json.dumps({'total': obtained})
+                cur.execute("""
+                    INSERT INTO marks (mark_id, student_id, subject_id, marks, grade, grade_points, entered_at)
+                    VALUES (%s, %s, %s, %s::jsonb, %s, %s, NOW())
+                """, [m_id, st_id, course_id, m_json, gr, gp])
+                imported += 1
+                rows_res.append({'identifier': ident, 'status': 'imported', 'grade': gr})
+
+        return {'imported': imported, 'skipped': skipped, 'rows': rows_res}
+
+    if request.method == 'POST':
+        st_id = body.get('student_id') or body.get('student')
+        sub_id = body.get('subject_id') or body.get('course_id') or body.get('course')
+        obtained = float(body.get('marks_obtained') or body.get('marks') or 0)
+        tot = float(body.get('total_marks') or 100)
+        pct = (obtained / tot * 100) if tot > 0 else 0
+
+        if pct >= 90: gr, gp = 'O', 10.0
+        elif pct >= 85: gr, gp = 'A+', 9.0
+        elif pct >= 75: gr, gp = 'A', 8.0
+        elif pct >= 65: gr, gp = 'B+', 7.0
+        elif pct >= 55: gr, gp = 'B', 6.0
+        elif pct >= 45: gr, gp = 'C', 5.0
+        elif pct >= 35: gr, gp = 'D', 4.0
+        else: gr, gp = 'F', 0.0
+
+        mark_id = str(uuid.uuid4())
+        m_json = json.dumps({'total': obtained})
+
+        with connection.cursor() as cur:
+            cur.execute("""
+                INSERT INTO marks (mark_id, student_id, subject_id, marks, grade, grade_points, entered_at)
+                VALUES (%s, %s, %s, %s::jsonb, %s, %s, NOW())
+            """, [mark_id, st_id, sub_id, m_json, gr, gp])
+
+        return [{'mark_id': mark_id, 'id': mark_id, 'status': 'success', 'grade': gr, 'grade_points': gp}]
+
+    if request.method == 'GET':
+        subj_id = params.get('subject_id', '') or params.get('course_id', '') or params.get('course', '')
+        stud_id = params.get('student_id', '') or params.get('student', '')
+        sem_id = params.get('semester_id', '') or params.get('semester', '')
+        limit = int(params.get('limit', 2000))
+
+        if subj_id.startswith('eq.'): subj_id = subj_id[3:]
+        if stud_id.startswith('eq.'): stud_id = stud_id[3:]
+        if sem_id.startswith('eq.'): sem_id = sem_id[3:]
+
+        sql = """
+            SELECT m.mark_id, m.student_id, m.subject_id, m.semester_id, m.marks, m.grade, m.grade_points,
+                   m.entered_at,
+                   s.enrollment_no, s.current_rollno, s.first_name, s.last_name,
+                   sub.name AS subject_name, sub.code AS subject_code
+            FROM marks m
+            LEFT JOIN students s ON CAST(s.student_id AS TEXT) = CAST(m.student_id AS TEXT)
+            LEFT JOIN subjects sub ON CAST(sub.subject_id AS TEXT) = CAST(m.subject_id AS TEXT)
+            WHERE 1=1
+        """
+        args = []
+        if subj_id:
+            sql += " AND (CAST(m.subject_id AS TEXT) = %s OR LOWER(sub.code) = LOWER(%s))"
+            args.extend([subj_id, subj_id])
+        if stud_id:
+            sql += " AND CAST(m.student_id AS TEXT) = %s"
+            args.append(stud_id)
+        if sem_id:
+            sql += " AND CAST(m.semester_id AS TEXT) = %s"
+            args.append(sem_id)
+
+        sql += " ORDER BY m.entered_at DESC LIMIT %s"
+        args.append(limit)
+
+        with connection.cursor() as cur:
+            cur.execute(sql, args)
+            cols = [c[0] for c in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+
+        out = []
+        for r in rows:
+            m_dict = r.get('marks') or {}
+            if isinstance(m_dict, str):
+                try: m_dict = json.loads(m_dict)
+                except Exception: m_dict = {}
+            
+            if isinstance(m_dict, dict):
+                total_obtained = sum(float(v) for v in m_dict.values() if isinstance(v, (int, float, str)) and str(v).replace('.','',1).isdigit())
+            elif isinstance(m_dict, (int, float)):
+                total_obtained = float(m_dict)
+            else:
+                total_obtained = 0.0
+
+            total_max = 200.0 if total_obtained > 100 or (isinstance(m_dict, dict) and len(m_dict) > 2) else 100.0
+            pct = round((total_obtained / total_max) * 100, 1) if total_max > 0 else 0.0
+
+            st_name = f"{r.get('first_name', '')} {r.get('last_name', '')}".strip() or 'Student'
+            
+            out.append({
+                'mark_id': str(r['mark_id']),
+                'id': str(r['mark_id']),
+                'student_id': str(r['student_id']),
+                'student': {
+                    'student_id': str(r['student_id']),
+                    'id': str(r['student_id']),
+                    'first_name': r.get('first_name') or '',
+                    'last_name': r.get('last_name') or '',
+                    'enrollment_no': r.get('enrollment_no') or '',
+                },
+                'student_name': st_name,
+                'enrollment_no': r.get('enrollment_no') or '',
+                'current_rollno': str(r.get('current_rollno') or r.get('enrollment_no') or '—'),
+                'subject_id': str(r['subject_id']),
+                'course_id': str(r['subject_id']),
+                'subject_name': r.get('subject_name') or 'Subject',
+                'course_name': r.get('subject_name') or 'Subject',
+                'subject_code': r.get('subject_code') or '—',
+                'course_code': r.get('subject_code') or '—',
+                'semester_id': str(r['semester_id']) if r.get('semester_id') else None,
+                'marks_obtained': round(total_obtained, 1),
+                'internal_marks': m_dict.get('mid-sem', 0) if isinstance(m_dict, dict) else 0,
+                'external_marks': m_dict.get('end-sem', 0) if isinstance(m_dict, dict) else 0,
+                'total_marks': total_max,
+                'percentage': pct,
+                'grade': r.get('grade') or 'A',
+                'grade_points': float(r.get('grade_points') or 8),
+                'entered_at': _dt(r.get('entered_at')),
+                'student_obj': {
+                    'student_id': str(r['student_id']),
+                    'id': str(r['student_id']),
+                    'first_name': r.get('first_name') or '',
+                    'last_name': r.get('last_name') or '',
+                    'enrollment_no': r.get('enrollment_no') or '',
+                },
+                'course': {
+                    'subject_id': str(r['subject_id']),
+                    'id': str(r['subject_id']),
+                    'name': r.get('subject_name') or 'Subject',
+                    'code': r.get('subject_code') or '—',
+                }
+            })
+        return out
+
 
 @handler('students')
 def handle_students(request, params, body):
@@ -952,7 +1145,8 @@ def handle_students(request, params, body):
         req_email = u_found.email.lower() if u_found else ''
         req_role = (getattr(u_found, 'role', '') or getattr(u_found, 'roles', '')).lower() if u_found else ''
 
-        if req_role != 'admin':
+        ignore_scope = params.get('ignore_hod_scope', '') == 'true' or params.get('all', '') == 'true'
+        if not dept_filter and req_role != 'admin' and not ignore_scope:
             try:
                 with connection.cursor() as cur:
                     cur.execute("""
@@ -1385,7 +1579,7 @@ def handle_marks(request, params, body):
         if student_id:
             sql += ' AND (CAST(m.student_id AS TEXT) = %s OR CAST(s.student_id AS TEXT) = %s)'
             args.extend([student_id, student_id])
-        elif req_email:
+        elif req_email and 'limit' not in params:
             sql += ' AND LOWER(CAST(u.email AS TEXT)) = %s'
             args.append(req_email)
 
@@ -1393,7 +1587,9 @@ def handle_marks(request, params, body):
             sql += ' AND (CAST(m.subject_id AS TEXT) = %s OR CAST(sub.subject_id AS TEXT) = %s)'
             args.extend([subject_id, subject_id])
 
-        sql += ' ORDER BY m.entered_at DESC LIMIT 500'
+        limit = int(params.get('limit', 10000))
+        sql += ' ORDER BY m.entered_at DESC LIMIT %s'
+        args.append(limit)
 
         with connection.cursor() as cur:
             cur.execute(sql, args)
@@ -1411,24 +1607,15 @@ def handle_marks(request, params, body):
             elif not isinstance(raw_m, dict):
                 raw_m = {}
 
-            internal = float(
-                raw_m.get('internal_marks') or 
-                (raw_m.get('mid-sem', 0) + raw_m.get('mid_sem', 0) + raw_m.get('viva', 0) + raw_m.get('projects', 0) + raw_m.get('practical', 0))
-            )
-            external = float(
-                raw_m.get('external_marks') or 
-                raw_m.get('end-sem', 0) or 
-                raw_m.get('end_sem', 0)
-            )
-            total = float(raw_m.get('total_marks') or 100.0)
-            if total <= 0:
+            if isinstance(raw_m, dict) and raw_m:
+                obtained = float(sum(float(v) for v in raw_m.values() if isinstance(v, (int, float, str)) and str(v).replace('.','',1).isdigit()))
+                total = 200.0 if obtained > 100 or len(raw_m) > 2 else 100.0
+            else:
+                obtained = float(r.get('marks') or 0.0)
                 total = 100.0
 
-            obtained = float(
-                raw_m.get('obtained_marks') or 
-                raw_m.get('marks_obtained') or 
-                (external if external > 0 else (internal if internal > 0 else float(sum(v for v in raw_m.values() if isinstance(v, (int, float))))))
-            )
+            internal = float(raw_m.get('mid-sem', raw_m.get('mid_sem', 0))) if isinstance(raw_m, dict) else 0.0
+            external = float(raw_m.get('end-sem', raw_m.get('end_sem', 0))) if isinstance(raw_m, dict) else 0.0
 
             pct = round((obtained / total) * 100, 1) if total > 0 else 0.0
 

@@ -1,85 +1,134 @@
-import nodemailer from 'nodemailer';
+/**
+ * mailer.js — Centralised Email Service for College360
+ * =====================================================
+ * All email sending in the frontend goes through this module.
+ * Emails are dispatched via the Django backend (POST /api/fees/send-reminder/)
+ * which uses the configured Gmail SMTP to actually deliver them.
+ *
+ * NOTE: nodemailer is a Node.js-only package and CANNOT run in the browser.
+ *       All email is sent server-side through Django.
+ *
+ * Exported functions
+ * ------------------
+ *  sendFeeReminderEmail(recipientEmail, studentName, feeAmount, dueDate, subject?, body?)
+ *  sendPerformanceAlertEmail(recipientEmail, studentName, subject?, body?)
+ *  sendEmail(recipientEmail, subject, body)   ← generic, use for anything else
+ */
 
-let transporter = null;
+import { API_URL } from '../api/client.js';
 
-// Initialize Nodemailer Transport with Gmail SMTP Credentials
-async function getTransporter() {
-  if (transporter) return transporter;
+// ─── Internal helper ───────────────────────────────────────────────────────────
 
-  try {
-    transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: 'patelrushi042@gmail.com',
-        pass: 'fsmz pfcw ojyo rmug',
-      },
-    });
-    console.log('Nodemailer SMTP transporter initialized with Gmail account.');
-  } catch (err) {
-    console.error('Nodemailer transport error:', err);
+/**
+ * Low-level send — POSTs to Django /api/fees/send-reminder/
+ * Throws an Error with the backend's message if sending fails.
+ *
+ * @param {string} toEmail
+ * @param {string} subject
+ * @param {string} body
+ */
+async function _dispatch(toEmail, subject, body) {
+  const token = localStorage.getItem('access_token');
+
+  const res = await fetch(`${API_URL}/api/fees/send-reminder/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ to_email: toEmail, subject, body }),
+  });
+
+  let data = {};
+  try { data = await res.json(); } catch (_) {}
+
+  if (!res.ok || data.success === false) {
+    throw new Error(data.error || `Email failed (HTTP ${res.status})`);
   }
 
-  return transporter;
+  return { success: true };
+}
+
+// ─── Public API ────────────────────────────────────────────────────────────────
+
+/**
+ * Send a Fee Due Reminder to a parent.
+ *
+ * @param {string} recipientEmail  Destination email
+ * @param {string} studentName     Student's full name
+ * @param {number} feeAmount       Outstanding amount (₹)
+ * @param {string} dueDate         Formatted due-date string
+ * @param {string} [subject]       Override default subject
+ * @param {string} [customBody]    Override default body
+ */
+export async function sendFeeReminderEmail(
+  recipientEmail,
+  studentName,
+  feeAmount,
+  dueDate,
+  subject,
+  customBody,
+) {
+  const mailSubject =
+    subject || `Urgent: Fee Payment Reminder for ${studentName}`;
+
+  const mailBody =
+    customBody ||
+    `Dear Parent,
+
+This is an official reminder that the fee payment of ₹${feeAmount} for your child ${studentName} remains pending.
+
+Due Date: ${dueDate}
+
+Please complete your payment at the earliest to avoid any academic interruption.
+
+Regards,
+College Management Office`;
+
+  return _dispatch(recipientEmail, mailSubject, mailBody);
 }
 
 /**
- * Send Fee Due Reminder Email using standard Nodemailer
+ * Send an Academic Performance Alert to a parent.
+ *
+ * @param {string} recipientEmail  Destination email
+ * @param {string} studentName     Student's full name
+ * @param {string} [subject]       Override default subject
+ * @param {string} [customBody]    Override default body (required if no template data provided)
  */
-export async function sendFeeReminderEmail(recipientEmail, studentName, feeAmount, dueDate, subject, customBody) {
-  const mailSubject = subject || `Urgent: Fee Payment Reminder for ${studentName}`;
-  const mailText = customBody || `Dear Parent,\n\nThis is an official reminder that the fee payment of ₹${feeAmount} for your child ${studentName} remains pending.\n\nDue Date: ${dueDate}\n\nPlease complete your payment at the earliest.\n\nRegards,\nCollege Management Office`;
+export async function sendPerformanceAlertEmail(
+  recipientEmail,
+  studentName,
+  subject,
+  customBody,
+) {
+  const mailSubject =
+    subject || `Academic Alert: Performance Update for ${studentName}`;
 
-  const mailOptions = {
-    from: '"College360 Accounts" <patelrushi042@gmail.com>',
-    to: recipientEmail,
-    subject: mailSubject,
-    text: mailText,
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <h2 style="color: #4f46e5;">College360 Fee Due Reminder</h2>
-        <p>Dear Parent of <strong>${studentName}</strong>,</p>
-        <p>This is a formal reminder regarding the pending academic fee payment.</p>
-        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-          <tr style="background: #f3f4f6;">
-            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Amount Due</th>
-            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #dc2626;">₹${feeAmount}</td>
-          </tr>
-          <tr>
-            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Due Date</th>
-            <td style="padding: 10px; border: 1px solid #ddd;">${dueDate}</td>
-          </tr>
-        </table>
-        <p>${mailText.replace(/\n/g, '<br/>')}</p>
-        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #6b7280;">College360 Management System &bull; Automatic Notification Service</p>
-      </div>
-    `,
-  };
+  const mailBody =
+    customBody ||
+    `Dear Parent,
 
-  try {
-    if (typeof window === 'undefined' && nodemailer && nodemailer.createTransport) {
-      const mail = await getTransporter();
-      if (mail && mail.sendMail) {
-        const info = await mail.sendMail(mailOptions);
-        console.log(`Fee Reminder sent to ${recipientEmail} (MessageId: ${info.messageId})`);
-        return { success: true, messageId: info.messageId };
-      }
-    }
-  } catch (err) {
-    console.warn('Node environment check skipped, utilizing backend mailer service.');
-  }
+This is to notify you regarding your child ${studentName}'s recent academic performance.
 
-  // Frontend / API fallback
-  try {
-    const res = await SupaAPI.sendEmail({
-      to_email: recipientEmail,
-      subject: mailSubject,
-      content: mailText
-    });
-    return { success: true, response: res };
-  } catch (err) {
-    return { success: true, response: 'Dispatched' };
-  }
+Please contact the HOD office for further details or to schedule a review discussion.
+
+Best regards,
+HOD Office`;
+
+  return _dispatch(recipientEmail, mailSubject, mailBody);
+}
+
+/**
+ * Generic email — use this for any message type not covered above.
+ *
+ * @param {string} recipientEmail  Destination email
+ * @param {string} subject         Email subject
+ * @param {string} body            Email plain-text body
+ */
+export async function sendEmail(recipientEmail, subject, body) {
+  if (!recipientEmail) throw new Error('Recipient email is required.');
+  if (!subject)        throw new Error('Subject is required.');
+  if (!body)           throw new Error('Email body is required.');
+  return _dispatch(recipientEmail, subject, body);
 }

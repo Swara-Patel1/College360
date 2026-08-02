@@ -3,6 +3,8 @@ import { API } from '../api/client.js';
 import { useAuthStore } from '../store/useAuthStore.js';
 import { Toast } from '../store/useNotifStore.js';
 import Modal from '../components/Modal.jsx';
+import DownloadDropdown from '../components/DownloadDropdown.jsx';
+import { downloadFacultyCSV, downloadFacultyExcel, downloadFacultyPDF } from '../course_utilities/dataExport.js';
 
 export default function ManageFaculty() {
   const { user } = useAuthStore();
@@ -255,7 +257,12 @@ export default function ManageFaculty() {
           <p>{isAdmin ? 'Manage faculty profiles, departments, and employment status.' : 'View faculty members and HOD belonging to your department.'}</p>
         </div>
         {isAdmin && (
-          <div className="page-header-right">
+          <div className="page-header-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <DownloadDropdown
+              onCSV={() => downloadFacultyCSV(filtered, Toast)}
+              onExcel={() => downloadFacultyExcel(filtered, Toast)}
+              onPDF={async () => await downloadFacultyPDF(filtered, Toast)}
+            />
             <button className="btn btn-primary" onClick={() => { resetForm(); setIsAddOpen(true); }}>
               <i className="bi bi-plus-lg"></i> Add Faculty
             </button>

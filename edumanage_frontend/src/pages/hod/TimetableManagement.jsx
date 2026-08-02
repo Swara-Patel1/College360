@@ -3,6 +3,8 @@ import { API } from '../../api/client.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
 import { Toast } from '../../store/useNotifStore.js';
 import Modal from '../../components/Modal.jsx';
+import DownloadDropdown from '../../components/DownloadDropdown.jsx';
+import { downloadTimetableCSV, downloadTimetableExcel, downloadTimetablePDF } from '../../course_utilities/dataExport.js';
 
 // ── Timetable helpers (shared by the grid and the clash detector) ──
 const DAY_CANON = { mon: 'monday', tue: 'tuesday', wed: 'wednesday', thu: 'thursday', fri: 'friday', sat: 'saturday', sun: 'sunday' };
@@ -68,6 +70,7 @@ export default function TimetableManagement() {
   const [selectedSemesterFilter, setSelectedSemesterFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [deptId, setDeptId] = useState('');
+  const [dlOpen, setDlOpen] = useState(false);
 
   const [isOpen, setIsOpen] = useState(false);
   const [clashOpen, setClashOpen] = useState(false);
@@ -289,7 +292,13 @@ export default function TimetableManagement() {
           <p>Schedule weekly subject lectures, assign classrooms, and organize faculty schedules.</p>
           <div className="today-badge"><i className="bi bi-star-fill"></i> Today is {todayName}</div>
         </div>
-        <div className="page-header-right" style={{ display: 'flex', gap: '10px' }}>
+        <div className="page-header-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <DownloadDropdown
+            open={dlOpen} setOpen={setDlOpen}
+            onCSV={() => { setDlOpen(false); downloadTimetableCSV(filteredTimetable, Toast); }}
+            onExcel={() => { setDlOpen(false); downloadTimetableExcel(filteredTimetable, Toast); }}
+            onPDF={async () => { setDlOpen(false); await downloadTimetablePDF(filteredTimetable, Toast); }}
+          />
           <button
             className={`btn ${conflicts.length ? 'btn-danger' : 'btn-ghost'}`}
             onClick={() => setClashOpen(true)}

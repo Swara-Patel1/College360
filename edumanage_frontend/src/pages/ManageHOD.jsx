@@ -3,6 +3,8 @@ import { API } from '../api/client.js';
 import { useAuthStore } from '../store/useAuthStore.js';
 import { Toast } from '../store/useNotifStore.js';
 import Modal from '../components/Modal.jsx';
+import DownloadDropdown from '../components/DownloadDropdown.jsx';
+import { downloadHODCSV, downloadHODExcel, downloadHODPDF } from '../course_utilities/dataExport.js';
 
 export default function ManageHOD() {
   const { user } = useAuthStore();
@@ -12,6 +14,7 @@ export default function ManageHOD() {
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [dlOpen, setDlOpen] = useState(false);
 
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [isRemoveOpen, setIsRemoveOpen] = useState(false);
@@ -115,7 +118,13 @@ export default function ManageHOD() {
           <p>Assign and manage Heads of Department. Assigning promotes a faculty member to HOD.</p>
         </div>
         {isAdmin && (
-          <div className="page-header-right">
+          <div className="page-header-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <DownloadDropdown
+              open={dlOpen} setOpen={setDlOpen}
+              onCSV={() => { setDlOpen(false); downloadHODCSV(filtered, Toast); }}
+              onExcel={() => { setDlOpen(false); downloadHODExcel(filtered, Toast); }}
+              onPDF={async () => { setDlOpen(false); await downloadHODPDF(filtered, Toast); }}
+            />
             <button className="btn btn-primary" onClick={() => openAssign()}><i className="bi bi-plus-lg"></i> Assign HOD</button>
           </div>
         )}

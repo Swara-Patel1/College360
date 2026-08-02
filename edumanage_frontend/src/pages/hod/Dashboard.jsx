@@ -89,15 +89,12 @@ export default function HODDashboard() {
     { icon: <i className="bi bi-megaphone" />, label: 'Complaints', path: '/hod/complaints', color: '#ef4444' },
     { icon: <i className="bi bi-exclamation-triangle" />, label: 'Academic Alerts', path: '/hod/performance', color: '#8b5cf6' },
     { icon: <i className="bi bi-cash-coin" />, label: 'Pending Fees', path: '/hod/fees', color: '#22c55e' },
-    { icon: <i className="bi bi-calendar-week" />, label: 'Manage Timetable', path: '/hod/timetable', color: '#f59e0b' },
-    { icon: <i className="bi bi-mic" />, label: 'Seminars', path: '/hod/seminars', color: '#14b8a6' },
     { icon: <i className="bi bi-star" />, label: 'Faculty Feedback', path: '/hod/feedback', color: '#a855f7' },
   ];
 
   const teachingActions = [
-    { icon: <i className="bi bi-person-check" />, label: 'Mark Attendance', path: '/faculty/attendance', color: '#22c55e' },
-    { icon: <i className="bi bi-journal-text" />, label: 'Enter Grades', path: '/faculty/grades', color: '#0ea5e9' },
-    { icon: <i className="bi bi-calendar3" />, label: 'My Timetable', path: '/faculty/timetable', color: '#6366f1' },
+    { icon: <i className="bi bi-person-check" />, label: 'Students Attendance', path: '/faculty/attendance', color: '#22c55e' },
+    { icon: <i className="bi bi-journal-text" />, label: 'Students Grades', path: '/faculty/grades', color: '#0ea5e9' },
     { icon: <i className="bi bi-broadcast" />, label: 'Notices', path: '/faculty/notices', color: '#f59e0b' },
   ];
 

@@ -138,11 +138,10 @@ export default function HODFees() {
         emailSubject,
         emailBody
       );
-      Toast.success(`Email directly sent to ${recipientEmail}!`);
+      Toast.success(`Email sent to ${recipientEmail}!`);
       setIsEmailOpen(false);
     } catch (err) {
-      Toast.success(`Email dispatched to ${recipientEmail}!`);
-      setIsEmailOpen(false);
+      Toast.error(err?.message || 'Failed to send email. Check SMTP settings.');
     } finally {
       setSendingEmail(false);
     }

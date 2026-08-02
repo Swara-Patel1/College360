@@ -3,6 +3,7 @@ import { API, Utils } from '../../api/client.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
 import { Toast } from '../../store/useNotifStore.js';
 import Modal from '../../components/Modal.jsx';
+import { sendPerformanceAlertEmail } from '../../course_utilities/mailer.js';
 
 export default function HODPerformance() {
   const { user } = useAuthStore();
@@ -60,26 +61,24 @@ export default function HODPerformance() {
         if (s.user_id) studentMap[String(s.user_id)] = s;
       });
 
-      // 3. Filter low marks records
+      // 3. Filter low marks records (obtained marks strictly < 70)
       const rawGrades = Array.isArray(gradesData) ? gradesData : [];
       let lowAlerts = rawGrades.filter(r => {
         const st = studentMap[String(r.student_id)] || r.student || {};
         const sDept = st.department_id || st.department?.id || st.department || r.student?.department_id;
         const isDept = !currentDeptId || (sDept && String(sDept) === String(currentDeptId));
 
-        const pct = r.percentage != null ? r.percentage : (r.total_marks ? (r.marks_obtained / r.total_marks) * 100 : 0);
-        const gradeStr = String(r.grade || '').toUpperCase();
-        const isLow = pct < 85 || ['F', 'FF', 'DD', 'CD', 'CC', 'BC', 'D', 'BB'].includes(gradeStr) || (r.gpa != null && r.gpa <= 8.5);
+        const obtained = parseFloat(r.marks_obtained ?? 0);
+        const isLow = obtained < 70;
 
         return isDept && isLow;
       });
 
-      // Fallback: if department filter yielded 0 matches, show all low grades across departments
+      // Fallback: if department filter yielded 0 matches, show low marks (obtained < 70) across departments
       if (lowAlerts.length === 0 && rawGrades.length > 0) {
         lowAlerts = rawGrades.filter(r => {
-          const pct = r.percentage != null ? r.percentage : (r.total_marks ? (r.marks_obtained / r.total_marks) * 100 : 0);
-          const gradeStr = String(r.grade || '').toUpperCase();
-          return pct < 85 || ['F', 'FF', 'DD', 'CD', 'CC', 'BC', 'D', 'BB'].includes(gradeStr);
+          const obtained = parseFloat(r.marks_obtained ?? 0);
+          return obtained < 70;
         });
       }
 
@@ -152,16 +151,16 @@ export default function HODPerformance() {
 
     setSendingEmail(true);
     try {
-      await SupaAPI.sendEmail({
-        to_email: recipientEmail,
-        subject: emailSubject,
-        content: emailBody
-      });
-      Toast.success(`Email directly sent to ${recipientEmail}!`);
+      await sendPerformanceAlertEmail(
+        recipientEmail,
+        emailTarget?.student_name || 'Student',
+        emailSubject,
+        emailBody,
+      );
+      Toast.success(`Email sent to ${recipientEmail}!`);
       setIsEmailOpen(false);
     } catch (err) {
-      Toast.success(`Email dispatched to ${recipientEmail}!`);
-      setIsEmailOpen(false);
+      Toast.error(err?.message || 'Failed to send email. Check SMTP settings.');
     } finally {
       setSendingEmail(false);
     }
@@ -358,7 +357,9 @@ export default function HODPerformance() {
             </div>
             <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setIsEmailOpen(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary">Open Mailer</button>
+              <button type="submit" className="btn btn-primary" disabled={sendingEmail}>
+                {sendingEmail ? <><div className="spinner"></div> Sending...</> : <><i className="bi bi-send me-1"></i> Send Email</>}
+              </button>
             </div>
           </form>
         </Modal>

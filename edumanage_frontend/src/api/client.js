@@ -11,7 +11,7 @@ export const Auth = {
   isLoggedIn: () => !!localStorage.getItem('access_token'),
 };
 
-const SupaFetch = {
+export const SupaFetch = {
   headers(token) {
     const userToken = token || Auth.getToken();
     return {
@@ -606,32 +606,34 @@ export const API = {
       }
 
       // 10. GRADES / MARKS
-      if (path === 'grades/my_grades' || path === 'grades') {
+      if (path === 'grades/my_grades' || path === 'grades' || path === 'marks') {
         if (method === 'GET') {
-          let studentUuid = params.get('student');
-          let courseUuid = params.get('course');
+          let studentUuid = params.get('student') || params.get('student_id');
+          let courseUuid = params.get('course') || params.get('subject_id');
+          const limit = params.get('limit') || 5000;
           if (!studentUuid && path === 'grades/my_grades') {
-            const studentRow = await SupaFetch.request(`students?select=student_id&user_id=eq.${loggedInUser.id}`);
+            if (!loggedInUser) return [];
+            const studentRow = await SupaFetch.request(`students?select=student_id&user_id=eq.${loggedInUser?.id}`).catch(() => []);
             if (!studentRow || studentRow.length === 0) return [];
             studentUuid = studentRow[0].student_id;
           }
-          let query = 'marks?select=*,course:subjects(*),student:students(*)';
-          if (studentUuid) query += `&student_id=eq.${studentUuid}`;
-          if (courseUuid) query += `&subject_id=eq.${courseUuid}`;
+          let query = `marks?limit=${limit}`;
+          if (studentUuid) query += `&student_id=${studentUuid}`;
+          if (courseUuid) query += `&subject_id=${courseUuid}`;
           const rows = await SupaFetch.request(query);
-          // Grade, GPA and percentage are computed by Django (grades.models.Grade);
-          // the client just presents them.
-          return rows.map(r => ({
+          return (Array.isArray(rows) ? rows : []).map(r => ({
             ...r,
-            id: r.mark_id,
+            id: r.mark_id || r.id,
+            mark_id: r.mark_id || r.id,
             marks_obtained: parseFloat(r.marks_obtained ?? r.total_marks ?? 0),
             total_marks: parseFloat(r.total_marks ?? 100),
             percentage: r.percentage,
             grade: r.grade,
             gpa: r.gpa,
-            course_name: r.course?.name || '—',
-            course_code: r.course?.code || '—',
-            student_name: r.student ? `${r.student.first_name || ''} ${r.student.last_name || ''}`.trim() : 'Student',
+            course_name: r.course_name || r.subject_name || r.course?.name || '—',
+            course_code: r.course_code || r.subject_code || r.course?.code || '—',
+            student_name: r.student_name || (r.student ? `${r.student.first_name || ''} ${r.student.last_name || ''}`.trim() : '') || 'Student',
+            enrollment_no: r.enrollment_no || r.student?.enrollment_no || '—',
             exam_type: r.exam_type || 'Semester End Exam',
             exam_date: r.exam_date || r.entered_at
           }));
@@ -1187,51 +1189,7 @@ export const API = {
         return Array.isArray(row) ? row[0] : row;
       }
 
-      // 21. SEMINARS
-      if (path === 'seminars') {
-        if (method === 'GET') {
-          const localSeminars = localStorage.getItem('mock_seminars');
-          if (localSeminars) return JSON.parse(localSeminars);
-          
-          const defaultSeminars = [
-            {
-              id: 'sem-001',
-              title: 'Introduction to Cloud Computing & AWS',
-              description: 'Learn the fundamentals of cloud infrastructure, virtualization, and key AWS services.',
-              speaker: 'Dr. Rajesh Kumar',
-              seminar_date: '2026-07-15T10:00:00Z',
-              room: 'Seminar Hall 1',
-              target: 'all'
-            },
-            {
-              id: 'sem-002',
-              title: 'Resume Building & Technical Interview Prep',
-              description: 'Crack coding interviews and build an outstanding resume to attract top recruiters.',
-              speaker: 'Swara Mehta (HR Recruiter)',
-              seminar_date: '2026-07-18T14:00:00Z',
-              room: 'Placement Auditorium',
-              target: 'low_placement'
-            }
-          ];
-          localStorage.setItem('mock_seminars', JSON.stringify(defaultSeminars));
-          return defaultSeminars;
-        }
-        if (method === 'POST') {
-          const newSem = {
-            id: 'sem-' + Math.floor(Math.random() * 1000000),
-            title: body.title,
-            description: body.description,
-            speaker: body.speaker,
-            seminar_date: body.seminar_date || new Date().toISOString(),
-            room: body.room || 'TBD',
-            target: body.target || 'all'
-          };
-          const current = JSON.parse(localStorage.getItem('mock_seminars') || '[]');
-          current.push(newSem);
-          localStorage.setItem('mock_seminars', JSON.stringify(current));
-          return newSem;
-        }
-      }
+
 
       // Fallback
       const token = Auth.getToken();
@@ -1408,9 +1366,7 @@ export const DataAPI = {
     markRead: (id)              => API.patch(`notifications?notification_id=eq.${id}`, { is_read: true }),
   },
 
-  seminars: {
-    upcoming: () => API.get('seminars?order=seminar_date.asc'),
-  },
+
 
   audit: {
     log: (actId, act, type, entId) =>

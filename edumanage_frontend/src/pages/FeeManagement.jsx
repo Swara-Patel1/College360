@@ -3,6 +3,8 @@ import { API, Utils } from '../api/client.js';
 import { useAuthStore } from '../store/useAuthStore.js';
 import { Toast } from '../store/useNotifStore.js';
 import Modal from '../components/Modal.jsx';
+import DownloadDropdown from '../components/DownloadDropdown.jsx';
+import { downloadFeesCSV, downloadFeesExcel, downloadFeesPDF } from '../course_utilities/dataExport.js';
 
 export default function FeeManagement() {
   const { user } = useAuthStore();
@@ -13,6 +15,7 @@ export default function FeeManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [dlOpen, setDlOpen] = useState(false);
 
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [paying, setPaying] = useState(null);
@@ -106,6 +109,14 @@ export default function FeeManagement() {
         <div className="page-header-left">
           <h1><i className="bi bi-cash-coin"></i> Fee Management</h1>
           <p>Track and manage student fee payments across the institution.</p>
+        </div>
+        <div className="page-header-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <DownloadDropdown
+            open={dlOpen} setOpen={setDlOpen}
+            onCSV={() => { setDlOpen(false); downloadFeesCSV(filtered, Toast); }}
+            onExcel={() => { setDlOpen(false); downloadFeesExcel(filtered, Toast); }}
+            onPDF={async () => { setDlOpen(false); await downloadFeesPDF(filtered, Toast); }}
+          />
         </div>
       </div>
 

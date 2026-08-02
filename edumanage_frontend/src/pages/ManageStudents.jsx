@@ -3,6 +3,11 @@ import { API } from '../api/client.js';
 import { useAuthStore } from '../store/useAuthStore.js';
 import { Toast } from '../store/useNotifStore.js';
 import Modal from '../components/Modal.jsx';
+import {
+  downloadStudentsCSV,
+  downloadStudentsExcel,
+  downloadStudentsPDF,
+} from '../course_utilities/studentExport.js';
 
 export default function ManageStudents() {
   const { user } = useAuthStore();
@@ -244,6 +249,24 @@ export default function ManageStudents() {
     setEditingStudent(null);
   };
 
+  // ─── Download handlers (logic lives in course_utilities/studentExport.js) ─────
+  const [dlOpen, setDlOpen] = useState(false);
+
+  const downloadCSV = () => {
+    setDlOpen(false);
+    downloadStudentsCSV(filteredStudents, Toast);
+  };
+
+  const downloadExcel = () => {
+    setDlOpen(false);
+    downloadStudentsExcel(filteredStudents, Toast);
+  };
+
+  const downloadPDF = async () => {
+    setDlOpen(false);
+    await downloadStudentsPDF(filteredStudents, Toast);
+  };
+
   // Filter Logic
   const filteredStudents = students.filter(s => {
     const name = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
@@ -281,7 +304,79 @@ export default function ManageStudents() {
           <p>{isAdmin ? 'Manage student enrollments, profiles, and academic status.' : 'View student listings and directory profiles.'}</p>
         </div>
         {isAdmin && (
-          <div className="page-header-right">
+          <div className="page-header-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {/* Download Data dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                className="btn btn-ghost"
+                id="dl-btn"
+                onClick={() => setDlOpen(o => !o)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <i className="bi bi-download"></i> Download Data <i className="bi bi-chevron-down" style={{ fontSize: '0.75rem' }}></i>
+              </button>
+              {dlOpen && (
+                <>
+                  {/* Backdrop to close on outside click */}
+                  <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                    onClick={() => setDlOpen(false)}
+                  />
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 100,
+                    background: 'var(--bg-card)', border: '1px solid var(--border)',
+                    borderRadius: '12px', padding: '6px', minWidth: '170px',
+                    boxShadow: 'var(--shadow-md)', display: 'flex', flexDirection: 'column', gap: '2px',
+                  }}>
+                    <button
+                      id="dl-pdf"
+                      onClick={downloadPDF}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '9px 14px', borderRadius: '8px', border: 'none',
+                        background: 'transparent', color: 'var(--text-primary)',
+                        cursor: 'pointer', fontSize: '0.9rem', width: '100%', textAlign: 'left',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <i className="bi bi-file-earmark-pdf" style={{ color: '#EF4444', fontSize: '1.1rem' }}></i>
+                      Export as PDF
+                    </button>
+                    <button
+                      id="dl-csv"
+                      onClick={downloadCSV}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '9px 14px', borderRadius: '8px', border: 'none',
+                        background: 'transparent', color: 'var(--text-primary)',
+                        cursor: 'pointer', fontSize: '0.9rem', width: '100%', textAlign: 'left',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <i className="bi bi-filetype-csv" style={{ color: '#10B981', fontSize: '1.1rem' }}></i>
+                      Export as CSV
+                    </button>
+                    <button
+                      id="dl-excel"
+                      onClick={downloadExcel}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '9px 14px', borderRadius: '8px', border: 'none',
+                        background: 'transparent', color: 'var(--text-primary)',
+                        cursor: 'pointer', fontSize: '0.9rem', width: '100%', textAlign: 'left',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <i className="bi bi-file-earmark-excel" style={{ color: '#22C55E', fontSize: '1.1rem' }}></i>
+                      Export as Excel
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             <button className="btn btn-primary" onClick={() => { resetForm(); setIsAddOpen(true); }}>
               <i className="bi bi-plus-lg"></i> Add Student
             </button>

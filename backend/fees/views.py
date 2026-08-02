@@ -2,7 +2,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.core.mail import send_mail
+from django.core.mail import send_mail, BadHeaderError
 from django.conf import settings
 from .models import Fee
 from .serializers import FeeSerializer
@@ -66,6 +66,38 @@ class FeeViewSet(viewsets.ModelViewSet):
             'details': details
         })
 
+    @action(detail=False, methods=['post'], url_path='send-reminder')
+    def send_reminder(self, request):
+        """
+        Send a targeted fee reminder email to a specific parent/student.
+        Expected payload: { to_email, subject, body }
+        Returns { success: true } or { success: false, error: "..." }
+        """
+        to_email = request.data.get('to_email', '').strip()
+        subject  = request.data.get('subject', 'Fee Payment Reminder').strip()
+        body     = request.data.get('body', '').strip()
+
+        if not to_email:
+            return Response({'success': False, 'error': 'Recipient email is required.'}, status=400)
+        if not body:
+            return Response({'success': False, 'error': 'Email body cannot be empty.'}, status=400)
+
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@college360.edu')
+
+        try:
+            send_mail(
+                subject,
+                body,
+                from_email,
+                [to_email],
+                fail_silently=False,  # raise on error so we can report it
+            )
+            return Response({'success': True, 'message': f'Email sent to {to_email}'})
+        except BadHeaderError:
+            return Response({'success': False, 'error': 'Invalid email header detected.'}, status=400)
+        except Exception as e:
+            return Response({'success': False, 'error': str(e)}, status=500)
+
     @action(detail=False, methods=['get'])
     def summary(self, request):
         qs = Fee.objects.all()
@@ -76,3 +108,4 @@ class FeeViewSet(viewsets.ModelViewSet):
         overdue = sum(f.amount for f in qs.filter(status='overdue'))
         return Response({'paid': paid, 'pending': pending, 'overdue': overdue,
                          'total': paid + pending + overdue})
+

@@ -114,7 +114,6 @@ export default function FacultyDashboard() {
     { icon: <i className="bi bi-cash-coin" />, label: 'Fees', path: '/hod/fees', color: '#22c55e' },
     { icon: <i className="bi bi-calendar-week" />, label: 'Timetable', path: '/hod/timetable', color: '#f59e0b' },
     { icon: <i className="bi bi-journal-check" />, label: 'Leaves', path: '/hod/leaves', color: '#ec4899' },
-    { icon: <i className="bi bi-mic" />, label: 'Seminars', path: '/hod/seminars', color: '#14b8a6' },
     { icon: <i className="bi bi-star" />, label: 'Feedback', path: '/hod/feedback', color: '#a855f7' },
   ];
 
