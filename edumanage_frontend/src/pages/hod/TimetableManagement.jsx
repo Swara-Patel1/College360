@@ -145,17 +145,18 @@ export default function TimetableManagement() {
   useEffect(() => { if (user) loadData(); }, [user]);
 
   const filteredTimetable = useMemo(() => {
+    const activeDeptId = deptId || (selectedDeptFilter !== 'all' ? selectedDeptFilter : '');
     return timetable.filter(s => {
-      let matchDept = selectedDeptFilter === 'all' || !selectedDeptFilter;
+      let matchDept = !activeDeptId;
       if (!matchDept) {
         const dId = s.department_id || s.course?.department_id || s.faculty?.department_id;
-        const targetDept = departments.find(d => String(d.department_id || d.id) === String(selectedDeptFilter));
+        const targetDept = departments.find(d => String(d.department_id || d.id) === String(activeDeptId));
         const targetName = (targetDept?.name || '').toLowerCase();
         const targetCode = (targetDept?.code || '').toLowerCase();
 
-        const matchId = dId && String(dId) === String(selectedDeptFilter);
+        const matchId = dId && String(dId).toLowerCase() === String(activeDeptId).toLowerCase();
         const matchName = s.department_name && (
-          s.department_name.toLowerCase() === selectedDeptFilter.toLowerCase() ||
+          s.department_name.toLowerCase() === activeDeptId.toLowerCase() ||
           (targetName && s.department_name.toLowerCase() === targetName)
         );
         const matchCode = s._courseCode && targetCode && s._courseCode.toLowerCase().startsWith(targetCode);
@@ -169,7 +170,7 @@ export default function TimetableManagement() {
 
       return matchDept && matchSem;
     });
-  }, [timetable, selectedDeptFilter, selectedSemesterFilter, departments]);
+  }, [timetable, deptId, selectedDeptFilter, selectedSemesterFilter, departments]);
 
   // Clash detection over the currently loaded timetable.
   const { conflicts, slotIds: conflictIds } = useMemo(() => detectConflicts(filteredTimetable), [filteredTimetable]);

@@ -61,26 +61,18 @@ export default function HODPerformance() {
         if (s.user_id) studentMap[String(s.user_id)] = s;
       });
 
-      // 3. Filter low marks records (obtained marks strictly < 70)
+      // Low performers strictly within HOD department
       const rawGrades = Array.isArray(gradesData) ? gradesData : [];
-      let lowAlerts = rawGrades.filter(r => {
+      const lowAlerts = rawGrades.filter(r => {
         const st = studentMap[String(r.student_id)] || r.student || {};
         const sDept = st.department_id || st.department?.id || st.department || r.student?.department_id;
-        const isDept = !currentDeptId || (sDept && String(sDept) === String(currentDeptId));
+        const isDept = currentDeptId ? (sDept && String(sDept).toLowerCase() === String(currentDeptId).toLowerCase()) : true;
 
         const obtained = parseFloat(r.marks_obtained ?? 0);
         const isLow = obtained < 70;
 
         return isDept && isLow;
       });
-
-      // Fallback: if department filter yielded 0 matches, show low marks (obtained < 70) across departments
-      if (lowAlerts.length === 0 && rawGrades.length > 0) {
-        lowAlerts = rawGrades.filter(r => {
-          const obtained = parseFloat(r.marks_obtained ?? 0);
-          return obtained < 70;
-        });
-      }
 
       const formatted = lowAlerts.map(r => {
         const st = studentMap[String(r.student_id)] || r.student || {};

@@ -14,7 +14,6 @@ import StudentContent from '../pages/student/Content.jsx';
 import StudentDoubts from '../pages/student/Doubts.jsx';
 import StudentComplaints from '../pages/student/Complaints.jsx';
 import Notices from '../pages/Notices.jsx';
-import StudentFeedback from '../pages/student/Feedback.jsx';
 import ExamSchedule from '../pages/ExamSchedule.jsx';
 import ExamScheduling from '../pages/admin/ExamScheduling.jsx';
 import AdminGrades from '../pages/admin/Grades.jsx';
@@ -22,7 +21,6 @@ import LibraryManagement from '../pages/admin/LibraryManagement.jsx';
 import StudentLibrary from '../pages/student/Library.jsx';
 import StudentPlacement from '../pages/student/Placement.jsx';
 import StudentFees from '../pages/student/Fees.jsx';
-import HODFeedback from '../pages/hod/Feedback.jsx';
 
 
 import FacultyDashboard from '../pages/faculty/Dashboard.jsx';
@@ -82,7 +80,6 @@ export const AppRoutes = () => {
         <Route path="/student/doubts" element={<MainLayout><StudentDoubts /></MainLayout>} />
         <Route path="/student/complaints" element={<MainLayout><StudentComplaints /></MainLayout>} />
         <Route path="/student/notices" element={<MainLayout><Notices /></MainLayout>} />
-        <Route path="/student/feedback" element={<MainLayout><StudentFeedback /></MainLayout>} />
         <Route path="/student/exams" element={<MainLayout><ExamSchedule /></MainLayout>} />
         <Route path="/student/library" element={<MainLayout><StudentLibrary /></MainLayout>} />
         <Route path="/student/placement" element={<MainLayout><StudentPlacement /></MainLayout>} />
@@ -113,7 +110,6 @@ export const AppRoutes = () => {
         <Route path="/hod/complaints" element={<MainLayout><HODComplaints /></MainLayout>} />
         <Route path="/hod/performance" element={<MainLayout><HODPerformance /></MainLayout>} />
         <Route path="/hod/fees" element={<MainLayout><HODFees /></MainLayout>} />
-        <Route path="/hod/feedback" element={<MainLayout><HODFeedback /></MainLayout>} />
         <Route path="/hod/leaves" element={<MainLayout><HODLeaves /></MainLayout>} />
         <Route path="/hod/timetable" element={<MainLayout><TimetableManagement /></MainLayout>} />
       </Route>

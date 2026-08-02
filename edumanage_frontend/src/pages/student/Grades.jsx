@@ -12,7 +12,7 @@ const EXAM_TYPES = [
 ];
 
 export default function Grades() {
-  const { user } = useAuthStore();
+  const { user, studentProfile } = useAuthStore();
   const [allGrades, setAllGrades] = useState([]);
   const [activeExam, setActiveExam] = useState('All');
   const [selectedSemester, setSelectedSemester] = useState('3');
@@ -27,7 +27,8 @@ export default function Grades() {
     const fetchGrades = async () => {
       try {
         setLoading(true);
-        const data = await API.get('marks');
+        const studentId = studentProfile?.student_id || studentProfile?.id || user?.id;
+        const data = await API.get(`marks?student_id=eq.${studentId}`);
         if (isMounted && data) {
           const list = Array.isArray(data) ? data : (data.results || []);
           setAllGrades(list);

@@ -22,7 +22,6 @@ export default function Sidebar() {
       { type: 'link', label: 'Study Materials', icon: 'bi-journal-bookmark', to: '/student/content' },
       { type: 'link', label: 'Library', icon: 'bi-book-half', to: '/student/library' },
       { type: 'link', label: 'My Doubts Q&A', icon: 'bi-question-circle', to: '/student/doubts' },
-      { type: 'link', label: 'Faculty Feedback', icon: 'bi-star', to: '/student/feedback' },
       { type: 'section', label: 'Finance' },
       { type: 'link', label: 'Fee Payment', icon: 'bi-credit-card', to: '/student/fees' },
       { type: 'section', label: 'Support & Info' },
@@ -58,8 +57,7 @@ export default function Sidebar() {
         { type: 'link', label: 'Leave Requests', icon: 'bi-clipboard-check', to: '/hod/leaves' },
         { type: 'link', label: 'Student Complaints', icon: 'bi-megaphone', to: '/hod/complaints' },
         { type: 'link', label: 'Academic Alerts', icon: 'bi-exclamation-triangle', to: '/hod/performance' },
-        { type: 'link', label: 'Pending Fees', icon: 'bi-cash-coin', to: '/hod/fees' },
-        { type: 'link', label: 'Faculty Feedback', icon: 'bi-star', to: '/hod/feedback' }
+        { type: 'link', label: 'Pending Fees', icon: 'bi-cash-coin', to: '/hod/fees' }
       );
     }
 

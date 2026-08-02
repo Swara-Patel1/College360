@@ -25,19 +25,9 @@ INSTALLED_APPS = [
     'corsheaders',
     # Local apps
     'accounts',
-    'students',
-    'faculty',
-    'courses',
-    'attendance',
-    'grades',
-    'fees',
-    'timetable',
-    'notices',
-    'complaints',
     'chatbot',
-    'campus',
-    'placement',
 ]
+
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

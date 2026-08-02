@@ -62,7 +62,10 @@ INTENT_KEYWORDS = {
 
 def _resolve_student(user, supabase_user_id=None):
     """Find the Student for the request — by auth user, then by the passed id or email."""
-    from students.models import Student
+    try:
+        from students.models import Student
+    except ImportError:
+        return None
     stu = getattr(user, 'student_profile', None)
     if stu:
         return stu
@@ -82,6 +85,7 @@ def _resolve_student(user, supabase_user_id=None):
             or qs.filter(student_id=val).first()
 
     return Student.objects.select_related('user', 'department').first()
+
 
 
 def build_rag_context(user, message, supabase_user_id=None):
@@ -139,7 +143,10 @@ def _detect_intents(message_lower):
 # ── Intent data builders (Django ORM) ────────────────────────────────────────
 
 def _get_attendance_data(student):
-    from attendance.models import AttendanceRecord
+    try:
+        from attendance.models import AttendanceRecord
+    except ImportError:
+        return "📊 ATTENDANCE DATA:\nNo attendance records found."
     records = AttendanceRecord.objects.filter(student=student).select_related('course')
     if not records:
         return "📊 ATTENDANCE DATA:\nNo attendance records found."
@@ -164,7 +171,10 @@ def _get_attendance_data(student):
 
 
 def _get_grades_data(student):
-    from grades.models import Grade
+    try:
+        from grades.models import Grade
+    except ImportError:
+        return "📝 GRADES DATA:\nNo grade records found."
     records = Grade.objects.filter(student=student).select_related('course')
     if not records:
         return "📝 GRADES DATA:\nNo grade records found."
@@ -191,7 +201,10 @@ def _get_grades_data(student):
 
 
 def _get_timetable_data(student):
-    from timetable.models import Schedule
+    try:
+        from timetable.models import Schedule
+    except ImportError:
+        return "📅 TIMETABLE:\nNo classes scheduled."
     schedules = (Schedule.objects.filter(
         course__department=student.department, course__semester=student.semester, is_active=True)
         .select_related('course', 'faculty__user'))
@@ -218,7 +231,10 @@ def _get_timetable_data(student):
 
 
 def _get_fees_data(student):
-    from fees.models import Fee
+    try:
+        from fees.models import Fee
+    except ImportError:
+        return "💰 FEES DATA:\nNo fee records found."
     fees = Fee.objects.filter(student=student)
     if not fees:
         return "💰 FEES DATA:\nNo fee records found."
@@ -239,7 +255,10 @@ def _get_fees_data(student):
 
 
 def _get_notices_data():
-    from notices.models import Notice
+    try:
+        from notices.models import Notice
+    except ImportError:
+        return "📢 NOTICES:\nNo active notices."
     notices = Notice.objects.filter(is_active=True).order_by('-created_at')[:5]
     if not notices:
         return "📢 NOTICES:\nNo active notices."
@@ -253,7 +272,10 @@ def _get_notices_data():
 
 
 def _get_courses_data(student):
-    from courses.models import Enrollment
+    try:
+        from courses.models import Enrollment
+    except ImportError:
+        return "📚 ENROLLED COURSES:\nNo active course enrollments found."
     enrollments = (Enrollment.objects.filter(student=student, is_active=True)
                    .select_related('course'))
     if not enrollments:
@@ -267,7 +289,7 @@ def _get_courses_data(student):
 
 def _get_placement_data(student):
     lines = ["🎯 PLACEMENT ELIGIBILITY:"]
-    lines.append(f"• Department: {student.department.name if student.department else 'N/A'}")
+    lines.append(f"• Department: {student.department.name if getattr(student, 'department', None) else 'N/A'}")
     try:
         from placement.service import compute_placement
         score = compute_placement(student)
@@ -282,7 +304,10 @@ def _get_placement_data(student):
 
 
 def _get_complaints_data(student):
-    from complaints.models import Complaint
+    try:
+        from complaints.models import Complaint
+    except ImportError:
+        return "📣 COMPLAINTS:\nNo complaints filed."
     complaints = Complaint.objects.filter(student=student).order_by('-created_at')[:5]
     if not complaints:
         return "📣 COMPLAINTS:\nNo complaints filed."
@@ -312,3 +337,4 @@ def _get_summary_data(student):
     except Exception:
         pass
     return "📋 QUICK SUMMARY:\n" + "\n".join(parts) if parts else ""
+

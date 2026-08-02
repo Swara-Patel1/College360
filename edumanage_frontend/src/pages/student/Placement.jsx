@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { API, SupaAPI } from '../../api/client.js';
+import { API } from '../../api/client.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
@@ -7,7 +7,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 export default function Placement() {
-  const { user } = useAuthStore();
+  const { user, studentProfile } = useAuthStore();
   const [scoreData, setScoreData] = useState(null);
   const [companies, setCompanies] = useState([]);
   const [filteredCompanies, setFilteredCompanies] = useState([]);
@@ -17,19 +17,18 @@ export default function Placement() {
   const fetchScoreAndCompanies = async () => {
     try {
       setLoading(true);
-      const profile = await API.get('students/my_profile');
-      console.log('Fetched student profile:', profile);
-      if (!profile) return;
-      
+      // Get student_id from auth store or profile
+      const studentId = studentProfile?.student_id || studentProfile?.id;
+
       const [scoreRows, companyRows] = await Promise.all([
-        SupaAPI.placement.forStudent(profile.id),
-        SupaAPI.companies.all()
+        studentId
+          ? API.get(`placement_scores?student_id=eq.${studentId}`).catch(() => [])
+          : API.get('placement_scores').catch(() => []),
+        API.get('placement_companies').catch(() => [])
       ]);
-      console.log('Fetched scoreRows:', scoreRows);
-      console.log('Fetched companyRows:', companyRows);
-      
+
       const ps = Array.isArray(scoreRows) ? scoreRows[0] : (scoreRows?.results?.[0] || null);
-      setScoreData(ps);
+      setScoreData(ps || null);
       const comps = Array.isArray(companyRows) ? companyRows : (companyRows?.results || []);
       setCompanies(comps);
       setFilteredCompanies(comps);
@@ -44,6 +43,7 @@ export default function Placement() {
     if (!user) return;
     fetchScoreAndCompanies();
   }, [user]);
+
 
   // Apply local filtering to companies list
   useEffect(() => {

@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import StudyMaterial, Doubt, FacultyFeedback, Backlog, Exam
+from .models import StudyMaterial, Doubt, Backlog, Exam
+
 
 
 @admin.register(Exam)
@@ -32,9 +33,6 @@ class DoubtAdmin(admin.ModelAdmin):
     search_fields = ('question',)
 
 
-@admin.register(FacultyFeedback)
-class FacultyFeedbackAdmin(admin.ModelAdmin):
-    list_display = ('faculty', 'course', 'overall', 'is_anonymous', 'created_at')
-    list_filter = ('is_anonymous', 'academic_year')
+
 
 

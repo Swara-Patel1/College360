@@ -35,21 +35,13 @@ export default function Content() {
             } catch (e) {}
           }
 
-          const [enrollData, coursesData] = await Promise.all([
-            API.get('enrollments').catch(() => []),
-            API.get('courses').catch(() => [])
-          ]);
+          const enrollData = await API.get(`enrollments?user_id=${user.id}`).catch(() => []);
 
-          const myCourseIds = new Set((enrollData || []).map(e => String(e.course || e.course_id || e.subject_id)).filter(Boolean));
-
-          const currentSemCourses = (coursesData || []).filter(c => {
-            const isEnrolled = myCourseIds.has(String(c.id)) || myCourseIds.has(String(c.subject_id));
-            const isCurrentSem = !currentSem || String(c.semester) === String(currentSem);
-            return isEnrolled && isCurrentSem;
-          });
-
+          // Build subject ID set directly from enrollment records
           currentSemSubjectIds = new Set(
-            currentSemCourses.flatMap(c => [String(c.id), String(c.subject_id)]).filter(Boolean)
+            (enrollData || []).flatMap(e => [
+              e.subject_id, e.course_id, e.course, e.id
+            ]).filter(Boolean).map(String)
           );
 
           if (isMounted) setEnrolledSubjectIds(currentSemSubjectIds);
@@ -58,8 +50,9 @@ export default function Content() {
         const data = await API.get('content');
         if (isMounted) {
           let content = Array.isArray(data) ? data : (data?.results || []);
-          // For students: only show content from their current semester subjects
-          if (user.role === 'student' && currentSemSubjectIds) {
+          // For students: only show content from their enrolled subjects
+          // If we have enrolled subject IDs, filter — otherwise show all content
+          if (user.role === 'student' && currentSemSubjectIds && currentSemSubjectIds.size > 0) {
             content = content.filter(c => c.subject_id && currentSemSubjectIds.has(String(c.subject_id)));
           }
           setAllContent(content);
@@ -69,6 +62,7 @@ export default function Content() {
       } finally {
         if (isMounted) setLoading(false);
       }
+
     };
 
     fetchContent();

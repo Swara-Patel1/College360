@@ -33,6 +33,8 @@ export default function HODDashboard() {
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [hodDeptName, setHodDeptName] = useState('');
+
   useEffect(() => {
     if (!user) return;
     const loadHODData = async () => {
@@ -41,38 +43,68 @@ export default function HODDashboard() {
         setProfile(prof);
 
         let deptId = prof?.department_id || prof?.department?.id || (typeof prof?.department === 'string' ? prof.department : '');
+        let dName = prof?.department_name || prof?.department?.name || '';
+
         try {
           const query = user?.id ? `hod/check?user_id=eq.${user.id}` : (user?.email ? `hod/check?email=eq.${user.email}` : 'hod/check');
           const hodCheck = await API.get(query);
           if (hodCheck && (hodCheck.department_id || hodCheck.hod?.department_id)) {
             deptId = hodCheck.department_id || hodCheck.hod?.department_id || deptId;
+            dName = hodCheck.dept_name || hodCheck.hod?.dept_name || dName;
           }
         } catch (_) {}
+
+        setHodDeptName(dName || 'Computer Engineering');
 
         const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
         const facultyEndpoint = deptId ? `faculty?department_id=${deptId}&limit=1000` : 'faculty?limit=1000';
         const studentsEndpoint = deptId ? `students?department_id=${deptId}&limit=1000` : 'students?limit=1000';
+        const coursesEndpoint = deptId ? `courses?department_id=${deptId}&limit=1000` : 'courses?limit=1000';
+        const complaintsEndpoint = deptId ? `complaints?department_id=${deptId}&limit=1000` : 'complaints?limit=1000';
 
         const [facList, studList, courseList, compList, todaySchedule] = await Promise.all([
           API.get(facultyEndpoint),
           API.get(studentsEndpoint),
-          API.get('courses'),
-          API.get('complaints'),
+          API.get(coursesEndpoint),
+          API.get(complaintsEndpoint),
           prof?.id ? API.get(`timetable?day=${todayName}&faculty=${prof.id}`) : []
         ]);
 
         if (deptId) {
           const targetId = String(deptId).toLowerCase();
-          setDeptFaculty((facList || []).filter(f => String(f.department_id || f.department?.id || f.department || '').toLowerCase() === targetId));
-          setDeptStudents((studList || []).filter(s => String(s.department_id || s.department?.id || s.department?.department_id || s.department || '').toLowerCase() === targetId));
-          setDeptCourses((courseList || []).filter(c => String(c.department_id || c.department?.id || c.department || '').toLowerCase() === targetId));
-        } else {
-          setDeptFaculty(facList || []);
-          setDeptStudents(studList || []);
-          setDeptCourses(courseList || []);
-        }
+          const targetName = String(dName || prof?.department_name || prof?.department?.name || '').toLowerCase();
 
-        setComplaints((compList || []).filter(c => c.status === 'pending' || c.status === 'open'));
+          setDeptFaculty((facList || []).filter(f => {
+            const dId = String(f.department_id || f.department?.department_id || f.department?.id || '').toLowerCase();
+            const fName = String(f.department_name || f.department?.name || (typeof f.department === 'string' ? f.department : '')).toLowerCase();
+            return dId === targetId || (targetName && fName && fName === targetName);
+          }));
+
+          setDeptStudents((studList || []).filter(s => {
+            const dId = String(s.department_id || s.department?.department_id || s.department?.id || '').toLowerCase();
+            const sName = String(s.department_name || s.department?.name || (typeof s.department === 'string' ? s.department : '')).toLowerCase();
+            return dId === targetId || (targetName && sName && sName === targetName);
+          }));
+
+          setDeptCourses((courseList || []).filter(c => {
+            const dId = String(c.department_id || c.department?.department_id || c.department?.id || '').toLowerCase();
+            const cName = String(c.department_name || c.department?.name || (typeof c.department === 'string' ? c.department : '')).toLowerCase();
+            return dId === targetId || (targetName && cName && cName === targetName);
+          }));
+          
+          // Filter complaints by HOD department
+          const deptComp = (compList || []).filter(c => {
+            const cDeptId = String(c.department_id || c.department?.department_id || c.department?.id || c.student?.department_id || c.student?.department?.department_id || '').toLowerCase();
+            const cDeptName = String(c.department_name || c.department?.name || c.student?.department_name || c.student?.department?.name || (typeof c.department === 'string' ? c.department : '')).toLowerCase();
+            return cDeptId === targetId || (targetName && cDeptName && cDeptName === targetName);
+          });
+          setComplaints(deptComp.filter(c => c.status === 'pending' || c.status === 'open'));
+        } else {
+          setDeptFaculty([]);
+          setDeptStudents([]);
+          setDeptCourses([]);
+          setComplaints([]);
+        }
         setSchedule(todaySchedule || []);
       } catch (e) {
         console.error('Failed to load HOD dashboard data:', e);
@@ -89,7 +121,6 @@ export default function HODDashboard() {
     { icon: <i className="bi bi-megaphone" />, label: 'Complaints', path: '/hod/complaints', color: '#ef4444' },
     { icon: <i className="bi bi-exclamation-triangle" />, label: 'Academic Alerts', path: '/hod/performance', color: '#8b5cf6' },
     { icon: <i className="bi bi-cash-coin" />, label: 'Pending Fees', path: '/hod/fees', color: '#22c55e' },
-    { icon: <i className="bi bi-star" />, label: 'Faculty Feedback', path: '/hod/feedback', color: '#a855f7' },
   ];
 
   const teachingActions = [
@@ -98,7 +129,7 @@ export default function HODDashboard() {
     { icon: <i className="bi bi-broadcast" />, label: 'Notices', path: '/faculty/notices', color: '#f59e0b' },
   ];
 
-  const deptName = profile?.department_name || 'Department';
+  const deptName = hodDeptName || profile?.department_name || profile?.department?.name || 'Computer Engineering';
 
   return (
     <div className="admin-dashboard">

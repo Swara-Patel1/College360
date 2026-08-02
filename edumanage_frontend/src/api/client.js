@@ -36,7 +36,14 @@ export const SupaFetch = {
 
     const res = await fetch(url, opts);
     if (res.status === 204) return null;
-    const data = await res.json();
+    const contentType = res.headers.get('content-type') || '';
+    let data;
+    if (contentType.includes('application/json')) {
+      data = await res.json();
+    } else {
+      const text = await res.text();
+      throw { error: `Server error (${res.status}): ${res.statusText}` };
+    }
     if (!res.ok) throw data;
     return data;
   }
@@ -74,13 +81,19 @@ export const API = {
         const emailInput = body.email || body.username;
         const password = body.password;
 
-        // Call Django DRF login endpoint
         const res = await fetch(`${SUPABASE_URL}/api/auth/login/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: emailInput, password }),
         });
-        const loginData = await res.json();
+        const contentType = res.headers.get('content-type') || '';
+        let loginData;
+        if (contentType.includes('application/json')) {
+          loginData = await res.json();
+        } else {
+          const text = await res.text();
+          throw { error: `Server error (${res.status}): Please check backend server` };
+        }
         if (!res.ok) throw loginData;
 
         const dbUser = loginData.user;
@@ -148,10 +161,11 @@ export const API = {
                   const s = rows[0];
                   localStorage.setItem('student_profile', JSON.stringify({
                     ...s,
-                    id: s.student_id,
-                    student_id: s.enrollment_no,
+                    id: s.student_id || s.id,
+                    student_id: s.student_id || s.id,
+                    enrollment_no: s.enrollment_no || '',
                     user_id: loggedInUser.id,
-                    department_name: s.department?.name || '—',
+                    department_name: s.department?.name || s.department_name || '—',
                     semester: s.current_semester?.number || s.semester || '—',
                     year_of_study: s.current_semester?.number ? Math.ceil(s.current_semester.number / 2) : (s.year_of_study || '—'),
                     user: s.user
@@ -169,7 +183,8 @@ export const API = {
         const result = {
           ...s,
           id: s.student_id || s.id,
-          student_id: s.enrollment_no || s.student_id,
+          student_id: s.student_id || s.id,
+          enrollment_no: s.enrollment_no || '',
           user_id: loggedInUser.id,
           department_name: s.department?.name || s.department_name || '—',
           semester: s.current_semester?.number || s.semester || '—',
@@ -199,15 +214,20 @@ export const API = {
 
       // 4b. COURSES / SUBJECTS LIST
       if (path === 'courses' || path === 'subjects') {
-        const rows = await SupaFetch.request('courses');
+        const qStr = queryStr || '';
+        const reqUrl = `courses${qStr ? '?' + qStr : ''}`;
+        const rows = await SupaFetch.request(reqUrl);
         return (Array.isArray(rows) ? rows : []).map(c => ({
           ...c,
           id: c.subject_id || c.id,
           faculty_id: c.faculty_id || c.faculty?.faculty_id || c.faculty?.id,
           subject_id: c.subject_id || c.id,
+          department_id: c.department_id || c.department?.department_id || c.department?.id || '',
+          department_name: c.department_name || c.department?.name || (typeof c.department === 'string' ? c.department : '—'),
         }));
       }
 
+      // 5. ALL STUDENTS LIST
       // 5. ALL STUDENTS LIST
       if (path === 'students') {
         if (method === 'GET') {
@@ -217,8 +237,9 @@ export const API = {
           return (Array.isArray(rows) ? rows : []).map(s => ({
             ...s,
             id: s.student_id || s.id,
-            student_id: s.enrollment_no || s.student_id,
-            enrollment_no: s.enrollment_no || s.student_id || '',
+            student_id: s.student_id || s.id,
+            department_id: s.department_id || s.department?.department_id || s.department?.id || '',
+            enrollment_no: s.enrollment_no || '',
             department_name: s.department?.name || s.department_name || '—',
             semester: s.current_semester?.number || s.semester || '—',
             year_of_study: s.year_of_study || (s.current_semester?.number ? Math.ceil(s.current_semester.number / 2) : '—'),
@@ -265,10 +286,14 @@ export const API = {
       // 7. ALL FACULTY LIST / CRUD
       if (path === 'faculty') {
         if (method === 'GET') {
-          const rows = await SupaFetch.request('faculty?select=*,user:users(*),department:departments(*)&order=employee_id.asc');
-          return rows.map(f => ({
+          const qStr = queryStr || '';
+          const reqUrl = `faculty?select=*,user:users(*),department:departments(*)&order=employee_id.asc${qStr ? '&' + qStr : ''}`;
+          const rows = await SupaFetch.request(reqUrl);
+          return (Array.isArray(rows) ? rows : []).map(f => ({
             ...f,
             id: f.faculty_id,
+            faculty_id: f.faculty_id,
+            department_id: f.department_id || f.department?.department_id || f.department?.id || '',
             email: f.user?.email || '',
             status: f.user?.is_active !== false ? 'active' : 'inactive',
             department_name: f.department?.name || '—',
@@ -922,11 +947,15 @@ export const API = {
       // 15. COMPLAINTS
       if (path === 'complaints') {
         if (method === 'GET') {
-          const rows = await SupaFetch.request('grievances?select=*,student:students(*,user:users(*))&order=submitted_at.desc');
-          return rows.map(c => ({
+          const qStr = queryStr || '';
+          const reqUrl = `grievances?select=*,student:students(*,user:users(*))&order=submitted_at.desc${qStr ? '&' + qStr : ''}`;
+          const rows = await SupaFetch.request(reqUrl);
+          return (Array.isArray(rows) ? rows : []).map(c => ({
             ...c,
             created_at: c.submitted_at,
-            student_name: c.is_anonymous ? 'Anonymous Student' : `${c.student?.first_name || ''} ${c.student?.last_name || ''}`,
+            department_id: c.department_id || c.student_department_id || c.student?.department_id || c.student?.department?.department_id || '',
+            department_name: c.dept_name || c.department_name || c.student?.department_name || c.student?.department?.name || '—',
+            student_name: c.is_anonymous ? 'Anonymous Student' : `${c.student?.first_name || ''} ${c.student?.last_name || ''}`.trim() || 'Student',
           }));
         }
         if (method === 'POST') {
@@ -1265,12 +1294,6 @@ export const DataAPI = {
     all:       ()       => API.get('backlogs'),
     register:  (id, date) => API.patch(`backlogs?backlog_id=eq.${id}`, { action: 'register', reexam_date: date }),
     clear:     (id, marks) => API.patch(`backlogs?backlog_id=eq.${id}`, { action: 'clear', marks_obtained: marks }),
-  },
-
-  feedback: {
-    summary:   (deptId) => API.get(`faculty_feedback/summary${deptId ? `?department=${deptId}` : ''}`),
-    byFaculty: (facId)  => API.get(`faculty_feedback?faculty_id=eq.${facId}&order=created_at.desc`),
-    submit:    (data)   => API.post('faculty_feedback', data),
   },
 
   sendEmail: (data) => API.post('send-email', data),

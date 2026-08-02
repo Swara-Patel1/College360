@@ -46,20 +46,15 @@ export default function HODFees() {
 
       const rawPayments = Array.isArray(feeData) ? feeData : [];
 
-      // Filter by HOD department and pending/partial/overdue status
-      let deptPending = rawPayments.filter(p => {
+      // Filter strictly by HOD department and pending/partial/overdue status
+      const deptPending = rawPayments.filter(p => {
         const st = studentMap[String(p.student_id)] || p.student || {};
         const sDept = st.department_id || st.department?.id || st.department || p.student?.department_id;
-        const isDept = !currentDeptId || (sDept && String(sDept) === String(currentDeptId));
+        const isDept = currentDeptId ? (sDept && String(sDept).toLowerCase() === String(currentDeptId).toLowerCase()) : true;
         const stStatus = String(p.status || '').toLowerCase();
         const isPending = stStatus !== 'paid';
         return isDept && isPending;
       });
-
-      // Fallback: if department filter yields 0 defaulters, show all pending fee defaulters across departments
-      if (deptPending.length === 0 && rawPayments.length > 0) {
-        deptPending = rawPayments.filter(p => String(p.status || '').toLowerCase() !== 'paid');
-      }
 
       const formatted = deptPending.map(p => {
         const st = studentMap[String(p.student_id)] || p.student || {};

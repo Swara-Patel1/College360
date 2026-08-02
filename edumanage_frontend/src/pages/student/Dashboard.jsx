@@ -51,12 +51,12 @@ export default function StudentDashboard() {
         const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
         const timetableUrl = `timetable?day=${todayDay}&user_id=${user.id}${deptId ? `&department_id=${deptId}` : ''}${semId ? `&semester_id=${semId}` : ''}`;
         const [gradesData, feesData, attData, noticesData, classesData, subjsData] = await Promise.all([
-          safeGet(`grades?student=${studUuid}`),
-          safeGet(`fees?student=${studUuid}`),
+          safeGet(`marks?student_id=eq.${studUuid}`),
+          safeGet(`fee_payments?student_id=eq.${studUuid}`),
           safeGet(`attendance/stats?student=${studUuid}${semId ? `&semester_id=${semId}` : ''}`),
           safeGet('notices?audience=students'),
           safeGet(timetableUrl),
-          deptId && semId ? safeGet(`subjects?department_id=${deptId}&semester_id=${semId}`) : safeGet(`courses/enrollments?student=${studUuid}`)
+          deptId && semId ? safeGet(`subjects?department_id=${deptId}&semester_id=${semId}`) : safeGet(`enrollments?user_id=${user.id}`)
         ]);
         if (!isMounted) return;
         setGrades(gradesData || []);

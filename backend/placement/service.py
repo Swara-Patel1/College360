@@ -1,7 +1,6 @@
 from django.db import connection
 from django.utils import timezone
 
-from .models import PlacementCompany
 from . import ml
 
 

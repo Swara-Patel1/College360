@@ -10,17 +10,5 @@ urlpatterns = [
     path('rest/v1/<path:table>', RestV1View.as_view(), name='rest-v1'),
     # Django DRF API endpoints
     path('api/auth/', include('accounts.urls')),
-    path('api/students/', include('students.urls')),
-    path('api/faculty/', include('faculty.urls')),
-    path('api/courses/', include('courses.urls')),
-    path('api/attendance/', include('attendance.urls')),
-    path('api/grades/', include('grades.urls')),
-    path('api/fees/', include('fees.urls')),
-    path('api/timetable/', include('timetable.urls')),
-    path('api/notices/', include('notices.urls')),
-    path('api/complaints/', include('complaints.urls')),
     path('api/chat/', include('chatbot.urls')),
-    path('api/placement/', include('placement.urls')),
-    path('api/reports/', include('reports.urls')),
-    path('api/analytics/', include('analytics.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

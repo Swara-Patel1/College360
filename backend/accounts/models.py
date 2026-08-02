@@ -28,8 +28,12 @@ class User(AbstractUser):
         else:
             self.password = raw_password
 
+    class Meta:
+        db_table = 'users'
+
     def __str__(self):
         return f"{self.get_full_name()} ({self.role})"
+
 
 
 
