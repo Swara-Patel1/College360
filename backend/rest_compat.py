@@ -957,6 +957,36 @@ def handle_hod(request, params, body):
 
 @handler('semesters')
 def handle_semesters(request, params, body):
+    # Return the REAL semester rows (with their DB semester_id UUIDs) so that
+    # dropdown option values match students.current_semester_id / marks.semester_id
+    # / subjects.semester_id. Returning synthetic 'sem-0N' slugs here silently broke
+    # every "filter by semester" control (the slug never equalled the stored UUID).
+    from django.db import connection
+    active = params.get('is_active', '')
+    where = ''
+    args = []
+    if active.startswith('eq.'):
+        where = ' WHERE is_active = %s'
+        args.append(active[3:].lower() in ('true', '1', 't'))
+    try:
+        with connection.cursor() as cur:
+            cur.execute(
+                f"SELECT semester_id, number, academic_year, is_active FROM semesters{where} ORDER BY number ASC",
+                args,
+            )
+            rows = cur.fetchall()
+        if rows:
+            return [{
+                'semester_id': str(sid),
+                'id': str(sid),
+                'number': num,
+                'name': f'Semester {num}',
+                'academic_year': ay or '',
+                'is_active': bool(act),
+            } for (sid, num, ay, act) in rows]
+    except Exception as e:
+        print('handle_semesters error:', e)
+    # Fallback to synthetic list only if the table can't be read.
     return [serialize_semester(n) for n in range(1, 9)]
 
 
@@ -1405,9 +1435,9 @@ def handle_subjects(request, params, body):
             LEFT JOIN faculty f ON f.faculty_id = t.faculty_id
             LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(f.user_id AS TEXT)
             LEFT JOIN faculty f2 ON f2.subject_id = sub.subject_id
-            LEFT JOIN users u2 ON u2.id = f2.user_id
+            LEFT JOIN users u2 ON CAST(u2.id AS TEXT) = CAST(f2.user_id AS TEXT)
             LEFT JOIN faculty f3 ON f3.department_id = sub.department_id
-            LEFT JOIN users u3 ON u3.id = f3.user_id
+            LEFT JOIN users u3 ON CAST(u3.id AS TEXT) = CAST(f3.user_id AS TEXT)
             WHERE 1=1
         """
         args = []
@@ -1979,10 +2009,12 @@ def handle_faculty_leaves(request, params, body):
     import uuid
 
     user_id = params.get('user_id') or getattr(request, 'user_id', None)
+    if user_id and str(user_id).startswith('eq.'):
+        user_id = str(user_id)[3:]
     faculty_id = None
     if user_id:
         with connection.cursor() as cur:
-            cur.execute("SELECT faculty_id FROM faculty WHERE user_id = %s LIMIT 1", [user_id])
+            cur.execute("SELECT faculty_id FROM faculty WHERE CAST(user_id AS TEXT) = %s LIMIT 1", [str(user_id)])
             r = cur.fetchone()
             if r:
                 faculty_id = str(r[0])
@@ -2175,10 +2207,12 @@ def handle_faculty_interchange(request, params, body):
     import uuid, json
 
     user_id = params.get('user_id') or getattr(request, 'user_id', None)
+    if user_id and str(user_id).startswith('eq.'):
+        user_id = str(user_id)[3:]
     faculty_id = None
     if user_id:
         with connection.cursor() as cur:
-            cur.execute("SELECT faculty_id FROM faculty WHERE user_id = %s LIMIT 1", [user_id])
+            cur.execute("SELECT faculty_id FROM faculty WHERE CAST(user_id AS TEXT) = %s LIMIT 1", [str(user_id)])
             r = cur.fetchone()
             if r:
                 faculty_id = str(r[0])
@@ -2793,6 +2827,7 @@ def handle_timetable(request, params, body):
             SELECT t.timetable_id, t.class_section_id, t.subject_id, t.faculty_id, t.department_id AS t_dept_id,
                    t.day_of_week, t.start_time, t.end_time, t.room_no, t.is_active,
                    sub.name AS subject_name, sub.code AS subject_code, sub.department_id AS sub_dept_id,
+                   sub.semester_id AS semester_id, sem.number AS sem_number,
                    f.first_name AS fac_first, f.last_name AS fac_last, f.department_id AS fac_dept_id,
                    u.email AS fac_email
             FROM timetable t
@@ -3267,6 +3302,8 @@ def handle_student_profile(request, params, body):
 def handle_faculty_profile(request, params, body):
     from django.db import connection
     user_id = params.get('user_id')
+    if user_id and user_id.startswith('eq.'):
+        user_id = user_id[3:]
     if not user_id and hasattr(request, 'user') and request.user.is_authenticated:
         user_id = str(request.user.pk)
     if not user_id:
@@ -6268,8 +6305,14 @@ def handle_users(request, params, body):
         limit_param = params.get('limit', '2000').replace('eq.', '').strip()
         limit = int(limit_param) if limit_param.isdigit() else 2000
 
+        # DISTINCT ON (u.id): a user can have >1 students/faculty row linked to the
+        # same user_id, and the LEFT JOINs fan out to duplicate rows per user. Duplicate
+        # ids then collide as React keys on the frontend and break list rendering
+        # (e.g. the role filter appeared to do nothing). Dedupe to one row per user.
         sql = """
-            SELECT u.id, u.email, u.role::text AS role, u.is_active, u.created_at, u.last_login,
+            SELECT * FROM (
+            SELECT DISTINCT ON (u.id)
+                   u.id, u.email, u.role::text AS role, u.is_active, u.created_at, u.last_login,
                    COALESCE(s.first_name, f.first_name, '') AS first_name,
                    COALESCE(s.last_name, f.last_name, '') AS last_name
             FROM users u
@@ -6292,7 +6335,7 @@ def handle_users(request, params, body):
             s_like = f"%{search_param.lower()}%"
             args.extend([s_like, s_like, s_like, s_like, s_like])
 
-        sql += " ORDER BY u.created_at DESC LIMIT %s"
+        sql += " ORDER BY u.id) sub ORDER BY created_at DESC LIMIT %s"
         args.append(limit)
 
         with connection.cursor() as cur:

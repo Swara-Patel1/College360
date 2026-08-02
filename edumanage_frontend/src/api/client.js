@@ -813,8 +813,15 @@ export const API = {
         });
       }
 
-      // 13. FEES — ADMIN / GENERAL LIST
+      // 13. FEES — ADMIN / GENERAL LIST (or a single student's fees when scoped)
       if (path === 'admin/fees' || path === 'fee_payments') {
+        // Honor a student_id/student filter — otherwise a student's dashboard would
+        // sum every student's dues (the "Fees Due" card showed the whole college's total).
+        const studentUuid = (params.get('student_id') || params.get('student') || '').replace('eq.', '');
+        if (studentUuid) {
+          const rows = await SupaFetch.request(`fee_payments?student_id=eq.${encodeURIComponent(studentUuid)}`);
+          return Array.isArray(rows) ? rows : [];
+        }
         const rows = await SupaFetch.request('admin/fees');
         return Array.isArray(rows) ? rows : [];
       }
@@ -973,16 +980,25 @@ export const API = {
 
       // 16. HOD CHECK (real HOD, or a deputy acting via delegation)
       if (path === 'hod/check') {
-        const hodRow = await SupaFetch.request(`hod?user_id=eq.${loggedInUser.id}`);
-        if (hodRow?.length) return { isHod: true, hod: hodRow[0], viaDelegation: false };
+        // Primary HOD resolution happens server-side: the backend endpoint maps the
+        // user (by id or email) to a department robustly. The old client-side lookup
+        // queried `hod?user_id=eq.<numeric id>`, but hod.user_id holds UUIDs, so it
+        // never matched and returned no department_id (all HOD dashboard cards read 0).
+        const suffix = queryStr ? `?${queryStr}` : `?user_id=eq.${loggedInUser?.id || ''}`;
+        const serverCheck = await SupaFetch.request(`hod/check${suffix}`).catch(() => null);
+        if (serverCheck?.isHod && (serverCheck.department_id || serverCheck.hod?.department_id)) {
+          return { viaDelegation: false, ...serverCheck };
+        }
+        // Fall back to a delegation (deputy HOD) grant.
         const acc = await SupaFetch.request(`hod/my-access?user_id=eq.${loggedInUser.id}`).catch(() => null);
         if (acc?.isDelegate) {
           return {
             isHod: true, viaDelegation: true, scopes: acc.scopes,
-            hod: { hod_id: acc.delegator_hod_id, department_id: acc.department_id, delegator_name: acc.delegator_name },
+            department_id: acc.department_id, dept_name: acc.department_name,
+            hod: { hod_id: acc.delegator_hod_id, department_id: acc.department_id, dept_name: acc.department_name, delegator_name: acc.delegator_name },
           };
         }
-        return { isHod: false, hod: null };
+        return serverCheck || { isHod: false, hod: null };
       }
 
       // 17. FACULTY LEAVE
