@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { API } from '../../api/client.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
+import { Toast } from '../../store/useNotifStore.js';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 
@@ -13,10 +14,11 @@ export default function Placement() {
   const [filteredCompanies, setFilteredCompanies] = useState([]);
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [rePredicting, setRePredicting] = useState(false);
 
-  const fetchScoreAndCompanies = async () => {
+  const fetchScoreAndCompanies = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       // Get student_id from auth store or profile
       const studentId = studentProfile?.student_id || studentProfile?.id;
 
@@ -35,7 +37,24 @@ export default function Placement() {
     } catch (e) {
       console.error('Failed to load placement predictor data:', e);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
+    }
+  };
+
+  const handleRePredict = async () => {
+    try {
+      setRePredicting(true);
+      const studentId = studentProfile?.student_id || studentProfile?.id;
+      if (studentId) {
+        await API.post('placement/re_predict/', { student_id: studentId }).catch(() => null);
+      }
+      await fetchScoreAndCompanies(false);
+      Toast.success('Placement prediction updated successfully!');
+    } catch (err) {
+      console.error(err);
+      Toast.error('Failed to re-calculate placement prediction.');
+    } finally {
+      setRePredicting(false);
     }
   };
 
@@ -122,10 +141,31 @@ export default function Placement() {
 
   return (
     <>
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div className="page-header-left">
           <h1><i className="bi bi-bullseye"></i> Placement Eligibility Predictor</h1>
           <p>Real-time analytics and company matching dashboard.</p>
+        </div>
+        <div className="page-header-right">
+          <button 
+            className="btn btn-primary"
+            disabled={rePredicting || loading}
+            onClick={handleRePredict}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: 600,
+              borderRadius: '10px',
+              padding: '9px 18px',
+              fontSize: '0.88rem',
+              boxShadow: '0 4px 14px rgba(108, 99, 255, 0.35)',
+              cursor: rePredicting ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <i className={`bi bi-arrow-repeat ${rePredicting ? 'spin' : ''}`} style={{ fontSize: '1.05rem' }}></i>
+            {rePredicting ? 'Re-predicting...' : 'Re-Predict'}
+          </button>
         </div>
       </div>
 

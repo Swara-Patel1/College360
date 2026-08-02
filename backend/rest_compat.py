@@ -406,11 +406,20 @@ def serialize_hod(u):
     """Represent admin/hod users in the hod table format."""
     fac = Faculty.objects.filter(user=u).first()
     dept = fac.department if fac else None
+    first = getattr(u, 'first_name', '') or (fac.first_name if fac else '')
+    last = getattr(u, 'last_name', '') or (fac.last_name if fac else '')
+    email = getattr(u, 'email', '') or (fac.email if fac else '')
+    if not email and first and last:
+        email = f"{first.lower().replace(' ', '')}.{last.lower().replace(' ', '')}@lju.edu.in"
     return {
         'hod_id': str(u.pk),
         'id': str(u.pk),
         'user_id': str(u.pk),
+        'first_name': first,
+        'last_name': last,
+        'email': email,
         'department_id': str(dept.pk) if dept else None,
+        'department_name': dept.name if dept else '',
         'user': serialize_user(u),
         'department': serialize_dept(dept),
     }
@@ -835,12 +844,13 @@ def handle_hod(request, params, body):
         sql = """
             SELECT h.hod_id, h.user_id, h.department_id, h.address, h.firstname, h.lastname,
                    d.name AS dept_name, d.code AS dept_code,
-                   u.email AS user_email,
+                   COALESCE(u.email, u2.email) AS user_email,
                    f.faculty_id, f.first_name AS fac_first, f.last_name AS fac_last, f.employee_id
             FROM hod h
             LEFT JOIN departments d ON CAST(d.department_id AS TEXT) = CAST(h.department_id AS TEXT)
             LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(h.user_id AS TEXT) OR LOWER(CAST(h.user_id AS TEXT)) = LOWER(u.email)
-            LEFT JOIN faculty f ON CAST(f.user_id AS TEXT) = CAST(u.id AS TEXT) OR CAST(f.user_id AS TEXT) = CAST(h.user_id AS TEXT)
+            LEFT JOIN users u2 ON LOWER(u2.first_name) = LOWER(h.firstname) AND LOWER(u2.last_name) = LOWER(h.lastname)
+            LEFT JOIN faculty f ON CAST(f.user_id AS TEXT) = CAST(u.id AS TEXT) OR CAST(f.user_id AS TEXT) = CAST(h.user_id AS TEXT) OR (LOWER(f.first_name) = LOWER(h.firstname) AND LOWER(f.last_name) = LOWER(h.lastname))
             WHERE 1=1
         """
         args = []
@@ -872,6 +882,9 @@ def handle_hod(request, params, body):
             first = r.get('firstname') or r.get('fac_first') or ''
             last = r.get('lastname') or r.get('fac_last') or ''
             email = r.get('user_email') or ''
+
+            if not email and first and last:
+                email = f"{first.lower().replace(' ', '')}.{last.lower().replace(' ', '')}@lju.edu.in"
 
             if not first and not last and email:
                 first = email.split('@')[0].capitalize()
@@ -1668,11 +1681,11 @@ def handle_marks(request, params, body):
         """
         args = []
         if student_id:
-            sql += ' AND (CAST(m.student_id AS TEXT) = %s OR CAST(s.student_id AS TEXT) = %s)'
-            args.extend([student_id, student_id])
+            sql += ' AND (CAST(m.student_id AS TEXT) = %s OR CAST(s.student_id AS TEXT) = %s OR CAST(s.user_id AS TEXT) = %s OR LOWER(CAST(u.email AS TEXT)) = %s OR LOWER(CAST(s.enrollment_no AS TEXT)) = %s)'
+            args.extend([student_id, student_id, student_id, student_id.lower(), student_id.lower()])
         elif req_email and 'limit' not in params:
-            sql += ' AND LOWER(CAST(u.email AS TEXT)) = %s'
-            args.append(req_email)
+            sql += ' AND (LOWER(CAST(u.email AS TEXT)) = %s OR LOWER(CAST(s.parent_email AS TEXT)) = %s)'
+            args.extend([req_email, req_email])
 
         if subject_id:
             sql += ' AND (CAST(m.subject_id AS TEXT) = %s OR CAST(sub.subject_id AS TEXT) = %s)'
@@ -2319,7 +2332,50 @@ def handle_interchange_reject(request, params, body):
     if interchange_id:
         with connection.cursor() as cur:
             cur.execute("UPDATE lecture_interchanges SET status = 'rejected', reject_reason = %s WHERE interchange_id = %s", [reason, interchange_id])
-    return {'success': True, 'status': 'rejected'}
+def _safe_uuid(val, fallback='10db43be-116d-5131-80fe-0487e76961fb'):
+    if not val:
+        return fallback
+    val_str = str(val).strip()
+    if re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', val_str, re.I):
+        return val_str
+    try:
+        from django.db import connection
+        with connection.cursor() as cur:
+            cur.execute("SELECT CAST(faculty_id AS TEXT) FROM faculty WHERE CAST(user_id AS TEXT) = %s OR CAST(faculty_id AS TEXT) = %s LIMIT 1", [val_str, val_str])
+            r = cur.fetchone()
+            if r and r[0] and re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(r[0]), re.I):
+                return str(r[0])
+            
+            cur.execute("SELECT CAST(hod_id AS TEXT) FROM hod WHERE CAST(user_id AS TEXT) = %s OR CAST(hod_id AS TEXT) = %s LIMIT 1", [val_str, val_str])
+            r = cur.fetchone()
+            if r and r[0] and re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(r[0]), re.I):
+                return str(r[0])
+
+            cur.execute("SELECT CAST(student_id AS TEXT) FROM students WHERE CAST(user_id AS TEXT) = %s OR CAST(student_id AS TEXT) = %s LIMIT 1", [val_str, val_str])
+            r = cur.fetchone()
+            if r and r[0] and re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(r[0]), re.I):
+                return str(r[0])
+    except Exception:
+        pass
+    return fallback
+
+
+def _safe_dept_uuid(val):
+    if not val:
+        return None
+    val_str = str(val).strip()
+    if re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', val_str, re.I):
+        return val_str
+    try:
+        from django.db import connection
+        with connection.cursor() as cur:
+            cur.execute("SELECT CAST(department_id AS TEXT) FROM departments WHERE CAST(department_id AS TEXT) = %s OR code = %s LIMIT 1", [val_str, val_str])
+            r = cur.fetchone()
+            if r and r[0] and re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(r[0]), re.I):
+                return str(r[0])
+    except Exception:
+        pass
+    return None
 
 
 def resolve_user_department_id(user_id):
@@ -2427,14 +2483,14 @@ def handle_notices(request, params, body):
         target_audience = aud_map.get(raw_audience, 'all')
 
         notice_id = str(uuid.uuid4())
-        user_id = params.get('user_id') or getattr(request, 'user_id', None)
-        author_id = user_id if user_id else '10db43be-116d-5131-80fe-0487e76961fb'
-        notice_dept_id = body.get('department_id') or resolve_user_department_id(user_id)
+        raw_user_id = params.get('user_id') or getattr(request, 'user_id', None) or (request.headers.get('X-User-ID') if hasattr(request, 'headers') else None)
+        author_id = _safe_uuid(raw_user_id)
+        notice_dept_id = _safe_dept_uuid(body.get('department_id')) or _safe_dept_uuid(resolve_user_department_id(raw_user_id))
 
         with connection.cursor() as cur:
             cur.execute("""
                 INSERT INTO notices (notice_id, author_id, author_role, title, content, target_audience, priority, published_at, is_active, department_id)
-                VALUES (%s, %s, 'admin', %s, %s, %s, %s, NOW(), TRUE, %s)
+                VALUES (%s, %s, 'faculty', %s, %s, %s, %s, NOW(), TRUE, %s)
             """, [notice_id, author_id, title, content, target_audience, priority, notice_dept_id])
 
         return {
@@ -3063,14 +3119,14 @@ def handle_notices(request, params, body):
         target_audience = aud_map.get(raw_audience, 'all')
 
         notice_id = str(uuid.uuid4())
-        user_id = params.get('user_id') or getattr(request, 'user_id', None)
-        author_id = user_id if user_id else '10db43be-116d-5131-80fe-0487e76961fb'
-        notice_dept_id = body.get('department_id') or resolve_user_department_id(user_id)
+        raw_user_id = params.get('user_id') or getattr(request, 'user_id', None) or (request.headers.get('X-User-ID') if hasattr(request, 'headers') else None)
+        author_id = _safe_uuid(raw_user_id)
+        notice_dept_id = _safe_dept_uuid(body.get('department_id')) or _safe_dept_uuid(resolve_user_department_id(raw_user_id))
 
         with connection.cursor() as cur:
             cur.execute("""
                 INSERT INTO notices (notice_id, author_id, author_role, title, content, target_audience, priority, published_at, is_active, department_id)
-                VALUES (%s, %s, 'admin', %s, %s, %s, %s, NOW(), TRUE, %s)
+                VALUES (%s, %s, 'faculty', %s, %s, %s, %s, NOW(), TRUE, %s)
             """, [notice_id, author_id, title, content, target_audience, priority, notice_dept_id])
 
         return {

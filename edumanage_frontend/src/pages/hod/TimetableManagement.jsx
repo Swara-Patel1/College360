@@ -145,7 +145,7 @@ export default function TimetableManagement() {
   useEffect(() => { if (user) loadData(); }, [user]);
 
   const filteredTimetable = useMemo(() => {
-    const activeDeptId = deptId || (selectedDeptFilter !== 'all' ? selectedDeptFilter : '');
+    const activeDeptId = (selectedDeptFilter && selectedDeptFilter !== 'all') ? selectedDeptFilter : (deptId || '');
     return timetable.filter(s => {
       let matchDept = !activeDeptId;
       if (!matchDept) {
@@ -159,7 +159,12 @@ export default function TimetableManagement() {
           s.department_name.toLowerCase() === activeDeptId.toLowerCase() ||
           (targetName && s.department_name.toLowerCase() === targetName)
         );
-        const matchCode = s._courseCode && targetCode && s._courseCode.toLowerCase().startsWith(targetCode);
+        const courseCode = (s.course_code || s.subject_code || s._courseCode || '').toLowerCase();
+        const matchCode = targetCode && courseCode && (
+          courseCode.startsWith(targetCode) || 
+          (targetCode === 'ce' && courseCode.startsWith('ce')) ||
+          (targetCode === 'cv' && (courseCode.startsWith('cv') || courseCode.startsWith('civil')))
+        );
         matchDept = matchId || matchName || matchCode;
       }
 
@@ -319,11 +324,10 @@ export default function TimetableManagement() {
         gap: '16px',
         marginBottom: '20px',
         padding: '12px 18px',
-        background: 'linear-gradient(135deg, rgba(26, 31, 55, 0.85) 0%, rgba(19, 23, 46, 0.85) 100%)',
-        border: '1px solid rgba(108, 99, 255, 0.25)',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border)',
         borderRadius: '14px',
-        backdropFilter: 'blur(12px)',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)'
+        boxShadow: 'var(--shadow-sm)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
           {/* Department Filter */}
@@ -333,7 +337,7 @@ export default function TimetableManagement() {
               height: '32px',
               borderRadius: '8px',
               background: 'rgba(108, 99, 255, 0.15)',
-              color: '#6C63FF',
+              color: 'var(--primary-light)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -341,14 +345,14 @@ export default function TimetableManagement() {
             }}>
               <i className="bi bi-building"></i>
             </div>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Department:</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Department:</span>
             <select
               className="form-control"
               style={{
                 minWidth: '220px',
-                background: 'rgba(20, 24, 40, 0.8)',
-                color: '#FFFFFF',
-                border: '1px solid rgba(108, 99, 255, 0.3)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
                 borderRadius: '8px',
                 padding: '7px 12px',
                 fontSize: '0.875rem',
@@ -360,7 +364,7 @@ export default function TimetableManagement() {
               onChange={(e) => setSelectedDeptFilter(e.target.value)}
             >
               {departments.map(d => (
-                <option key={d.department_id || d.id} value={d.department_id || d.id} style={{ background: '#141828', color: '#FFF' }}>
+                <option key={d.department_id || d.id} value={d.department_id || d.id}>
                   {d.name}
                 </option>
               ))}
@@ -382,14 +386,14 @@ export default function TimetableManagement() {
             }}>
               <i className="bi bi-layers"></i>
             </div>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Semester:</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Semester:</span>
             <select
               className="form-control"
               style={{
                 minWidth: '160px',
-                background: 'rgba(20, 24, 40, 0.8)',
-                color: '#FFFFFF',
-                border: '1px solid rgba(0, 212, 170, 0.35)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
                 borderRadius: '8px',
                 padding: '7px 12px',
                 fontSize: '0.875rem',
@@ -400,21 +404,21 @@ export default function TimetableManagement() {
               value={selectedSemesterFilter}
               onChange={(e) => setSelectedSemesterFilter(e.target.value)}
             >
-              <option value="all" style={{ background: '#141828', color: '#FFF' }}>All Semesters</option>
-              <option value="1" style={{ background: '#141828', color: '#FFF' }}>Semester 1</option>
-              <option value="2" style={{ background: '#141828', color: '#FFF' }}>Semester 2</option>
-              <option value="3" style={{ background: '#141828', color: '#FFF' }}>Semester 3</option>
-              <option value="4" style={{ background: '#141828', color: '#FFF' }}>Semester 4</option>
-              <option value="5" style={{ background: '#141828', color: '#FFF' }}>Semester 5</option>
-              <option value="6" style={{ background: '#141828', color: '#FFF' }}>Semester 6</option>
-              <option value="7" style={{ background: '#141828', color: '#FFF' }}>Semester 7</option>
-              <option value="8" style={{ background: '#141828', color: '#FFF' }}>Semester 8</option>
+              <option value="all">All Semesters</option>
+              <option value="1">Semester 1</option>
+              <option value="2">Semester 2</option>
+              <option value="3">Semester 3</option>
+              <option value="4">Semester 4</option>
+              <option value="5">Semester 5</option>
+              <option value="6">Semester 6</option>
+              <option value="7">Semester 7</option>
+              <option value="8">Semester 8</option>
             </select>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span className="badge badge-info" style={{ padding: '6px 12px', fontSize: '0.78rem', borderRadius: '8px', background: 'rgba(108, 99, 255, 0.2)', border: '1px solid rgba(108, 99, 255, 0.4)', color: 'var(--primary-light)' }}>
+          <span className="badge badge-info" style={{ padding: '6px 12px', fontSize: '0.78rem', borderRadius: '8px' }}>
             {filteredTimetable.length} {filteredTimetable.length === 1 ? 'Slot' : 'Slots'}
           </span>
 

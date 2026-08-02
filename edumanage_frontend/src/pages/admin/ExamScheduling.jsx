@@ -196,10 +196,35 @@ export default function ExamScheduling() {
   };
   const openEdit = (e) => {
     setEditing(e);
+    let matchedCourseId = e.course_id || e.subject_id || e.course?.subject_id || e.course?.id || '';
+    if (!courses.some(c => String(c.subject_id || c.id) === String(matchedCourseId))) {
+      const targetCode = (e.course_code || e.subject_code || e.code || e.course?.code || '').toLowerCase();
+      const targetName = (e.course_name || e.subject_name || e.name || e.course?.name || '').toLowerCase();
+      const found = courses.find(c => {
+        const cId = String(c.subject_id || c.id).toLowerCase();
+        const cCode = (c.code || c.subject_code || '').toLowerCase();
+        const cName = (c.name || c.subject_name || '').toLowerCase();
+        return (
+          (matchedCourseId && cId === String(matchedCourseId).toLowerCase()) ||
+          (targetCode && cCode === targetCode) ||
+          (targetName && cName === targetName)
+        );
+      });
+      if (found) {
+        matchedCourseId = found.subject_id || found.id;
+      }
+    }
+
     setForm({
-      course_id: e.course_id, exam_type: e.exam_type, date: e.date,
-      start_time: e.start_time, end_time: e.end_time, room: e.room,
-      building: e.building, max_marks: e.max_marks, seats_per_room: e.seats_per_room,
+      course_id: matchedCourseId,
+      exam_type: e.exam_type || 'endsem',
+      date: e.date || '',
+      start_time: e.start_time || '10:00',
+      end_time: e.end_time || '13:00',
+      room: e.room || '',
+      building: e.building || 'Main Campus',
+      max_marks: e.max_marks || 100,
+      seats_per_room: e.seats_per_room || 30,
     });
     setIsCustomRoom(false);
     setFormOpen(true);
@@ -276,9 +301,8 @@ export default function ExamScheduling() {
 
       {/* ── Sleek Filter Bar ── */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(26, 31, 55, 0.85) 0%, rgba(19, 23, 46, 0.85) 100%)',
-        backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(108, 99, 255, 0.25)',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border)',
         borderRadius: '14px',
         padding: '12px 18px',
         marginBottom: '20px',
@@ -287,26 +311,26 @@ export default function ExamScheduling() {
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '16px',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
+        boxShadow: 'var(--shadow-sm)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6C63FF', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.5px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary-light)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.5px' }}>
             <i className="bi bi-funnel-fill" style={{ fontSize: '1.05rem' }}></i>
             <span>FILTERS</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <i className="bi bi-building" style={{ color: 'var(--primary-light)' }}></i> Department:
             </span>
             <select
               className="form-control"
               style={{
                 width: '240px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(108, 99, 255, 0.35)',
+                background: 'var(--bg-primary)',
+                border: '1px solid var(--border)',
                 borderRadius: '10px',
-                color: 'var(--text-main)',
+                color: 'var(--text-primary)',
                 fontWeight: 600,
                 fontSize: '0.85rem',
                 padding: '6px 12px',
@@ -316,7 +340,7 @@ export default function ExamScheduling() {
               onChange={(e) => setSelectedDept(e.target.value)}
             >
               {departments.map(d => (
-                <option key={d.department_id || d.id} value={d.department_id || d.id} style={{ background: '#1a1f37', color: '#fff' }}>
+                <option key={d.department_id || d.id} value={d.department_id || d.id}>
                   {d.name}
                 </option>
               ))}
@@ -324,17 +348,17 @@ export default function ExamScheduling() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <i className="bi bi-layers" style={{ color: 'var(--primary-light)' }}></i> Semester:
             </span>
             <select
               className="form-control"
               style={{
                 width: '160px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(108, 99, 255, 0.35)',
+                background: 'var(--bg-primary)',
+                border: '1px solid var(--border)',
                 borderRadius: '10px',
-                color: 'var(--text-main)',
+                color: 'var(--text-primary)',
                 fontWeight: 600,
                 fontSize: '0.85rem',
                 padding: '6px 12px',
@@ -343,15 +367,15 @@ export default function ExamScheduling() {
               value={selectedSem}
               onChange={(e) => setSelectedSem(e.target.value)}
             >
-              <option value="all" style={{ background: '#1a1f37', color: '#fff' }}>All Semesters</option>
-              <option value="1" style={{ background: '#1a1f37', color: '#fff' }}>Semester 1</option>
-              <option value="2" style={{ background: '#1a1f37', color: '#fff' }}>Semester 2</option>
-              <option value="3" style={{ background: '#1a1f37', color: '#fff' }}>Semester 3</option>
-              <option value="4" style={{ background: '#1a1f37', color: '#fff' }}>Semester 4</option>
-              <option value="5" style={{ background: '#1a1f37', color: '#fff' }}>Semester 5</option>
-              <option value="6" style={{ background: '#1a1f37', color: '#fff' }}>Semester 6</option>
-              <option value="7" style={{ background: '#1a1f37', color: '#fff' }}>Semester 7</option>
-              <option value="8" style={{ background: '#1a1f37', color: '#fff' }}>Semester 8</option>
+              <option value="all">All Semesters</option>
+              <option value="1">Semester 1</option>
+              <option value="2">Semester 2</option>
+              <option value="3">Semester 3</option>
+              <option value="4">Semester 4</option>
+              <option value="5">Semester 5</option>
+              <option value="6">Semester 6</option>
+              <option value="7">Semester 7</option>
+              <option value="8">Semester 8</option>
             </select>
           </div>
 

@@ -218,16 +218,15 @@ export default function Grades() {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '12px',
         marginBottom: '20px',
         padding: '12px 18px',
-        background: 'linear-gradient(135deg, rgba(26, 31, 55, 0.85) 0%, rgba(19, 23, 46, 0.85) 100%)',
-        border: '1px solid rgba(108, 99, 255, 0.25)',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border)',
         borderRadius: '14px',
-        backdropFilter: 'blur(12px)',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)'
+        boxShadow: 'var(--shadow-sm)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
@@ -235,7 +234,7 @@ export default function Grades() {
             height: '32px',
             borderRadius: '8px',
             background: 'rgba(108, 99, 255, 0.15)',
-            color: '#6C63FF',
+            color: 'var(--primary-light)',
             display: 'flex',
             alignItems: 'center',
             justify: 'center',
@@ -243,14 +242,14 @@ export default function Grades() {
           }}>
             <i className="bi bi-layers"></i>
           </div>
-          <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Semester:</span>
+          <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>Semester:</span>
           <select
             className="form-control"
             style={{
               minWidth: '170px',
-              background: 'rgba(20, 24, 40, 0.8)',
-              color: '#FFFFFF',
-              border: '1px solid rgba(108, 99, 255, 0.35)',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
               borderRadius: '8px',
               padding: '6px 12px',
               fontSize: '0.875rem',
@@ -261,9 +260,9 @@ export default function Grades() {
             value={selectedSemester}
             onChange={(e) => setSelectedSemester(e.target.value)}
           >
-            <option value="all" style={{ background: '#141828', color: '#FFF' }}>All Semesters</option>
+            <option value="all">All Semesters</option>
             {availableSemesters.map(s => (
-              <option key={s} value={s} style={{ background: '#141828', color: '#FFF' }}>
+              <option key={s} value={s}>
                 Semester {s} {String(s) === String(currentSemester) ? '(Current)' : ''}
               </option>
             ))}
@@ -386,15 +385,15 @@ export default function Grades() {
                                     fontWeight: 600,
                                     borderRadius: '6px',
                                     background: 'rgba(108, 99, 255, 0.12)',
-                                    color: '#E2E8F0',
+                                    color: 'var(--text-primary)',
                                     border: '1px solid rgba(108, 99, 255, 0.25)',
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '4px'
                                   }}
                                 >
-                                  <span style={{ color: '#A0AEC0', fontWeight: 500 }}>{label}:</span>
-                                  <span style={{ color: '#818CF8', fontWeight: 700 }}>{val} {maxM}</span>
+                                  <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>{label}:</span>
+                                  <span style={{ color: 'var(--primary-light)', fontWeight: 700 }}>{val} {maxM}</span>
                                 </span>
                               );
                             })}

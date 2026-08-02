@@ -25,15 +25,37 @@ def _extract_features(student_input):
         if r:
             student_id_str = r[0]
 
-        # 1. Marks & CPI
+        # 1. Marks & CPI (Dynamically parsed from JSON marks)
         cur.execute("""
-            SELECT grade_points, grade FROM marks
+            SELECT marks, grade_points, grade FROM marks
             WHERE CAST(student_id AS TEXT) = %s
         """, [student_id_str])
         marks_rows = cur.fetchall()
-        if marks_rows:
-            cpi = round(sum(float(m[0] or 0) for m in marks_rows) / len(marks_rows), 2)
-            active_backlogs = sum(1 for m in marks_rows if (m[1] or '').upper() in ('F', 'FF'))
+        gps = []
+        backlog_cnt = 0
+        import json
+        for r in marks_rows:
+            raw_m, gp, gr = r[0], r[1], r[2]
+            if (gr or '').upper() in ('F', 'FF'):
+                backlog_cnt += 1
+
+            if isinstance(raw_m, str):
+                try:
+                    raw_m = json.loads(raw_m)
+                except Exception:
+                    raw_m = {}
+
+            if isinstance(raw_m, dict) and raw_m:
+                obtained = sum(float(v) for v in raw_m.values() if isinstance(v, (int, float, str)) and str(v).replace('.', '', 1).isdigit())
+                total = 200.0 if obtained > 100 or len(raw_m) > 2 else 100.0
+                pct = (obtained / total * 100.0) if total > 0 else 0.0
+                gps.append(pct / 10.0)
+            elif gp is not None and float(gp) > 0:
+                gps.append(float(gp))
+
+        if gps:
+            cpi = round(sum(gps) / len(gps), 2)
+            active_backlogs = backlog_cnt
         else:
             cpi, active_backlogs = 0.0, 0
 

@@ -22,12 +22,12 @@ import '../css/chatbot.css';
 
 // ── Suggested Questions shown in the welcome state ──
 const SUGGESTED_QUESTIONS = [
+  { icon: <i className="bi bi-code-slash" />, text: 'Write a Python binary search code' },
+  { icon: <i className="bi bi-calculator" />, text: 'Help me solve an algebra equation' },
   { icon: <i className="bi bi-bar-chart-line" />, text: 'What is my attendance percentage?' },
   { icon: <i className="bi bi-crosshair" />, text: 'Am I eligible for placements?' },
   { icon: <i className="bi bi-calendar3" />, text: "Show today's timetable" },
-  { icon: <i className="bi bi-balloon" />, text: 'What are upcoming events?' },
-  { icon: <i className="bi bi-journal-bookmark" />, text: 'Recommend courses for me' },
-  { icon: <i className="bi bi-building" />, text: 'Which companies can I apply to?' },
+  { icon: <i className="bi bi-envelope-paper" />, text: 'Draft a professional leave email' },
 ];
 
 export default function ChatBot() {
@@ -287,7 +287,7 @@ export default function ChatBot() {
                   Hi{user?.first_name ? ` ${user.first_name}` : ''}!
                 </div>
                 <div className="chatbot-welcome-subtitle">
-                  I'm your LJU Student Assistant. Ask me about your attendance, grades, timetable, fees, placements, or anything university-related!
+                  I'm your AI Assistant. Ask me anything — coding, math, general questions, essay writing, or your attendance, grades & timetable!
                 </div>
 
                 {/* Suggested Questions */}

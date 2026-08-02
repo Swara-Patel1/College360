@@ -94,10 +94,19 @@ export default function ManageHOD() {
     return !hods.some(h => (h.department_id || h.department?.department_id || h.department?.id) === dId);
   });
 
+  const getHodEmail = (h) => {
+    if (h.email) return h.email;
+    if (h.user?.email) return h.user.email;
+    const fn = h.first_name || h.user?.first_name || '';
+    const ln = h.last_name || h.user?.last_name || '';
+    if (fn && ln) return `${fn.toLowerCase().replace(/\s+/g, '')}.${ln.toLowerCase().replace(/\s+/g, '')}@lju.edu.in`;
+    return '—';
+  };
+
   const filtered = hods.filter(h => {
     const q = searchQuery.toLowerCase();
     const name = `${h.first_name || h.user?.first_name || ''} ${h.last_name || h.user?.last_name || ''}`.trim().toLowerCase();
-    const email = (h.email || h.user?.email || '').toLowerCase();
+    const email = getHodEmail(h).toLowerCase();
     const deptName = (h.department_name || h.department?.name || '').toLowerCase();
     return name.includes(q) || email.includes(q) || deptName.includes(q);
   });
@@ -205,7 +214,7 @@ export default function ManageHOD() {
                       <span className="badge badge-info" style={{ marginLeft: '8px' }}>HOD</span>
                     </td>
                     <td>{h.department_name || h.department?.name || '—'}</td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{h.email || h.user?.email || '—'}</td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{getHodEmail(h)}</td>
                     {isAdmin && (
                       <td style={{ textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>

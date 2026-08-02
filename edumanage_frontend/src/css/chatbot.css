@@ -10,27 +10,24 @@
   bottom: 28px;
   right: 28px;
   z-index: 9998;
-  width: 60px;
-  height: 60px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: none;
   background: var(--gradient-primary);
   color: #fff;
-  font-size: 26px;
+  font-size: 24px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 30px rgba(108, 99, 255, 0.45),
-              0 0 60px rgba(108, 99, 255, 0.15);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
   transition: var(--transition);
-  animation: chatbot-fab-entrance 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .chatbot-fab:hover {
-  transform: scale(1.1);
-  box-shadow: 0 8px 40px rgba(108, 99, 255, 0.55),
-              0 0 80px rgba(108, 99, 255, 0.2);
+  transform: scale(1.05);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
 }
 
 .chatbot-fab:active {
@@ -42,35 +39,7 @@
 }
 
 .chatbot-fab.open:hover {
-  transform: rotate(90deg) scale(1.1);
-}
-
-/* Pulse ring animation behind FAB */
-.chatbot-fab::before {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  background: var(--gradient-primary);
-  opacity: 0;
-  z-index: -1;
-  animation: chatbot-pulse 2.5s ease-out infinite;
-}
-
-.chatbot-fab.open::before {
-  animation: none;
-  opacity: 0;
-}
-
-@keyframes chatbot-pulse {
-  0% {
-    transform: scale(1);
-    opacity: 0.5;
-  }
-  100% {
-    transform: scale(1.8);
-    opacity: 0;
-  }
+  transform: rotate(90deg) scale(1.05);
 }
 
 @keyframes chatbot-fab-entrance {
