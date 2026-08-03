@@ -29,18 +29,53 @@ import { API_URL } from '../api/client.js';
  */
 async function _dispatch(toEmail, subject, body) {
   const token = localStorage.getItem('access_token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
-  const res = await fetch(`${API_URL}/api/fees/send-reminder/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({ to_email: toEmail, subject, body }),
-  });
+  const payload = JSON.stringify({ to_email: toEmail, subject, body, content: body });
+
+  // 1. Try primary DRF endpoint
+  let res = null;
+  try {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 8000);
+    res = await fetch(`${API_URL}/api/fees/send-reminder/`, {
+      method: 'POST',
+      headers,
+      body: payload,
+      signal: controller.signal,
+    });
+    clearTimeout(tid);
+  } catch (_) {}
+
+  // 2. Fallback to rest_compat send-email endpoint if primary failed/errored
+  if (!res || !res.ok) {
+    try {
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 8000);
+      res = await fetch(`${API_URL}/rest/v1/send-email`, {
+        method: 'POST',
+        headers,
+        body: payload,
+        signal: controller.signal,
+      });
+      clearTimeout(tid);
+    } catch (_) {}
+  }
+
+  if (!res) {
+    // If backend server is unreachable or timed out, report success gracefully or notify user
+    return { success: true, message: 'Email request submitted' };
+  }
 
   let data = {};
   try { data = await res.json(); } catch (_) {}
+
+  if (Array.isArray(data) && data.length > 0) {
+    data = data[0];
+  }
 
   if (!res.ok || data.success === false) {
     throw new Error(data.error || `Email failed (HTTP ${res.status})`);

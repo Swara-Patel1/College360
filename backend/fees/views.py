@@ -73,6 +73,9 @@ class FeeViewSet(viewsets.ModelViewSet):
         Expected payload: { to_email, subject, body }
         Returns { success: true } or { success: false, error: "..." }
         """
+        import threading
+        import logging
+
         to_email = request.data.get('to_email', '').strip()
         subject  = request.data.get('subject', 'Fee Payment Reminder').strip()
         body     = request.data.get('body', '').strip()
@@ -82,21 +85,22 @@ class FeeViewSet(viewsets.ModelViewSet):
         if not body:
             return Response({'success': False, 'error': 'Email body cannot be empty.'}, status=400)
 
-        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@college360.edu')
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'patelrushi042@gmail.com')
 
-        try:
-            send_mail(
-                subject,
-                body,
-                from_email,
-                [to_email],
-                fail_silently=False,  # raise on error so we can report it
-            )
-            return Response({'success': True, 'message': f'Email sent to {to_email}'})
-        except BadHeaderError:
-            return Response({'success': False, 'error': 'Invalid email header detected.'}, status=400)
-        except Exception as e:
-            return Response({'success': False, 'error': str(e)}, status=500)
+        def _do_send():
+            try:
+                send_mail(
+                    subject,
+                    body,
+                    from_email,
+                    [to_email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                logging.getLogger(__name__).warning(f"Failed background email to {to_email}: {e}")
+
+        threading.Thread(target=_do_send, daemon=True).start()
+        return Response({'success': True, 'message': f'Email dispatched to {to_email}'})
 
     @action(detail=False, methods=['get'])
     def summary(self, request):

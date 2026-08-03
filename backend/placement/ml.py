@@ -30,8 +30,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    confusion_matrix, roc_auc_score,
+    accuracy_score, confusion_matrix, r2_score,
 )
 
 try:
@@ -148,6 +147,21 @@ def train(model_type=DEFAULT_MODEL, persist=True):
     else:
         y_pred = model.predict(X_te).astype(int)
 
+    # Confusion matrix → TP, TN, FP, FN
+    cm = confusion_matrix(y_te, y_pred)
+    if cm.shape == (2, 2):
+        tn, fp, fn, tp = cm.ravel()
+        sensitivity = round(float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0, 4)  # recall
+        specificity = round(float(tn / (tn + fp)) if (tn + fp) > 0 else 0.0, 4)  # true negative rate
+    else:
+        sensitivity = specificity = None
+
+    # R² score (coefficient of determination)
+    try:
+        r2 = round(float(r2_score(y_te, y_pred)), 4)
+    except Exception:
+        r2 = None
+
     metrics = {
         'model_type': model_type,
         'algorithm': type(model.steps[-1][1]).__name__ if hasattr(model, 'steps') else type(model).__name__,
@@ -157,20 +171,12 @@ def train(model_type=DEFAULT_MODEL, persist=True):
         'n_test': int(len(X_te)),
         'features': FEATURE_NAMES,
         'accuracy': round(float(accuracy_score(y_te, y_pred)), 4),
-        'precision': round(float(precision_score(y_te, y_pred, zero_division=0)), 4),
-        'recall': round(float(recall_score(y_te, y_pred, zero_division=0)), 4),
-        'f1': round(float(f1_score(y_te, y_pred, zero_division=0)), 4),
-        'confusion_matrix': confusion_matrix(y_te, y_pred).tolist(),
+        'sensitivity': sensitivity,
+        'specificity': specificity,
+        'r2': r2,
+        'confusion_matrix': cm.tolist(),
         'feature_importance': _feature_importances(model),
     }
-
-    # ROC-AUC where the model can produce probabilities
-    try:
-        if hasattr(model, 'predict_proba'):
-            proba = model.predict_proba(X_te)[:, 1]
-            metrics['roc_auc'] = round(float(roc_auc_score(y_te, proba)), 4)
-    except Exception:
-        pass
 
     # 5-fold cross-validation (skipped for the continuous regressor)
     if not is_regression:
@@ -231,11 +237,23 @@ def get_model(model_type=None):
 
 
 def get_metrics(model_type=None):
-    """Return the evaluation metrics for the active (or requested) model."""
-    global _METRICS
+    """Return the evaluation metrics for the active (or requested) model.
+
+    If the cached metrics are from an older schema (missing sensitivity /
+    specificity / r2), force a retrain so the new keys are populated.
+    """
+    global _MODEL, _METRICS
     get_model(model_type)
     if _METRICS is None:
         _, _METRICS = train(model_type or _MODEL_TYPE, persist=True)
+
+    # ── schema migration: retrain if new metric keys are absent ──────────────
+    _NEW_KEYS = {'sensitivity', 'specificity', 'r2'}
+    if not _NEW_KEYS.issubset(_METRICS.keys()):
+        with _LOCK:
+            if not _NEW_KEYS.issubset(_METRICS.keys()):  # double-checked
+                _MODEL, _METRICS = train(model_type or _MODEL_TYPE, persist=True)
+
     return _METRICS
 
 

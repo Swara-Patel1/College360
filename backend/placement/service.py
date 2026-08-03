@@ -134,6 +134,14 @@ def compute_placement(student):
             if cpi >= float(min_cpi or 0) and backlogs <= int(max_b or 0) and attendance_pct >= float(min_att or 0):
                 eligible_ids.append(cid)
 
+    # Attach model evaluation metrics for UI display.
+    metrics = ml.get_metrics()
+    model_accuracy = metrics.get('accuracy')
+    model_sensitivity = metrics.get('sensitivity')
+    model_specificity = metrics.get('specificity')
+    model_r2 = metrics.get('r2')
+    cv_accuracy = metrics.get('cv_accuracy_mean')
+
     return {
         'student_id': student_id_str,
         'total_score': total_score,
@@ -151,4 +159,10 @@ def compute_placement(student):
         'improvement_tips': _tips(cpi, attendance_pct, backlogs, extra_count, category),
         'model': f'{ml._MODEL_TYPE} (scikit-learn)',
         'computed_at': timezone.now().isoformat(),
+        # ML evaluation metrics exposed to the student UI
+        'model_accuracy': round(model_accuracy * 100, 1) if model_accuracy is not None else None,
+        'model_sensitivity': round(model_sensitivity * 100, 1) if model_sensitivity is not None else None,
+        'model_specificity': round(model_specificity * 100, 1) if model_specificity is not None else None,
+        'model_r2': round(model_r2 * 100, 1) if model_r2 is not None else None,
+        'model_cv_accuracy': round(cv_accuracy * 100, 1) if cv_accuracy is not None else None,
     }

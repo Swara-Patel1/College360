@@ -197,9 +197,67 @@ export default function Placement() {
               {scoreData ? getCategoryMessage(category, score) : 'Not enough academic history yet.'}
             </h3>
             {scoreData?.placement_probability != null && (
-              <span className="badge badge-info" style={{ marginBottom: '8px' }}>
+              <span className="badge badge-info" style={{ marginBottom: '6px' }}>
                 <i className="bi bi-robot"></i> ML model · {Math.round(scoreData.placement_probability * 100)}% placement probability
               </span>
+            )}
+            {scoreData?.model_accuracy != null && (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '8px' }}>
+                <span
+                  title="Model accuracy on held-out test set"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '5px',
+                    background: 'rgba(108,99,255,0.15)', border: '1px solid rgba(108,99,255,0.35)',
+                    color: '#a09aff', borderRadius: '6px', padding: '3px 10px',
+                    fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em'
+                  }}
+                >
+                  <i className="bi bi-cpu" style={{ fontSize: '0.75rem' }}></i>
+                  Accuracy&nbsp;<span style={{ color: '#fff', fontWeight: 800 }}>{scoreData.model_accuracy}%</span>
+                </span>
+                {scoreData.model_sensitivity != null && (
+                  <span
+                    title="Sensitivity (Recall) — % of placed students correctly identified by the model"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '5px',
+                      background: 'rgba(0,212,170,0.12)', border: '1px solid rgba(0,212,170,0.3)',
+                      color: '#00D4AA', borderRadius: '6px', padding: '3px 10px',
+                      fontSize: '0.72rem', fontWeight: 700
+                    }}
+                  >
+                    <i className="bi bi-activity" style={{ fontSize: '0.72rem' }}></i>
+                    Sensitivity&nbsp;<span style={{ color: '#fff', fontWeight: 800 }}>{scoreData.model_sensitivity}%</span>
+                  </span>
+                )}
+                {scoreData.model_specificity != null && (
+                  <span
+                    title="Specificity — % of non-placed students correctly identified (True Negative Rate)"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '5px',
+                      background: 'rgba(255,159,67,0.12)', border: '1px solid rgba(255,159,67,0.3)',
+                      color: '#FF9F43', borderRadius: '6px', padding: '3px 10px',
+                      fontSize: '0.72rem', fontWeight: 700
+                    }}
+                  >
+                    <i className="bi bi-shield-check" style={{ fontSize: '0.72rem' }}></i>
+                    Specificity&nbsp;<span style={{ color: '#fff', fontWeight: 800 }}>{scoreData.model_specificity}%</span>
+                  </span>
+                )}
+                {scoreData.model_r2 != null && (
+                  <span
+                    title="R² Score — how well the model fits the data (coefficient of determination)"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '5px',
+                      background: 'rgba(255,107,107,0.12)', border: '1px solid rgba(255,107,107,0.3)',
+                      color: '#FF6B6B', borderRadius: '6px', padding: '3px 10px',
+                      fontSize: '0.72rem', fontWeight: 700
+                    }}
+                  >
+                    <i className="bi bi-graph-up-arrow" style={{ fontSize: '0.72rem' }}></i>
+                    R²&nbsp;<span style={{ color: '#fff', fontWeight: 800 }}>{scoreData.model_r2}%</span>
+                  </span>
+                )}
+              </div>
             )}
             <p id="scoreComputedAt" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               {scoreData
