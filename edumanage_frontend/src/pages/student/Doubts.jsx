@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { API, Utils, SupaAPI } from '../../api/client.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
+import { Toast } from '../../store/useNotifStore.js';
 import Modal from '../../components/Modal.jsx';
 
 // Minimal renderer for the AI answer's **bold** + newline formatting.
@@ -17,7 +18,7 @@ function renderRich(text) {
 }
 
 export default function Doubts() {
-  const { user } = useAuthStore();
+  const { user, studentProfile } = useAuthStore();
   const [allDoubts, setAllDoubts] = useState([]);
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -31,6 +32,7 @@ export default function Doubts() {
 
   const fetchDoubts = async () => {
     try {
+      // Pass user.id — backend resolves it to student_id via user_id lookup
       const data = await SupaAPI.doubts.byStudent(user.id);
       setAllDoubts(Array.isArray(data) ? data : (data?.results || []));
     } catch (e) {
@@ -159,29 +161,39 @@ export default function Doubts() {
 
     try {
       setIsSubmitting(true);
-      
+
+      // Use real student_id from profile; fall back to user.id (backend resolves both)
+      const studentId = studentProfile?.student_id || studentProfile?.id || user.id;
+
       // Calculate SLA deadline: +72 hours (3 days) from now
       const slaDeadline = new Date();
       slaDeadline.setHours(slaDeadline.getHours() + 72);
 
-      await SupaAPI.doubts.add({
-        student_id: user.id,
-        student_name: `${user.first_name} ${user.last_name}`.trim(),
+      const result = await SupaAPI.doubts.add({
+        student_id: studentId,
+        student_name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
         subject_id: selectedSubjectId,
         subject_name: name,
         subject_code: code,
         question: questionText.trim(),
-        assigned_faculty_id: facId,
-        faculty_id: facId,
+        assigned_faculty_id: facId || null,
+        faculty_id: facId || null,
         status: 'open',
         submitted_at: new Date().toISOString(),
         sla_deadline: slaDeadline.toISOString()
       });
 
+      if (!result) throw new Error('No response from server');
+
       setIsOpen(false);
+      setQuestionText('');
+      setSelectedSubjectId('');
+      Toast.success('Doubt submitted successfully!');
       fetchDoubts();
     } catch (err) {
-      alert('Failed to submit doubt: ' + (err.message || JSON.stringify(err)));
+      console.error('Submit doubt error:', err);
+      const msg = err?.message || err?.error || JSON.stringify(err);
+      Toast.error('Failed to submit doubt: ' + msg);
     } finally {
       setIsSubmitting(false);
     }

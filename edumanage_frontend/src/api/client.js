@@ -1376,15 +1376,7 @@ export const DataAPI = {
     all:        ()       => API.get('placement_scores?order=total_score.desc'),
   },
 
-  doubts: {
-    byStudent: (userId)  => API.get(`doubts?student_id=eq.${userId}`),
-    all:       ()        => API.get('doubts'),
-    add:       (data)    => API.post('doubts', data),
-    update:    (id, d)   => API.patch(`doubts?doubt_id=eq.${id}`, d),
-    acceptAI:  (id)      => API.patch(`doubts?doubt_id=eq.${id}`, { action: 'accept_ai', status: 'resolved' }),
-    escalate:  (id)      => API.patch(`doubts?doubt_id=eq.${id}`, { action: 'escalate', status: 'escalated' }),
-    resolve:   (id, res) => API.patch(`doubts?doubt_id=eq.${id}`, { resolution: res }),
-  },
+
 
   wellness: {
     history: (studId, limit = 12) => API.get(`wellness_records?student_id=eq.${studId}&order=assessment_date.desc&limit=${limit}`),
